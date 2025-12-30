@@ -8,20 +8,25 @@ export function DonutChart({ data, size = 150, thickness = 20 }) {
   );
   
   const segments = useMemo(() => {
+    const result = [];
     let currentAngle = -90; // Start from top
     
-    return data.map((d) => {
+    for (const d of data) {
       const angle = (d.value / total) * 360;
       const startAngle = currentAngle;
-      currentAngle += angle;
+      const endAngle = currentAngle + angle;
       
-      return {
+      result.push({
         ...d,
         startAngle,
-        endAngle: currentAngle,
+        endAngle,
         percent: ((d.value / total) * 100).toFixed(1),
-      };
-    });
+      });
+      
+      currentAngle = endAngle;
+    }
+    
+    return result;
   }, [data, total]);
   
   const center = size / 2;

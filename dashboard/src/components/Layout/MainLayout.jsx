@@ -6,7 +6,7 @@ import './MainLayout.css';
 
 export function MainLayout({ user }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [notifications, setNotifications] = useState([]);
+  const [notifications] = useState([]);
   
   return (
     <div className={`app-layout ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
