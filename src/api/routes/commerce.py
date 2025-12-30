@@ -91,11 +91,11 @@ def get_commerce_agent() -> CommerceAgent:
         _commerce_agent = CommerceAgent()
         
         # Configure from settings if available
-        if hasattr(settings, 'SHOPIFY_SHOP_NAME') and settings.SHOPIFY_SHOP_NAME:
+        if settings.SHOPIFY_SHOP_NAME and settings.SHOPIFY_ACCESS_TOKEN:
             config = ShopifyConfig(
                 shop_name=settings.SHOPIFY_SHOP_NAME,
                 access_token=settings.SHOPIFY_ACCESS_TOKEN,
-                webhook_secret=getattr(settings, 'SHOPIFY_WEBHOOK_SECRET', None)
+                webhook_secret=settings.SHOPIFY_WEBHOOK_SECRET
             )
             _commerce_agent.set_store(config)
     

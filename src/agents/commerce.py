@@ -3,6 +3,7 @@ Commerce Agent - E-commerce operations via Shopify.
 Manages products, inventory, orders, and store analytics.
 """
 
+import re
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -12,8 +13,7 @@ from src.agents.base import SubAgent
 from src.integrations.shopify_client import (
     ShopifyClient,
     ShopifyConfig,
-    ShopifyAPIError,
-    PaginatedResponse
+    ShopifyAPIError
 )
 from src.utils.structured_logging import get_logger
 from src.utils.metrics import TASKS_EXECUTED
@@ -283,8 +283,6 @@ PRODUCT_TYPE: [category]
     
     def _parse_generated_product(self, response: str) -> Dict[str, Any]:
         """Parse AI-generated product listing."""
-        import re
-        
         result = {
             "title": "",
             "body_html": "",

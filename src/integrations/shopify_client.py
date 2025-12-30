@@ -266,13 +266,15 @@ class ShopifyClient:
         response = await self.get("products.json", params=params)
         products = response.get("products", [])
         
-        # Check for next page
-        # Note: Shopify uses Link headers for cursor-based pagination
+        # Note: Shopify uses Link headers for cursor-based pagination.
+        # In a production implementation, parse the Link header to extract next_cursor.
+        # For now, we use a simple heuristic based on response length.
+        # This may incorrectly indicate has_next=True if last page has exactly `limit` items.
         
         return PaginatedResponse(
             items=products,
             has_next=len(products) == limit,
-            next_cursor=None  # Would be extracted from Link header
+            next_cursor=None  # TODO: Extract from Link header in production
         )
     
     async def get_product(self, product_id: str) -> Dict[str, Any]:
