@@ -1,11 +1,12 @@
 """
-AST Parser - Python AST parsing and analysis utilities.
-Provides code structure analysis and validation.
+AST Parser - Utilities for parsing and analyzing Python code.
+Used by the evolution engine to understand code structure.
 """
 
 import ast
-from typing import Optional, List, Dict, Any, Tuple
+from typing import List, Dict, Any, Optional, Set, Tuple
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from src.utils.structured_logging import get_logger
 
@@ -14,15 +15,23 @@ logger = get_logger("ast_parser")
 
 @dataclass
 class FunctionInfo:
-    """Information about a function."""
+    """Information about a function or method."""
     name: str
     lineno: int
     end_lineno: int
-    args: List[str] = field(default_factory=list)
-    decorators: List[str] = field(default_factory=list)
+    args: List[str]
+    decorators: List[str]
+    docstring: Optional[str]
     is_async: bool = False
-    docstring: Optional[str] = None
-    returns: Optional[str] = None
+    is_method: bool = False
+    class_name: Optional[str] = None
+    calls: List[str] = field(default_factory=list)
+    
+    @property
+    def full_name(self) -> str:
+        if self.class_name:
+            return f"{self.class_name}.{self.name}"
+        return self.name
 
 
 @dataclass
@@ -31,37 +40,50 @@ class ClassInfo:
     name: str
     lineno: int
     end_lineno: int
+    bases: List[str]
+    decorators: List[str]
+    docstring: Optional[str]
     methods: List[FunctionInfo] = field(default_factory=list)
-    bases: List[str] = field(default_factory=list)
-    decorators: List[str] = field(default_factory=list)
-    docstring: Optional[str] = None
+    attributes: List[str] = field(default_factory=list)
+
+
+@dataclass
+class ImportInfo:
+    """Information about an import statement."""
+    module: str
+    names: List[str]  # Specific names imported, or ['*'] for star import
+    alias: Optional[str] = None
+    lineno: int = 0
+    is_from_import: bool = False
 
 
 @dataclass
 class CodeStructure:
-    """Represents the structure of a Python file."""
+    """Complete structure of a Python file."""
     file_path: str
-    imports: List[str] = field(default_factory=list)
-    functions: List[FunctionInfo] = field(default_factory=list)
+    imports: List[ImportInfo] = field(default_factory=list)
     classes: List[ClassInfo] = field(default_factory=list)
-    global_vars: List[str] = field(default_factory=list)
+    functions: List[FunctionInfo] = field(default_factory=list)
+    global_variables: List[str] = field(default_factory=list)
+    errors: List[str] = field(default_factory=list)
+    
+    @property
+    def all_functions(self) -> List[FunctionInfo]:
+        """Get all functions including methods."""
+        all_funcs = list(self.functions)
+        for cls in self.classes:
+            all_funcs.extend(cls.methods)
+        return all_funcs
     
     def get_function(self, name: str) -> Optional[FunctionInfo]:
-        """Get function by name."""
-        for func in self.functions:
-            if func.name == name:
+        """Find a function by name."""
+        for func in self.all_functions:
+            if func.name == name or func.full_name == name:
                 return func
-        
-        # Check class methods
-        for cls in self.classes:
-            for method in cls.methods:
-                if method.name == name:
-                    return method
-        
         return None
     
     def get_class(self, name: str) -> Optional[ClassInfo]:
-        """Get class by name."""
+        """Find a class by name."""
         for cls in self.classes:
             if cls.name == name:
                 return cls
@@ -70,74 +92,156 @@ class CodeStructure:
 
 class ASTParser:
     """
-    Parser for Python AST operations.
-    Provides analysis and validation of Python code.
+    Parses Python source code into structured information.
     """
     
-    def parse_source(self, source: str, file_path: str = "<string>") -> CodeStructure:
+    def parse_file(self, file_path: str) -> CodeStructure:
         """
-        Parse Python source code into structured format.
+        Parse a Python file and extract its structure.
         
         Args:
-            source: Python source code
-            file_path: Path to the file (for reference)
+            file_path: Path to the Python file
             
         Returns:
-            CodeStructure with parsed information
+            CodeStructure with all extracted information
         """
-        try:
-            tree = ast.parse(source)
-        except SyntaxError as e:
-            logger.error(f"Syntax error parsing {file_path}: {e}")
-            return CodeStructure(file_path=file_path)
-        
         structure = CodeStructure(file_path=file_path)
         
-        # Extract imports
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Import):
-                for alias in node.names:
-                    structure.imports.append(alias.name)
-            elif isinstance(node, ast.ImportFrom):
-                if node.module:
-                    structure.imports.append(node.module)
-        
-        # Extract top-level items
-        for node in tree.body:
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                func_info = self._extract_function_info(node)
-                structure.functions.append(func_info)
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                source = f.read()
             
-            elif isinstance(node, ast.ClassDef):
-                class_info = self._extract_class_info(node)
-                structure.classes.append(class_info)
+            return self.parse_source(source, file_path)
             
-            elif isinstance(node, ast.Assign):
-                for target in node.targets:
-                    if isinstance(target, ast.Name):
-                        structure.global_vars.append(target.id)
+        except FileNotFoundError:
+            structure.errors.append(f"File not found: {file_path}")
+        except Exception as e:
+            structure.errors.append(f"Parse error: {str(e)}")
         
         return structure
     
-    def _extract_function_info(self, node: ast.FunctionDef) -> FunctionInfo:
-        """Extract information from a function definition."""
-        args = [arg.arg for arg in node.args.args]
+    def parse_source(self, source: str, file_path: str = "<string>") -> CodeStructure:
+        """
+        Parse Python source code string.
         
-        decorators = []
-        for dec in node.decorator_list:
-            if isinstance(dec, ast.Name):
-                decorators.append(dec.id)
-            elif isinstance(dec, ast.Call) and isinstance(dec.func, ast.Name):
-                decorators.append(dec.func.id)
+        Args:
+            source: Python source code
+            file_path: Optional file path for error messages
+            
+        Returns:
+            CodeStructure with all extracted information
+        """
+        structure = CodeStructure(file_path=file_path)
         
+        try:
+            tree = ast.parse(source)
+            
+            # Extract imports
+            structure.imports = self._extract_imports(tree)
+            
+            # Extract classes and functions
+            for node in ast.iter_child_nodes(tree):
+                if isinstance(node, ast.ClassDef):
+                    class_info = self._extract_class(node)
+                    structure.classes.append(class_info)
+                elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    func_info = self._extract_function(node)
+                    structure.functions.append(func_info)
+                elif isinstance(node, ast.Assign):
+                    # Global variable assignments
+                    for target in node.targets:
+                        if isinstance(target, ast.Name):
+                            structure.global_variables.append(target.id)
+            
+        except SyntaxError as e:
+            structure.errors.append(f"Syntax error at line {e.lineno}: {e.msg}")
+        except Exception as e:
+            structure.errors.append(f"Parse error: {str(e)}")
+        
+        return structure
+    
+    def _extract_imports(self, tree: ast.AST) -> List[ImportInfo]:
+        """Extract all imports from an AST."""
+        imports = []
+        
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    imports.append(ImportInfo(
+                        module=alias.name,
+                        names=[alias.name],
+                        alias=alias.asname,
+                        lineno=node.lineno,
+                        is_from_import=False
+                    ))
+            elif isinstance(node, ast.ImportFrom):
+                module = node.module or ""
+                names = [alias.name for alias in node.names]
+                imports.append(ImportInfo(
+                    module=module,
+                    names=names,
+                    lineno=node.lineno,
+                    is_from_import=True
+                ))
+        
+        return imports
+    
+    def _extract_class(self, node: ast.ClassDef) -> ClassInfo:
+        """Extract class information from a ClassDef node."""
+        # Get base classes
+        bases = []
+        for base in node.bases:
+            if isinstance(base, ast.Name):
+                bases.append(base.id)
+            elif isinstance(base, ast.Attribute):
+                bases.append(ast.unparse(base))
+        
+        # Get decorators
+        decorators = self._extract_decorators(node)
+        
+        # Get docstring
         docstring = ast.get_docstring(node)
         
-        returns = None
-        if node.returns:
-            try:
-                returns = ast.unparse(node.returns)
-            except:
-                returns = None
+        class_info = ClassInfo(
+            name=node.name,
+            lineno=node.lineno,
+            end_lineno=node.end_lineno or node.lineno,
+            bases=bases,
+            decorators=decorators,
+            docstring=docstring
+        )
+        
+        # Extract methods and attributes
+        for item in node.body:
+            if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                method = self._extract_function(item, class_name=node.name)
+                class_info.methods.append(method)
+            elif isinstance(item, ast.Assign):
+                for target in item.targets:
+                    if isinstance(target, ast.Name):
+                        class_info.attributes.append(target.id)
+        
+        return class_info
+    
+    def _extract_function(
+        self,
+        node: ast.FunctionDef | ast.AsyncFunctionDef,
+        class_name: str = None
+    ) -> FunctionInfo:
+        """Extract function information from a FunctionDef node."""
+        # Get arguments
+        args = []
+        for arg in node.args.args:
+            args.append(arg.arg)
+        
+        # Get decorators
+        decorators = self._extract_decorators(node)
+        
+        # Get docstring
+        docstring = ast.get_docstring(node)
+        
+        # Get function calls within the body
+        calls = self._extract_calls(node)
         
         return FunctionInfo(
             name=node.name,
@@ -145,47 +249,58 @@ class ASTParser:
             end_lineno=node.end_lineno or node.lineno,
             args=args,
             decorators=decorators,
-            is_async=isinstance(node, ast.AsyncFunctionDef),
             docstring=docstring,
-            returns=returns
+            is_async=isinstance(node, ast.AsyncFunctionDef),
+            is_method=class_name is not None,
+            class_name=class_name,
+            calls=calls
         )
     
-    def _extract_class_info(self, node: ast.ClassDef) -> ClassInfo:
-        """Extract information from a class definition."""
-        bases = []
-        for base in node.bases:
-            if isinstance(base, ast.Name):
-                bases.append(base.id)
-        
+    def _extract_decorators(self, node) -> List[str]:
+        """Extract decorator names from a node."""
         decorators = []
         for dec in node.decorator_list:
             if isinstance(dec, ast.Name):
                 decorators.append(dec.id)
+            elif isinstance(dec, ast.Call):
+                if isinstance(dec.func, ast.Name):
+                    decorators.append(dec.func.id)
+                elif isinstance(dec.func, ast.Attribute):
+                    decorators.append(ast.unparse(dec.func))
+            elif isinstance(dec, ast.Attribute):
+                decorators.append(ast.unparse(dec))
+        return decorators
+    
+    def _extract_calls(self, node: ast.AST) -> List[str]:
+        """Extract function/method calls from a node."""
+        calls = []
+        for child in ast.walk(node):
+            if isinstance(child, ast.Call):
+                if isinstance(child.func, ast.Name):
+                    calls.append(child.func.id)
+                elif isinstance(child.func, ast.Attribute):
+                    calls.append(child.func.attr)
+        return list(set(calls))  # Deduplicate
+    
+    def get_line_range(self, source: str, start: int, end: int) -> str:
+        """
+        Extract lines from source code.
         
-        methods = []
-        for item in node.body:
-            if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                methods.append(self._extract_function_info(item))
-        
-        docstring = ast.get_docstring(node)
-        
-        return ClassInfo(
-            name=node.name,
-            lineno=node.lineno,
-            end_lineno=node.end_lineno or node.lineno,
-            methods=methods,
-            bases=bases,
-            decorators=decorators,
-            docstring=docstring
-        )
+        Args:
+            source: Full source code
+            start: Start line (1-indexed)
+            end: End line (1-indexed, inclusive)
+            
+        Returns:
+            Extracted lines as string
+        """
+        lines = source.split('\n')
+        return '\n'.join(lines[start-1:end])
     
     def validate_syntax(self, source: str) -> Tuple[bool, Optional[str]]:
         """
         Validate Python syntax.
         
-        Args:
-            source: Python source code
-            
         Returns:
             Tuple of (is_valid, error_message)
         """
@@ -193,72 +308,4 @@ class ASTParser:
             ast.parse(source)
             return True, None
         except SyntaxError as e:
-            return False, str(e)
-    
-    def get_line_range(self, source: str, start_line: int, end_line: int) -> str:
-        """
-        Extract a range of lines from source code.
-        
-        Args:
-            source: Source code
-            start_line: Starting line number (1-indexed)
-            end_line: Ending line number (inclusive)
-            
-        Returns:
-            Extracted code as string
-        """
-        lines = source.splitlines(keepends=True)
-        # Convert to 0-indexed
-        return ''.join(lines[start_line - 1:end_line])
-    
-    def find_imports(self, source: str) -> List[str]:
-        """
-        Find all imports in source code.
-        
-        Args:
-            source: Python source code
-            
-        Returns:
-            List of imported module names
-        """
-        imports = []
-        
-        try:
-            tree = ast.parse(source)
-            
-            for node in ast.walk(tree):
-                if isinstance(node, ast.Import):
-                    for alias in node.names:
-                        imports.append(alias.name)
-                elif isinstance(node, ast.ImportFrom):
-                    if node.module:
-                        imports.append(node.module)
-        except SyntaxError:
-            pass
-        
-        return imports
-    
-    def find_function_calls(self, source: str, function_name: str) -> List[int]:
-        """
-        Find all calls to a specific function.
-        
-        Args:
-            source: Python source code
-            function_name: Name of function to find
-            
-        Returns:
-            List of line numbers where function is called
-        """
-        call_lines = []
-        
-        try:
-            tree = ast.parse(source)
-            
-            for node in ast.walk(tree):
-                if isinstance(node, ast.Call):
-                    if isinstance(node.func, ast.Name) and node.func.id == function_name:
-                        call_lines.append(node.lineno)
-        except SyntaxError:
-            pass
-        
-        return call_lines
+            return False, f"Line {e.lineno}: {e.msg}"
