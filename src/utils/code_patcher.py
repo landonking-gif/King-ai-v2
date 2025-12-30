@@ -6,104 +6,27 @@ Handles atomic file operations with backup capabilities.
 import os
 import shutil
 import difflib
-from pathlib import Path
-from typing import Optional, List, Tuple, Dict, Any
-from dataclasses import dataclass, field
-from datetime import datetime
-from enum import Enum
-
-from src.utils.ast_parser import ASTParser
-from src.utils.structured_logging import get_logger
-
-logger = get_logger("code_patcher")
-
-
-class PatchStatus(str, Enum):
-    """Status of a patch operation."""
-    PENDING = "pending"
-    VALIDATED = "validated"
-    APPLIED = "applied"
-    FAILED = "failed"
-    ROLLED_BACK = "rolled_back"
+from typing import List
+from dataclasses import dataclass
 
 
 @dataclass
-class CodePatch:
-    """Represents a single code patch."""
+class Patch:
+    """Represents a single file patch."""
     file_path: str
-    original_content: str
+    old_content: str
     new_content: str
-    description: str = ""
-    status: PatchStatus = PatchStatus.PENDING
-    applied_at: Optional[datetime] = None
-    error: Optional[str] = None
-    
-    @property
-    def diff(self) -> str:
-        """Generate unified diff."""
-        original_lines = self.original_content.splitlines(keepends=True)
-        new_lines = self.new_content.splitlines(keepends=True)
-        
-        diff = difflib.unified_diff(
-            original_lines,
-            new_lines,
-            fromfile=f"a/{self.file_path}",
-            tofile=f"b/{self.file_path}"
-        )
-        return ''.join(diff)
-    
-    @property
-    def stats(self) -> Dict[str, int]:
-        """Get addition/deletion stats."""
-        original_lines = self.original_content.splitlines()
-        new_lines = self.new_content.splitlines()
-        
-        matcher = difflib.SequenceMatcher(None, original_lines, new_lines)
-        
-        additions = 0
-        deletions = 0
-        
-        for tag, i1, i2, j1, j2 in matcher.get_opcodes():
-            if tag == 'replace':
-                deletions += i2 - i1
-                additions += j2 - j1
-            elif tag == 'delete':
-                deletions += i2 - i1
-            elif tag == 'insert':
-                additions += j2 - j1
-        
-        return {
-            "additions": additions,
-            "deletions": deletions,
-            "total_changes": additions + deletions
-        }
 
 
-@dataclass
 class PatchSet:
-    """Collection of patches to apply atomically."""
-    id: str
-    description: str
-    patches: List[CodePatch] = field(default_factory=list)
-    created_at: datetime = field(default_factory=datetime.now)
-    applied_at: Optional[datetime] = None
-    status: PatchStatus = PatchStatus.PENDING
-    backup_dir: Optional[str] = None
+    """Collection of patches to apply."""
     
-    def add_patch(self, patch: CodePatch):
+    def __init__(self):
+        self.patches: List[Patch] = []
+    
+    def add_patch(self, file_path: str, old_content: str, new_content: str):
         """Add a patch to the set."""
-        self.patches.append(patch)
-    
-    @property
-    def total_stats(self) -> Dict[str, int]:
-        """Get total stats across all patches."""
-        total = {"additions": 0, "deletions": 0, "total_changes": 0, "files": len(self.patches)}
-        for patch in self.patches:
-            stats = patch.stats
-            total["additions"] += stats["additions"]
-            total["deletions"] += stats["deletions"]
-            total["total_changes"] += stats["total_changes"]
-        return total
+        self.patches.append(Patch(file_path, old_content, new_content))
 
 
 class CodePatcher:
