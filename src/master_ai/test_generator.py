@@ -39,6 +39,10 @@ class TestGenerator:
     Uses LLM for intelligent test generation.
     """
     
+    # Configuration constants
+    MAX_CODE_LENGTH = 3000  # Maximum characters of source code to send to LLM
+    MAX_CONTEXT_FUNCTIONS = 5  # Maximum number of functions to include in context
+    
     TEST_GENERATION_PROMPT = """Generate pytest test cases for the following Python code.
 
 Code to test:
@@ -106,7 +110,7 @@ Output the tests as valid Python code:
         
         # Generate tests via LLM
         prompt = self.TEST_GENERATION_PROMPT.format(
-            code=source_code[:3000],  # Limit code size
+            code=source_code[:self.MAX_CODE_LENGTH],  # Limit code size
             context=context,
             num_tests=num_tests
         )
@@ -131,7 +135,7 @@ Output the tests as valid Python code:
         functions = analysis.get("functions", [])
         if functions:
             parts.append(f"Functions: {', '.join(f.name for f in functions)}")
-            for func in functions[:5]:
+            for func in functions[:self.MAX_CONTEXT_FUNCTIONS]:
                 params = ", ".join(f"{p.name}: {p.type_hint or 'Any'}" for p in func.parameters)
                 parts.append(f"  - {func.name}({params}) -> {func.return_type or 'None'}")
         
@@ -219,10 +223,18 @@ Output the tests as valid Python code:
         source_context: str = ""
     ) -> List[GeneratedTest]:
         """Generate tests specifically for one function."""
+        # Build a proper code representation
+        params = ", ".join(f"{p.name}: {p.type_hint or 'Any'}" for p in function.parameters)
+        func_signature = f"def {function.name}({params}) -> {function.return_type or 'None'}"
+        
         prompt = f"""Generate pytest test cases for this function:
 
 ```python
-{function.to_dict()}
+{func_signature}
+    \"\"\"
+    {function.docstring or 'No documentation'}
+    \"\"\"
+    pass
 ```
 
 {f'Context: {source_context}' if source_context else ''}
