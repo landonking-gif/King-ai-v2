@@ -1,0 +1,61 @@
+/* Common Components Styles */
+
+/* Status Indicator */
+.status-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--status-color) 15%, transparent);
+  font-size: 12px;
+}
+
+.status-label {
+  color: var(--status-color);
+  font-weight: 600;
+}
+
+.status-icon {
+  font-size: 14px;
+}
+
+/* Data Table */
+.data-table-container {
+  overflow-x: auto;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+}
+
+.data-table thead {
+  background: #f5f5f5;
+}
+
+.data-table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  color: #333;
+  border-bottom: 2px solid #ddd;
+}
+
+.data-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #eee;
+}
+
+.data-table tbody tr:hover {
+  background: #f9f9f9;
+}
+
+.empty-row {
+  text-align: center;
+  padding: 40px;
+  color: #999;
+}
