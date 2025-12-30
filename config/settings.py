@@ -38,6 +38,17 @@ class Settings(BaseSettings):
     # Port for the FastAPI server
     api_port: int = Field(default=8000)
     
+    # --- Search API Configuration ---
+    GOOGLE_API_KEY: str | None = Field(default=None, env="GOOGLE_API_KEY")
+    GOOGLE_CX: str | None = Field(default=None, env="GOOGLE_CX")  # Custom Search Engine ID
+    BING_API_KEY: str | None = Field(default=None, env="BING_API_KEY")
+    
+    # --- Web Scraping Configuration ---
+    SCRAPER_RATE_LIMIT: float = Field(default=1.0)  # Requests per second
+    SCRAPER_TIMEOUT: int = Field(default=30)
+    SCRAPER_MAX_RETRIES: int = Field(default=3)
+    SCRAPER_CACHE_TTL_HOURS: int = Field(default=1)
+    
     class Config:
         env_file = ".env" # Path to the environment file
         extra = "ignore" # Ignore extra environment variables not defined here
