@@ -44,16 +44,15 @@ class Settings(BaseSettings):
     # Port for the FastAPI server
     api_port: int = Field(default=8000)
     
-    # --- Search API Configuration ---
-    GOOGLE_API_KEY: str | None = Field(default=None, env="GOOGLE_API_KEY")
-    GOOGLE_CX: str | None = Field(default=None, env="GOOGLE_CX")  # Custom Search Engine ID
-    BING_API_KEY: str | None = Field(default=None, env="BING_API_KEY")
-    
-    # --- Web Scraping Configuration ---
-    SCRAPER_RATE_LIMIT: float = Field(default=1.0)  # Requests per second
-    SCRAPER_TIMEOUT: int = Field(default=30)
-    SCRAPER_MAX_RETRIES: int = Field(default=3)
-    SCRAPER_CACHE_TTL_HOURS: int = Field(default=1)
+    # --- Shopify Configuration ---
+    # Shopify store name (e.g., "my-store" from my-store.myshopify.com)
+    SHOPIFY_SHOP_NAME: str | None = Field(default=None, env="SHOPIFY_SHOP_NAME")
+    # Shopify Admin API access token
+    SHOPIFY_ACCESS_TOKEN: str | None = Field(default=None, env="SHOPIFY_ACCESS_TOKEN")
+    # Secret for verifying Shopify webhooks
+    SHOPIFY_WEBHOOK_SECRET: str | None = Field(default=None, env="SHOPIFY_WEBHOOK_SECRET")
+    # Shopify API version to use
+    SHOPIFY_API_VERSION: str = Field(default="2024-10", env="SHOPIFY_API_VERSION")
     
     class Config:
         env_file = ".env" # Path to the environment file

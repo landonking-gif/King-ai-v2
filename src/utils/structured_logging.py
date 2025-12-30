@@ -1,18 +1,22 @@
 """
-Structured Logging - Wrapper around structlog for consistent logging.
+Structured logging utility - Wrapper around structlog for consistent logging.
+Provides a simple interface to get logger instances with context.
 """
 
 import structlog
 
 
-def get_logger(name: str):
+def get_logger(name: str = None):
     """
-    Get a logger instance with the specified name.
+    Get a structured logger instance.
     
     Args:
         name: Logger name (typically module name)
         
     Returns:
-        Configured structlog logger
+        Structured logger with context binding
     """
-    return structlog.get_logger(name)
+    logger = structlog.get_logger()
+    if name:
+        logger = logger.bind(logger_name=name)
+    return logger
