@@ -93,8 +93,8 @@ class CodeQualityAnalyzer:
         try:
             tree = ast.parse(source)
             metrics.cyclomatic_complexity = self._calculate_complexity(tree)
-        except:
-            pass
+        except (SyntaxError, ValueError) as e:
+            logger.debug(f"Could not calculate complexity for {file_path}: {e}")
         
         # Docstring coverage
         with_docs = sum(1 for f in structure.all_functions if f.docstring)
@@ -133,7 +133,7 @@ class CodeQualityAnalyzer:
         """Analyze type hint coverage."""
         try:
             tree = ast.parse(source)
-        except:
+        except (SyntaxError, ValueError):
             return 0.0
         
         total_params = 0
