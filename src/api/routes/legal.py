@@ -3,7 +3,7 @@ Legal API Routes.
 """
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from src.agents.legal import LegalAgent
 from src.legal.templates import DocumentType, ComplianceFramework
@@ -49,6 +49,18 @@ class ContractRequest(BaseModel):
     terms: dict = Field(default_factory=dict)
 
 
+class ContractStatusUpdate(BaseModel):
+    status: str
+    
+    @field_validator('status')
+    @classmethod
+    def validate_status(cls, v: str) -> str:
+        valid_statuses = ["draft", "pending_signature", "active", "expired", "terminated"]
+        if v not in valid_statuses:
+            raise ValueError(f"Invalid status. Must be one of: {valid_statuses}")
+        return v
+
+
 class RiskRequest(BaseModel):
     business_type: str
     operations: list[str]
@@ -83,16 +95,10 @@ async def generate_custom_document(req: CustomDocRequest, agent: LegalAgent = De
 @router.get("/documents/{document_id}")
 async def get_document(document_id: str, agent: LegalAgent = Depends(get_agent)):
     """Get a generated document."""
-    doc = agent._documents.get(document_id)
-    if not doc:
-        raise HTTPException(404, "Document not found")
-    return {
-        "id": doc.id,
-        "title": doc.title,
-        "content": doc.content,
-        "version": doc.version,
-        "effective_date": doc.effective_date.isoformat(),
-    }
+    result = await agent.get_document(document_id)
+    if not result["success"]:
+        raise HTTPException(404, result["error"])
+    return result["output"]
 
 
 @router.post("/compliance/check")
@@ -136,10 +142,10 @@ async def get_contract(contract_id: str, agent: LegalAgent = Depends(get_agent))
 
 @router.patch("/contracts/{contract_id}/status")
 async def update_contract_status(
-    contract_id: str, status: str, agent: LegalAgent = Depends(get_agent)
+    contract_id: str, status_update: ContractStatusUpdate, agent: LegalAgent = Depends(get_agent)
 ):
     """Update contract status."""
-    result = await agent.update_contract_status(contract_id, status)
+    result = await agent.update_contract_status(contract_id, status_update.status)
     if not result["success"]:
         raise HTTPException(400, result["error"])
     return {"status": "updated"}
