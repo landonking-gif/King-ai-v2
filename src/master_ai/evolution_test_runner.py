@@ -98,7 +98,7 @@ class EvolutionTestRunner:
     async def test_evolution(
         self,
         proposal: EvolutionProposal,
-        patchset: 'PatchSet',
+        patchset: PatchSet,
         phases: List[TestPhase] = None
     ) -> EvolutionTestResult:
         """
@@ -165,7 +165,7 @@ class EvolutionTestRunner:
     
     async def _prepare_source_files(
         self,
-        patchset: 'PatchSet'
+        patchset: PatchSet
     ) -> Dict[str, str]:
         """Prepare source files with patches applied."""
         source_files = {}
@@ -421,7 +421,7 @@ class EvolutionTestRunner:
     
     async def quick_validate(
         self,
-        patchset: 'PatchSet'
+        patchset: PatchSet
     ) -> Tuple[bool, str]:
         """
         Quick validation of a patchset (syntax only).
@@ -433,10 +433,3 @@ class EvolutionTestRunner:
         result = await self._run_syntax_check(source_files)
         
         return result.passed, result.error_summary or ""
-
-
-# Add PatchSet stub for type hints
-class PatchSet:
-    """Stub for PatchSet - should be defined in code_patcher.py"""
-    def __init__(self):
-        self.patches = []
