@@ -3,6 +3,7 @@ Stripe Payment Processing Client.
 """
 import hmac
 import hashlib
+import json
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -354,7 +355,6 @@ class StripeClient:
         if not hmac.compare_digest(expected_sig, v1_sig):
             raise ValueError("Invalid webhook signature")
         
-        import json
         return json.loads(payload)
 
     # Parsing helpers
