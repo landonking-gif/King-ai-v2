@@ -43,10 +43,6 @@ class Settings(BaseSettings):
     api_host: str = Field(default="0.0.0.0")
     # Port for the FastAPI server
     api_port: int = Field(default=8000)
-    
-    class Config:
-        env_file = ".env" # Path to the environment file
-        extra = "ignore" # Ignore extra environment variables not defined here
 
 # Singleton instance
 settings = Settings()
