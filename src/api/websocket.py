@@ -1,39 +1,180 @@
 """
-WebSocket Manager - Handles real-time communication with the dashboard.
-Broadcasts system events, task updates, and financial metrics.
+WebSocket Manager for real-time communication.
 """
-
-from fastapi import WebSocket, WebSocketDisconnect
-from typing import List
+import asyncio
 import json
+import uuid
+from datetime import datetime
+from typing import Optional, Callable, Any
+from fastapi import WebSocket, WebSocketDisconnect
+from src.utils.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 class ConnectionManager:
-    """
-    Manages active WebSocket connections for the King AI dashboard.
-    """
+    """Manage WebSocket connections."""
+
     def __init__(self):
-        # Tracking active clients
-        self.active_connections: List[WebSocket] = []
+        self._connections: dict[str, WebSocket] = {}
+        self._subscriptions: dict[str, set[str]] = {}  # channel -> connection_ids
+        self._connection_meta: dict[str, dict] = {}
+        self._message_handlers: dict[str, Callable] = {}
 
-    async def connect(self, websocket: WebSocket):
-        """Accepts a new connection and adds it to the pool."""
+    async def connect(
+        self,
+        websocket: WebSocket,
+        user_id: str = None,
+        business_id: str = None,
+    ) -> str:
+        """Accept a new WebSocket connection."""
         await websocket.accept()
-        self.active_connections.append(websocket)
+        
+        connection_id = str(uuid.uuid4())
+        self._connections[connection_id] = websocket
+        self._connection_meta[connection_id] = {
+            "user_id": user_id,
+            "business_id": business_id,
+            "connected_at": datetime.utcnow().isoformat(),
+            "last_ping": datetime.utcnow().isoformat(),
+        }
 
-    def disconnect(self, websocket: WebSocket):
-        """Removes a connection from the pool."""
-        self.active_connections.remove(websocket)
+        # Auto-subscribe to user and business channels
+        if user_id:
+            await self.subscribe(connection_id, f"user:{user_id}")
+        if business_id:
+            await self.subscribe(connection_id, f"business:{business_id}")
+
+        # Subscribe to global channel
+        await self.subscribe(connection_id, "global")
+
+        logger.info(f"WebSocket connected: {connection_id}")
+        
+        # Send welcome message
+        await self.send_to_connection(connection_id, {
+            "type": "connected",
+            "connection_id": connection_id,
+            "timestamp": datetime.utcnow().isoformat(),
+        })
+
+        return connection_id
+
+    async def disconnect(self, connection_id: str):
+        """Disconnect a WebSocket."""
+        if connection_id in self._connections:
+            del self._connections[connection_id]
+        if connection_id in self._connection_meta:
+            del self._connection_meta[connection_id]
+
+        # Remove from all subscriptions
+        for channel, subs in self._subscriptions.items():
+            subs.discard(connection_id)
+
+        logger.info(f"WebSocket disconnected: {connection_id}")
+
+    async def subscribe(self, connection_id: str, channel: str):
+        """Subscribe a connection to a channel."""
+        if channel not in self._subscriptions:
+            self._subscriptions[channel] = set()
+        self._subscriptions[channel].add(connection_id)
+
+    async def unsubscribe(self, connection_id: str, channel: str):
+        """Unsubscribe from a channel."""
+        if channel in self._subscriptions:
+            self._subscriptions[channel].discard(connection_id)
+
+    async def send_to_connection(self, connection_id: str, message: dict):
+        """Send a message to a specific connection."""
+        ws = self._connections.get(connection_id)
+        if ws:
+            try:
+                await ws.send_json(message)
+            except Exception as e:
+                logger.error(f"Error sending to {connection_id}: {e}")
+                await self.disconnect(connection_id)
+
+    async def broadcast_to_channel(self, channel: str, message: dict):
+        """Broadcast a message to all connections in a channel."""
+        subscribers = self._subscriptions.get(channel, set())
+        for conn_id in list(subscribers):
+            await self.send_to_connection(conn_id, message)
+
+    async def broadcast_all(self, message: dict):
+        """Broadcast to all connections."""
+        for conn_id in list(self._connections.keys()):
+            await self.send_to_connection(conn_id, message)
 
     async def broadcast(self, message: dict):
-        """
-        Sends a JSON message to all connected clients (e.g., status updates).
-        """
-        for connection in self.active_connections:
-            try:
-                await connection.send_json(message)
-            except Exception:
-                # Handle stale connections
-                continue
+        """Legacy method for backward compatibility."""
+        await self.broadcast_all(message)
 
-# Global manager instance
+    def register_handler(self, message_type: str, handler: Callable):
+        """Register a handler for a message type."""
+        self._message_handlers[message_type] = handler
+
+    async def handle_message(self, connection_id: str, data: dict):
+        """Handle an incoming message."""
+        msg_type = data.get("type", "")
+        
+        # Handle ping/pong
+        if msg_type == "ping":
+            self._connection_meta[connection_id]["last_ping"] = datetime.utcnow().isoformat()
+            await self.send_to_connection(connection_id, {"type": "pong"})
+            return
+
+        # Handle subscription requests
+        if msg_type == "subscribe":
+            channel = data.get("channel")
+            if channel:
+                await self.subscribe(connection_id, channel)
+                await self.send_to_connection(connection_id, {
+                    "type": "subscribed",
+                    "channel": channel,
+                })
+            return
+
+        if msg_type == "unsubscribe":
+            channel = data.get("channel")
+            if channel:
+                await self.unsubscribe(connection_id, channel)
+            return
+
+        # Call registered handler
+        handler = self._message_handlers.get(msg_type)
+        if handler:
+            try:
+                await handler(connection_id, data)
+            except Exception as e:
+                logger.error(f"Handler error for {msg_type}: {e}")
+
+    def get_stats(self) -> dict:
+        """Get connection statistics."""
+        return {
+            "total_connections": len(self._connections),
+            "channels": {
+                ch: len(subs) for ch, subs in self._subscriptions.items()
+            },
+        }
+
+
+# Global connection manager
 manager = ConnectionManager()
+
+
+async def websocket_endpoint(
+    websocket: WebSocket,
+    user_id: str = None,
+    business_id: str = None,
+):
+    """WebSocket endpoint handler."""
+    connection_id = await manager.connect(websocket, user_id, business_id)
+    
+    try:
+        while True:
+            data = await websocket.receive_json()
+            await manager.handle_message(connection_id, data)
+    except WebSocketDisconnect:
+        await manager.disconnect(connection_id)
+    except Exception as e:
+        logger.error(f"WebSocket error: {e}")
+        await manager.disconnect(connection_id)
