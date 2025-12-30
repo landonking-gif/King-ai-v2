@@ -100,3 +100,37 @@ If no improvement is needed, respond with:
     "reason": "Why the system is currently optimal"
 }}
 """
+
+INTENT_CLASSIFICATION_PROMPT = """Classify the user's intent and extract relevant parameters.
+
+USER INPUT: "{user_input}"
+
+CURRENT CONTEXT (for reference):
+{context}
+
+Analyze the input and respond with JSON:
+{{
+    "type": "conversation" | "command" | "query",
+    "action": null | "start_business" | "stop_business" | "analyze_business" | "optimize_business" | "create_content" | "research_market" | "generate_report" | "propose_evolution",
+    "parameters": {{
+        // Extracted parameters relevant to the action
+        // e.g., "business_type": "dropshipping", "niche": "pet products"
+    }},
+    "confidence": 0.0-1.0,
+    "reasoning": "Brief explanation of why this classification"
+}}
+
+DEFINITIONS:
+- "conversation": General interaction, greetings, philosophical discussion, or unclear intent
+- "command": Request to CREATE, START, STOP, MODIFY, or OPTIMIZE something in the empire
+- "query": Request for DATA, STATUS, REPORTS, or INFORMATION about existing state
+
+EXAMPLES:
+- "Hello, how are you?" -> type: conversation
+- "Start a new dropshipping store for pet products" -> type: command, action: start_business
+- "How much revenue did we make yesterday?" -> type: query
+- "Optimize our marketing spend" -> type: command, action: optimize_business
+- "What businesses are currently active?" -> type: query
+
+Respond with valid JSON only.
+"""
