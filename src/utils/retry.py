@@ -57,6 +57,11 @@ def with_retry(config: RetryConfig):
     return decorator
 
 
+class TransientError(Exception):
+    """Exception indicating a transient/recoverable error that should be retried."""
+    pass
+
+
 # Pre-configured retry configurations for common use cases
 LLM_RETRY_CONFIG = RetryConfig(
     max_attempts=3,

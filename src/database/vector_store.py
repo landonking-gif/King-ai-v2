@@ -307,3 +307,7 @@ class VectorStore:
                 "metadata": metadata
             }]
         )
+
+
+# Global singleton instance
+vector_store = VectorStore()
