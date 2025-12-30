@@ -87,9 +87,12 @@ class TestGitManager:
     
     def test_list_branches(self, manager):
         """Test listing branches."""
+        # Get the default branch name
+        default_branch = manager.get_current_branch()
+        
         # Create a few branches
         manager.create_evolution_branch("test-1")
-        manager.checkout_branch("main")
+        manager.checkout_branch(default_branch)
         manager.create_evolution_branch("test-2")
         
         branches = manager.list_branches("evolution/*")
