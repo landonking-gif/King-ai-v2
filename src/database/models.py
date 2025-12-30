@@ -135,3 +135,41 @@ class Log(Base):
     created_at: datetime = Column(DateTime, server_default=func.now())
     
     business = relationship("BusinessUnit", back_populates="logs")
+
+
+class EvolutionHistory(Base):
+    """
+    History of evolution events for tracking and auditing.
+    """
+    __tablename__ = "evolution_history"
+    
+    id: str = Column(String(36), primary_key=True)
+    timestamp: datetime = Column(DateTime, server_default=func.now())
+    event_type: str = Column(String(20), nullable=False)  # proposed, approved, executed, failed, rolled_back
+    proposal_id: str = Column(String(36), ForeignKey("evolution_proposals.id"))
+    description: str = Column(Text, nullable=False)
+    metadata: dict = Column(JSON, default={})
+    
+    # System state snapshots
+    system_state_before: dict = Column(JSON, nullable=True)
+    system_state_after: dict = Column(JSON, nullable=True)
+    
+    # Relationship to proposal
+    proposal = relationship("EvolutionProposal", foreign_keys=[proposal_id])
+
+
+class EvolutionMetricsDB(Base):
+    """
+    Database model for evolution metrics tracking.
+    """
+    __tablename__ = "evolution_metrics"
+    
+    id: str = Column(String(36), primary_key=True, default="global")
+    total_proposals: int = Column(Integer, default=0)
+    successful_proposals: int = Column(Integer, default=0)
+    failed_proposals: int = Column(Integer, default=0)
+    average_confidence: float = Column(Float, default=0.0)
+    average_execution_time: float = Column(Float, default=0.0)
+    risk_distribution: dict = Column(JSON, default={})
+    last_updated: datetime = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
