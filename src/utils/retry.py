@@ -55,3 +55,12 @@ def with_retry(config: RetryConfig):
         
         return wrapper
     return decorator
+
+
+# Pre-configured retry configurations for common use cases
+LLM_RETRY_CONFIG = RetryConfig(
+    max_attempts=3,
+    base_delay=1.0,
+    max_delay=10.0,
+    exponential_base=2
+)

@@ -216,3 +216,77 @@ Create an alternative plan that:
 
 Respond with the same JSON task format as before.
 """
+
+
+# Evolution Engine Prompts
+
+EVOLUTION_PROPOSAL_PROMPT = """Generate an evolution proposal to improve the King AI system.
+
+GOAL: {goal}
+
+CURRENT SYSTEM CONTEXT:
+{context}
+
+PROPOSAL TYPE: {proposal_type}
+RISK PROFILE: {risk_profile}
+CONSTRAINTS:
+{constraints}
+
+Create a specific, actionable proposal that includes:
+1. Clear title and description
+2. Specific code changes with file paths
+3. Configuration changes if needed
+4. Risk assessment
+
+Focus on safe, incremental improvements that align with the system's autonomous business empire goals.
+
+Respond with JSON:
+{{
+    "title": "Proposal Title",
+    "description": "Detailed description of the improvement",
+    "changes": [
+        {{
+            "file_path": "src/some/file.py",
+            "change_type": "modify|add|delete",
+            "old_content": "existing code to replace",
+            "new_content": "new code to add",
+            "line_start": 10,
+            "line_end": 20,
+            "description": "What this change does"
+        }}
+    ],
+    "config_changes": {{
+        "setting.path": "new_value"
+    }},
+    "estimated_risk": "low|medium|high|critical",
+    "justification": "Why this improvement is needed"
+}}
+"""
+
+
+VALIDATION_PROMPT = """Validate this evolution proposal for safety and quality.
+
+PROPOSAL: {title}
+DESCRIPTION: {description}
+
+CHANGES:
+{changes}
+
+Check for:
+1. Code quality and best practices
+2. Potential security issues
+3. Compatibility with existing system
+4. Testing adequacy
+5. Rollback feasibility
+
+If any issues found, list them clearly. If no issues, say "NO ISSUES FOUND".
+
+Response format:
+ISSUES FOUND:
+- Issue 1
+- Issue 2
+
+or
+
+NO ISSUES FOUND
+"""
