@@ -1,139 +1,79 @@
 """
-Code Analyzer - Analyzes Python code structure using AST.
+Code Analyzer - Basic static analysis utilities for code review.
+Provides simple pattern matching and code metrics.
 """
 
-import ast
-from typing import List, Dict, Any, Optional
-from dataclasses import dataclass, field
-
-
-@dataclass
-class ParameterInfo:
-    """Information about a function parameter."""
-    name: str
-    type_hint: Optional[str] = None
-    default_value: Optional[str] = None
-
-
-@dataclass
-class FunctionInfo:
-    """Information about a function."""
-    name: str
-    parameters: List[ParameterInfo] = field(default_factory=list)
-    return_type: Optional[str] = None
-    docstring: Optional[str] = None
-    line_number: int = 0
-    is_async: bool = False
-    
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary."""
-        return {
-            "name": self.name,
-            "parameters": [
-                {"name": p.name, "type": p.type_hint, "default": p.default_value}
-                for p in self.parameters
-            ],
-            "return_type": self.return_type,
-            "docstring": self.docstring,
-            "line_number": self.line_number,
-            "is_async": self.is_async
-        }
-
-
-@dataclass
-class ClassInfo:
-    """Information about a class."""
-    name: str
-    methods: List[FunctionInfo] = field(default_factory=list)
-    bases: List[str] = field(default_factory=list)
-    docstring: Optional[str] = None
-    line_number: int = 0
+import re
+from typing import Dict, List, Any
 
 
 class CodeAnalyzer:
     """
-    Analyzes Python code structure using AST parsing.
+    Simple code analyzer for basic static analysis.
+    Used by code generation and review agents.
     """
     
-    def analyze_code(self, source_code: str) -> Dict[str, Any]:
+    def __init__(self):
+        """Initialize the code analyzer."""
+        pass
+    
+    def analyze_python(self, code: str) -> Dict[str, Any]:
         """
-        Analyze Python source code.
+        Analyze Python code for basic metrics and patterns.
         
         Args:
-            source_code: Python source code to analyze
+            code: Python source code to analyze
             
         Returns:
             Dictionary with analysis results
         """
-        try:
-            tree = ast.parse(source_code)
-        except SyntaxError as e:
-            return {
-                "error": f"Syntax error: {e}",
-                "functions": [],
-                "classes": []
-            }
-        
-        functions = []
-        classes = []
-        
-        for node in ast.walk(tree):
-            if isinstance(node, ast.FunctionDef) or isinstance(node, ast.AsyncFunctionDef):
-                functions.append(self._analyze_function(node))
-            elif isinstance(node, ast.ClassDef):
-                classes.append(self._analyze_class(node))
+        lines = code.split('\n')
         
         return {
-            "functions": functions,
-            "classes": classes,
-            "imports": self._extract_imports(tree)
+            "lines": len(lines),
+            "functions": len(re.findall(r'^\s*def\s+\w+', code, re.MULTILINE)),
+            "classes": len(re.findall(r'^\s*class\s+\w+', code, re.MULTILINE)),
+            "imports": len(re.findall(r'^\s*(?:from|import)\s+', code, re.MULTILINE)),
+            "comments": len(re.findall(r'^\s*#', code, re.MULTILINE)),
+            "docstrings": len(re.findall(r'"""[\s\S]*?"""|\'\'\'[\s\S]*?\'\'\'', code)),
         }
     
-    def _analyze_function(self, node) -> FunctionInfo:
-        """Analyze a function definition."""
-        parameters = []
-        for arg in node.args.args:
-            param = ParameterInfo(
-                name=arg.arg,
-                type_hint=ast.unparse(arg.annotation) if arg.annotation else None
-            )
-            parameters.append(param)
+    def extract_imports(self, code: str, language: str = "python") -> List[str]:
+        """
+        Extract import statements from code.
         
-        return FunctionInfo(
-            name=node.name,
-            parameters=parameters,
-            return_type=ast.unparse(node.returns) if node.returns else None,
-            docstring=ast.get_docstring(node),
-            line_number=node.lineno,
-            is_async=isinstance(node, ast.AsyncFunctionDef)
-        )
+        Args:
+            code: Source code
+            language: Programming language
+            
+        Returns:
+            List of imported modules
+        """
+        if language == "python":
+            imports = re.findall(r'^\s*(?:from|import)\s+(\S+)', code, re.MULTILINE)
+            return list(set(imports))
+        return []
     
-    def _analyze_class(self, node: ast.ClassDef) -> ClassInfo:
-        """Analyze a class definition."""
-        methods = []
-        for item in node.body:
-            if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                methods.append(self._analyze_function(item))
+    def check_complexity(self, code: str) -> Dict[str, Any]:
+        """
+        Basic complexity metrics.
         
-        bases = [ast.unparse(base) for base in node.bases]
+        Args:
+            code: Source code to analyze
+            
+        Returns:
+            Complexity metrics
+        """
+        lines = [line for line in code.split('\n') if line.strip()]
         
-        return ClassInfo(
-            name=node.name,
-            methods=methods,
-            bases=bases,
-            docstring=ast.get_docstring(node),
-            line_number=node.lineno
-        )
-    
-    def _extract_imports(self, tree: ast.AST) -> List[str]:
-        """Extract import statements."""
-        imports = []
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Import):
-                for alias in node.names:
-                    imports.append(alias.name)
-            elif isinstance(node, ast.ImportFrom):
-                module = node.module or ""
-                for alias in node.names:
-                    imports.append(f"{module}.{alias.name}")
-        return imports
+        # Count control flow statements
+        control_flow = len(re.findall(
+            r'\b(if|else|elif|for|while|try|except|with)\b',
+            code
+        ))
+        
+        return {
+            "total_lines": len(lines),
+            "control_flow_statements": control_flow,
+            "estimated_complexity": control_flow + len(lines) // 10
+        }
