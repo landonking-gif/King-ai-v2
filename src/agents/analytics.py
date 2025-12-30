@@ -5,7 +5,7 @@ Expert in pattern recognition, market trends, and KPI monitoring.
 
 import uuid
 from dataclasses import asdict
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, timezone
 from typing import Any, Optional
 from src.agents.base import SubAgent
 from src.utils.metrics import TASKS_EXECUTED
@@ -56,7 +56,7 @@ class AnalyticsAgent(SubAgent):
                 "conversion": {
                     "rate": metrics.get("conversion_rate").value if "conversion_rate" in metrics else 0,
                 },
-                "updated_at": datetime.utcnow().isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
             }
             
             return {"success": True, "data": dashboard}
@@ -70,7 +70,7 @@ class AnalyticsAgent(SubAgent):
             targets = self._kpi_targets.get(business_id, {})
             
             # Calculate comparison period (previous period)
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             period_start = now - timedelta(days=30)
             prev_start = period_start - timedelta(days=30)
             
@@ -129,7 +129,7 @@ class AnalyticsAgent(SubAgent):
     ) -> dict:
         """Get trend data for a metric."""
         try:
-            end_time = datetime.utcnow()
+            end_time = datetime.now(timezone.utc)
             start_time = end_time - timedelta(days=days)
             gran = TimeGranularity(granularity)
             
@@ -164,7 +164,7 @@ class AnalyticsAgent(SubAgent):
     ) -> dict:
         """Compare current period vs previous period."""
         try:
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             current_start = now - timedelta(days=current_days)
             prev_start = current_start - timedelta(days=current_days)
             
@@ -236,7 +236,7 @@ class AnalyticsAgent(SubAgent):
                         message=f"{definition.display_name} is {level}: {value.value} (threshold: {threshold})",
                         current_value=value.value,
                         threshold=threshold,
-                        triggered_at=datetime.utcnow(),
+                        triggered_at=datetime.now(timezone.utc),
                     )
                     new_alerts.append(new_alert)
                     self._alerts.append(new_alert)
@@ -284,7 +284,7 @@ class AnalyticsAgent(SubAgent):
                 business_id=business_id,
                 period_start=start_date,
                 period_end=end_date,
-                generated_at=datetime.utcnow(),
+                generated_at=datetime.now(timezone.utc),
                 sections=[
                     {"name": "Overview", "data": dashboard.get("data", {})},
                     {"name": "KPIs", "data": kpis_result.get("data", {})},

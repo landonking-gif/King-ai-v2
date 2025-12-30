@@ -2,7 +2,7 @@
 Metrics Collector - Aggregate data from various sources.
 """
 import asyncio
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, timezone
 from typing import Any, Optional
 from collections import defaultdict
 from src.analytics.models import (
@@ -133,7 +133,7 @@ class MetricsCollector:
                         results[name] = MetricValue(
                             metric_name=name,
                             value=value,
-                            timestamp=datetime.utcnow(),
+                            timestamp=datetime.now(timezone.utc),
                             dimensions={"source": source_name},
                         )
             except Exception as e:
@@ -150,7 +150,7 @@ class MetricsCollector:
         mv = MetricValue(
             metric_name=metric_name,
             value=value,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             dimensions=dimensions or {},
         )
         self._cache[metric_name].append(mv)
