@@ -43,20 +43,6 @@ class Settings(BaseSettings):
     api_host: str = Field(default="0.0.0.0")
     # Port for the FastAPI server
     api_port: int = Field(default=8000)
-    
-    # --- Shopify Configuration ---
-    # Shopify store name (e.g., "my-store" from my-store.myshopify.com)
-    SHOPIFY_SHOP_NAME: str | None = Field(default=None, env="SHOPIFY_SHOP_NAME")
-    # Shopify Admin API access token
-    SHOPIFY_ACCESS_TOKEN: str | None = Field(default=None, env="SHOPIFY_ACCESS_TOKEN")
-    # Secret for verifying Shopify webhooks
-    SHOPIFY_WEBHOOK_SECRET: str | None = Field(default=None, env="SHOPIFY_WEBHOOK_SECRET")
-    # Shopify API version to use
-    SHOPIFY_API_VERSION: str = Field(default="2024-10", env="SHOPIFY_API_VERSION")
-    
-    class Config:
-        env_file = ".env" # Path to the environment file
-        extra = "ignore" # Ignore extra environment variables not defined here
 
 # Singleton instance
 settings = Settings()
