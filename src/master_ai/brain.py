@@ -49,9 +49,13 @@ class MasterAI:
         if gemini_key:
             self.gemini = GeminiClient(api_key=gemini_key)
         
+        # Initialize LLM router for sophisticated routing
+        from src.utils.llm_router import LLMRouter
+        self.llm_router = LLMRouter()
+        
         # Specialized manager components
         self.context = ContextManager()      # Handles RAG and context window building
-        self.planner = Planner(self.ollama)  # Note: Planner might still use ollama directly; consider refactoring too
+        self.planner = Planner(self.llm_router)  # Uses LLM router for intelligent routing
         self.evolution = EvolutionEngine(self.ollama) 
         self.agent_router = AgentRouter()    # Dispatches tasks to sub-agents
         
