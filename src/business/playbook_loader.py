@@ -8,7 +8,7 @@ import yaml
 from src.business.playbook_models import (
     PlaybookDefinition, PlaybookType, TaskDefinition, PLAYBOOK_TEMPLATES
 )
-from src.utils.logging import get_logger
+from src.utils.structured_logging import get_logger
 
 logger = get_logger(__name__)
 
