@@ -1,36 +1,46 @@
 """
-Evolution Models - Data models for evolution proposals and status tracking.
+Evolution Models - Data models for evolution proposals.
 """
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
 from typing import Optional, List, Dict, Any
+from enum import Enum
 
 
 class ProposalStatus(str, Enum):
     """Status of an evolution proposal."""
     PENDING = "pending"
+    TESTING = "testing"
     APPROVED = "approved"
     REJECTED = "rejected"
     APPLIED = "applied"
-    ROLLED_BACK = "rolled_back"
+    FAILED = "failed"
 
 
 @dataclass
 class EvolutionProposal:
-    """
-    Represents an evolution proposal.
-    Compatible with database EvolutionProposal model.
-    """
+    """An evolution proposal for code improvements."""
     id: str
-    type: str
+    title: str
     description: str
-    rationale: str
-    proposed_changes: Dict[str, Any]
-    expected_impact: Optional[str] = None
-    confidence_score: float = 0.0
+    file_paths: List[str]
     status: ProposalStatus = ProposalStatus.PENDING
     created_at: datetime = field(default_factory=datetime.now)
-    reviewed_at: Optional[datetime] = None
-    applied_at: Optional[datetime] = None
+    impact_score: float = 0.0
+    risk_level: str = "medium"
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary."""
+        return {
+            "id": self.id,
+            "title": self.title,
+            "description": self.description,
+            "file_paths": self.file_paths,
+            "status": self.status.value,
+            "created_at": self.created_at.isoformat(),
+            "impact_score": self.impact_score,
+            "risk_level": self.risk_level,
+            "metadata": self.metadata
+        }

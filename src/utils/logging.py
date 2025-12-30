@@ -57,10 +57,10 @@ def get_logger(name: str = None):
     Get a logger instance with optional name.
     
     Args:
-        name: Optional name for the logger context
+        name: Optional logger name for context
         
     Returns:
-        A structlog logger instance
+        Structured logger instance
     """
     if name:
         return structlog.get_logger().bind(component=name)
