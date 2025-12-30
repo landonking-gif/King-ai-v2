@@ -85,6 +85,9 @@ class ContentAgent(SubAgent):
     name = "content"
     description = "Generates SEO-optimized blog posts, marketing copy, and social media content."
     
+    # SEO optimization threshold
+    MIN_SEO_SCORE_THRESHOLD = 70  # Minimum acceptable SEO score before improvement attempts
+    
     # Content generation prompts
     PROMPTS = {
         ContentType.BLOG_POST: """Write a comprehensive, SEO-optimized blog post about: {topic}
@@ -291,7 +294,7 @@ Tagline: [Tagline]
             content.seo_score = seo_score
             
             # If SEO score is low, try to improve
-            if seo_score.overall_score < 70:
+            if seo_score.overall_score < self.MIN_SEO_SCORE_THRESHOLD:
                 content = await self._improve_seo(content, request, seo_score)
         
         # Generate social snippets
