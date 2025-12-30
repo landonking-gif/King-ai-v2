@@ -3,6 +3,28 @@ import os
 import shutil
 from datetime import datetime
 import difflib
+from typing import List
+from dataclasses import dataclass
+
+
+@dataclass
+class Patch:
+    """Represents a single file patch."""
+    file_path: str
+    old_content: str
+    new_content: str
+
+
+class PatchSet:
+    """Collection of patches to apply."""
+    
+    def __init__(self):
+        self.patches: List[Patch] = []
+    
+    def add_patch(self, file_path: str, old_content: str, new_content: str):
+        """Add a patch to the set."""
+        self.patches.append(Patch(file_path, old_content, new_content))
+
 
 class CodePatcher:
     """
