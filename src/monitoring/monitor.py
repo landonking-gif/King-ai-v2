@@ -73,10 +73,11 @@ class SystemMonitor:
 
     async def collect_metrics(self) -> SystemMetrics:
         """Collect system metrics."""
+        # Avoid circular import by importing at runtime
         from src.api.websocket import manager
         
         metrics = SystemMetrics(
-            cpu_percent=psutil.cpu_percent(interval=0.1),
+            cpu_percent=psutil.cpu_percent(interval=None),  # Non-blocking
             memory_percent=psutil.virtual_memory().percent,
             disk_percent=psutil.disk_usage('/').percent,
             active_connections=manager.get_stats()["total_connections"],
