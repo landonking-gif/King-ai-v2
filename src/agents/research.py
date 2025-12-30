@@ -4,10 +4,11 @@ Handles web research, market analysis, and competitor tracking.
 """
 
 import asyncio
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
+import hashlib
 
 from src.agents.base import BaseAgent, AgentCapability, AgentResult
 from src.utils.web_scraper import WebScraper, ScrapedPage, ContentExtractor
@@ -291,10 +292,14 @@ class ResearchAgent(BaseAgent):
         query: str
     ) -> str:
         """Summarize page content using LLM."""
+        # Sanitize content to prevent prompt injection
+        sanitized_title = page.title.replace("```", "").replace("\n", " ")[:200]
+        sanitized_content = page.text_content.replace("```", "")[:3000]
+        
         prompt = f"""Summarize the following content in relation to: "{query}"
 
-Content from {page.title}:
-{page.text_content[:3000]}
+Content from {sanitized_title}:
+{sanitized_content}
 
 Provide a 2-3 sentence summary focusing on the most relevant information."""
 
@@ -307,11 +312,14 @@ Provide a 2-3 sentence summary focusing on the most relevant information."""
         sources: List[ResearchSource]
     ) -> ResearchReport:
         """Generate final research report."""
-        # Prepare source summaries
-        source_text = "\n".join([
-            f"Source: {s.title}\nSummary: {s.content_summary}\n"
-            for s in sources[:10]
-        ])
+        # Prepare source summaries with sanitization
+        sanitized_sources = []
+        for s in sources[:10]:
+            sanitized_title = s.title.replace("```", "").replace("\n", " ")[:200]
+            sanitized_summary = s.content_summary.replace("```", "")[:500]
+            sanitized_sources.append(f"Source: {sanitized_title}\nSummary: {sanitized_summary}\n")
+        
+        source_text = "\n".join(sanitized_sources)
         
         prompt = f"""Based on the following research sources, generate a comprehensive report.
 
@@ -351,7 +359,7 @@ KEY FINDINGS:
             }
         )
     
-    def _parse_report_response(self, response: str) -> tuple[str, List[str]]:
+    def _parse_report_response(self, response: str) -> Tuple[str, List[str]]:
         """Parse LLM report response."""
         summary = ""
         findings = []
@@ -375,8 +383,12 @@ KEY FINDINGS:
     async def _store_research(self, report: ResearchReport):
         """Store research in vector store for future reference."""
         try:
+            # Use deterministic hash for consistent IDs
+            query_hash = hashlib.md5(report.query.encode()).hexdigest()
+            research_id = f"research_{query_hash}_{int(datetime.now().timestamp())}"
+            
             await self.vector_store.upsert(
-                id=f"research_{hash(report.query)}_{int(datetime.now().timestamp())}",
+                id=research_id,
                 text=f"{report.summary}\n\nKey Findings:\n" + "\n".join(report.key_findings),
                 metadata={
                     "type": "research_report",
