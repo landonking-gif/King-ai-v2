@@ -1,9 +1,35 @@
 """Base class for all specialized agents."""
 
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Optional
+from enum import Enum
+from dataclasses import dataclass
 from src.utils.ollama_client import OllamaClient
 from config.settings import settings
+
+
+class AgentCapability(str, Enum):
+    """Agent capabilities."""
+    RESEARCH = "research"
+    WEB_SCRAPING = "web_scraping"
+    DATA_ANALYSIS = "data_analysis"
+    CODE_GENERATION = "code_generation"
+    CONTENT_CREATION = "content_creation"
+    COMMERCE = "commerce"
+    FINANCE = "finance"
+    ANALYTICS = "analytics"
+    LEGAL = "legal"
+
+
+@dataclass
+class AgentResult:
+    """Result from agent execution."""
+    success: bool
+    data: Optional[Any] = None
+    error: Optional[str] = None
+    message: str = ""
+    metadata: Optional[dict] = None
+
 
 class SubAgent(ABC):
     """
@@ -49,3 +75,27 @@ class SubAgent(ABC):
     async def _ask_llm(self, prompt: str) -> str:
         """Helper to query the LLM for agent-specific reasoning."""
         return await self.ollama.complete(prompt)
+
+
+class BaseAgent(SubAgent):
+    """
+    Base agent with enhanced initialization.
+    Supports different initialization patterns.
+    """
+    
+    def __init__(self, name: str, llm_client: Optional[OllamaClient] = None):
+        """
+        Initialize base agent.
+        
+        Args:
+            name: Agent name
+            llm_client: Optional LLM client (if None, creates default)
+        """
+        self.name = name
+        if llm_client:
+            self.llm = llm_client
+            self.ollama = llm_client
+        else:
+            super().__init__()
+            self.llm = self.ollama
+
