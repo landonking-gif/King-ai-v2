@@ -1,4 +1,6 @@
 import json
+import os
+from pathlib import Path
 from src.utils.ollama_client import OllamaClient
 from src.master_ai.prompts import EVOLUTION_PROMPT
 
@@ -52,10 +54,34 @@ class EvolutionEngine:
         """
         from src.utils.code_patcher import CodePatcher
         
-        # Absolute path resolution (base of the project)
-        abs_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../..", file_path))
+        # Get project root (two levels up from this file)
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
         
-        patcher = CodePatcher()
-        result = patcher.apply_patch(abs_path, new_code)
+        # Initialize patcher with project root
+        patcher = CodePatcher(project_root)
         
-        return result
+        # Create and apply patch
+        patch = patcher.create_patch(file_path, new_code, description="Evolution proposal")
+        
+        # Validate before applying
+        is_valid, errors = patcher.validate_patch(patch)
+        if not is_valid:
+            return {
+                "success": False,
+                "error": f"Validation failed: {', '.join(errors)}"
+            }
+        
+        # Apply the patch
+        success = patcher.apply_patch(patch)
+        
+        if success:
+            return {
+                "success": True,
+                "message": "Patch applied successfully",
+                "stats": patch.stats
+            }
+        else:
+            return {
+                "success": False,
+                "error": patch.error or "Unknown error"
+            }
