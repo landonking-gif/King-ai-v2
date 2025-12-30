@@ -1,7 +1,7 @@
 """Tests for Legal Agent."""
 import pytest
 from datetime import date
-from src.legal.templates import DocumentType, ComplianceFramework, LegalDocument, Contract
+from src.legal.templates import DocumentType, ComplianceFramework, LegalDocument, Contract, Party
 from src.agents.legal import LegalAgent
 
 
@@ -22,6 +22,16 @@ class TestLegalDocument:
         )
         assert doc.id == "doc_1"
         assert doc.document_type == DocumentType.PRIVACY_POLICY
+    
+    def test_create_party(self):
+        party = Party(
+            name="Test Company",
+            address="123 Test St",
+            role="Contractor",
+            email="test@test.com"
+        )
+        assert party.name == "Test Company"
+        assert party.role == "Contractor"
 
 
 class TestLegalAgent:

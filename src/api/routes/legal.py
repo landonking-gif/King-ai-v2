@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field, field_validator
 
 from src.agents.legal import LegalAgent
-from src.legal.templates import DocumentType, ComplianceFramework
+from src.legal.templates import DocumentType, ComplianceFramework, VALID_CONTRACT_STATUSES
 from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -55,9 +55,8 @@ class ContractStatusUpdate(BaseModel):
     @field_validator('status')
     @classmethod
     def validate_status(cls, v: str) -> str:
-        valid_statuses = ["draft", "pending_signature", "active", "expired", "terminated"]
-        if v not in valid_statuses:
-            raise ValueError(f"Invalid status. Must be one of: {valid_statuses}")
+        if v not in VALID_CONTRACT_STATUSES:
+            raise ValueError(f"Invalid status. Must be one of: {VALID_CONTRACT_STATUSES}")
         return v
 
 

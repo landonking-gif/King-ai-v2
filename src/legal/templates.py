@@ -7,6 +7,10 @@ from enum import Enum
 from typing import Any, Optional
 
 
+# Contract status constants
+VALID_CONTRACT_STATUSES = ["draft", "pending_signature", "active", "expired", "terminated"]
+
+
 class DocumentType(Enum):
     PRIVACY_POLICY = "privacy_policy"
     TERMS_OF_SERVICE = "terms_of_service"
@@ -43,10 +47,20 @@ class LegalDocument:
 
 
 @dataclass
+class Party:
+    """Represents a party in a legal contract."""
+    name: str
+    address: str
+    role: Optional[str] = None  # e.g., "Disclosing Party", "Receiving Party", "Contractor"
+    email: Optional[str] = None
+    phone: Optional[str] = None
+
+
+@dataclass
 class Contract:
     id: str
     title: str
-    parties: list[dict]
+    parties: list[Party]
     document_type: DocumentType
     content: str
     status: str = "draft"  # draft, pending_signature, active, expired, terminated

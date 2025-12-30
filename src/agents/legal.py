@@ -8,8 +8,8 @@ from typing import Any, Optional
 
 from src.agents.base import SubAgent
 from src.legal.templates import (
-    DocumentType, ComplianceFramework, LegalDocument, Contract,
-    ComplianceCheck, TEMPLATES
+    DocumentType, ComplianceFramework, LegalDocument, Contract, Party,
+    ComplianceCheck, TEMPLATES, VALID_CONTRACT_STATUSES
 )
 from src.utils.metrics import TASKS_EXECUTED
 
@@ -117,9 +117,17 @@ Generate the complete document in markdown format."""
 
             content = await self._ask_llm(prompt)
 
+            # Try to map document_type string to enum, default to CONTRACTOR_AGREEMENT
+            doc_type_enum = DocumentType.CONTRACTOR_AGREEMENT
+            try:
+                doc_type_enum = DocumentType(document_type.lower().replace(' ', '_'))
+            except ValueError:
+                # Use default if mapping fails
+                pass
+
             doc = LegalDocument(
                 id=str(uuid.uuid4()),
-                document_type=DocumentType.CONTRACTOR_AGREEMENT,  # Default
+                document_type=doc_type_enum,
                 title=document_type,
                 content=content,
                 version="1.0",
@@ -251,9 +259,21 @@ Generate the complete document in markdown format."""
         """Create a new contract."""
         try:
             variables = {**terms}
-            for i, party in enumerate(parties):
-                variables[f"party_{i+1}_name"] = party.get("name", "")
-                variables[f"party_{i+1}_address"] = party.get("address", "")
+            
+            # Convert party dicts to Party objects
+            party_objects = []
+            for i, party_dict in enumerate(parties):
+                party = Party(
+                    name=party_dict.get("name", ""),
+                    address=party_dict.get("address", ""),
+                    role=party_dict.get("role"),
+                    email=party_dict.get("email"),
+                    phone=party_dict.get("phone")
+                )
+                party_objects.append(party)
+                # Also set variables for template
+                variables[f"party_{i+1}_name"] = party.name
+                variables[f"party_{i+1}_address"] = party.address
 
             # Generate content
             doc_result = await self.generate_document(document_type, variables)
@@ -276,7 +296,7 @@ Generate the complete document in markdown format."""
             contract = Contract(
                 id=str(uuid.uuid4()),
                 title=title,
-                parties=parties,
+                parties=party_objects,
                 document_type=document_type,
                 content=doc_result["output"]["content"],
                 effective_date=effective_date,
@@ -291,7 +311,7 @@ Generate the complete document in markdown format."""
                     "contract_id": contract.id,
                     "title": contract.title,
                     "status": contract.status,
-                    "parties": contract.parties,
+                    "parties": [{"name": p.name, "address": p.address, "role": p.role} for p in contract.parties],
                 }
             }
         except Exception as e:
@@ -310,7 +330,7 @@ Generate the complete document in markdown format."""
                 "id": contract.id,
                 "title": contract.title,
                 "status": contract.status,
-                "parties": contract.parties,
+                "parties": [{"name": p.name, "address": p.address, "role": p.role} for p in contract.parties],
                 "content": contract.content,
                 "effective_date": contract.effective_date.isoformat() if contract.effective_date else None,
                 "expiration_date": contract.expiration_date.isoformat() if contract.expiration_date else None,
@@ -342,9 +362,8 @@ Generate the complete document in markdown format."""
         if not contract:
             return {"success": False, "error": "Contract not found"}
 
-        valid_statuses = ["draft", "pending_signature", "active", "expired", "terminated"]
-        if status not in valid_statuses:
-            return {"success": False, "error": f"Invalid status. Use: {valid_statuses}"}
+        if status not in VALID_CONTRACT_STATUSES:
+            return {"success": False, "error": f"Invalid status. Use: {VALID_CONTRACT_STATUSES}"}
 
         contract.status = status
         if status == "active":
@@ -418,7 +437,14 @@ Generate the complete document in markdown format."""
                     "mitigations": ["Copyright notices", "Content licensing terms", "Trademark registration"],
                 })
 
-            overall_level = "high" if any(r["level"] == "high" for r in risks) else "medium" if any(r["level"] == "medium" for r in risks) else "low"
+            # Determine overall risk level
+            risk_levels = [r["level"] for r in risks]
+            if "high" in risk_levels:
+                overall_level = "high"
+            elif "medium" in risk_levels:
+                overall_level = "medium"
+            else:
+                overall_level = "low"
 
             TASKS_EXECUTED.labels(agent=self.name, status="success").inc()
             return {
