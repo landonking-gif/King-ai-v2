@@ -55,6 +55,12 @@ class LegalAgent(SubAgent):
             except KeyError as e:
                 return {"success": False, "error": f"Missing variable: {e}"}
 
+            # Parse and validate effective_date
+            try:
+                effective_date = date.fromisoformat(variables["effective_date"])
+            except (ValueError, KeyError) as e:
+                return {"success": False, "error": f"Invalid effective_date format. Use YYYY-MM-DD: {e}"}
+
             # Add custom sections
             if custom_sections:
                 for section_name, section_content in custom_sections.items():
@@ -66,7 +72,7 @@ class LegalAgent(SubAgent):
                 title=f"{document_type.value.replace('_', ' ').title()}",
                 content=content,
                 version="1.0",
-                effective_date=date.fromisoformat(variables["effective_date"]),
+                effective_date=effective_date,
                 variables=variables,
             )
             self._documents[doc.id] = doc
@@ -254,14 +260,27 @@ Generate the complete document in markdown format."""
             if not doc_result["success"]:
                 return doc_result
 
+            # Parse dates with error handling
+            try:
+                effective_date = date.fromisoformat(terms.get("effective_date", date.today().isoformat()))
+            except ValueError as e:
+                return {"success": False, "error": f"Invalid effective_date format: {e}"}
+            
+            expiration_date = None
+            if terms.get("expiration_date"):
+                try:
+                    expiration_date = date.fromisoformat(terms["expiration_date"])
+                except ValueError as e:
+                    return {"success": False, "error": f"Invalid expiration_date format: {e}"}
+
             contract = Contract(
                 id=str(uuid.uuid4()),
                 title=title,
                 parties=parties,
                 document_type=document_type,
                 content=doc_result["output"]["content"],
-                effective_date=date.fromisoformat(terms.get("effective_date", date.today().isoformat())),
-                expiration_date=date.fromisoformat(terms["expiration_date"]) if terms.get("expiration_date") else None,
+                effective_date=effective_date,
+                expiration_date=expiration_date,
             )
             self._contracts[contract.id] = contract
 
@@ -295,6 +314,23 @@ Generate the complete document in markdown format."""
                 "content": contract.content,
                 "effective_date": contract.effective_date.isoformat() if contract.effective_date else None,
                 "expiration_date": contract.expiration_date.isoformat() if contract.expiration_date else None,
+            }
+        }
+
+    async def get_document(self, document_id: str) -> dict:
+        """Get document details."""
+        doc = self._documents.get(document_id)
+        if not doc:
+            return {"success": False, "error": "Document not found"}
+        
+        return {
+            "success": True,
+            "output": {
+                "id": doc.id,
+                "title": doc.title,
+                "content": doc.content,
+                "version": doc.version,
+                "effective_date": doc.effective_date.isoformat(),
             }
         }
 
