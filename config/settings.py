@@ -25,12 +25,16 @@ class Settings(BaseSettings):
     pinecone_api_key: str | None = Field(default=None, env="PINECONE_API_KEY")
     # The index name to use in Pinecone
     pinecone_index: str = Field(default="king-ai", env="PINECONE_INDEX")
+    # The Pinecone environment/region (e.g., us-east-1)
+    pinecone_environment: str = Field(default="us-east-1", env="PINECONE_ENV")
     
     # --- Risk & Evolution Controls ---
     # Controls how much autonomy the AI has: conservative, moderate, or aggressive
     risk_profile: Literal["conservative", "moderate", "aggressive"] = "moderate"
     # Max number of self-modification proposals allowed per hour
     max_evolutions_per_hour: int = Field(default=5)
+    # Whether autonomous mode is enabled
+    enable_autonomous_mode: bool = Field(default=False, env="ENABLE_AUTONOMOUS_MODE")
     
     # --- API Server Settings ---
     # Host for the FastAPI server

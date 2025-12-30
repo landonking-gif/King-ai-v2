@@ -35,5 +35,19 @@ def setup_logging():
         level=logging.INFO,
     )
 
+def get_logger(name: str = None):
+    """
+    Get a logger instance with an optional name.
+    
+    Args:
+        name: Optional name for the logger (e.g., module name)
+        
+    Returns:
+        A bound structlog logger instance
+    """
+    if name:
+        return structlog.get_logger(name)
+    return structlog.get_logger()
+
 # Global logger instance
 logger = structlog.get_logger()
