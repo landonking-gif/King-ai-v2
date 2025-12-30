@@ -148,7 +148,7 @@ class EvolutionHistory(Base):
     event_type: str = Column(String(20), nullable=False)  # proposed, approved, executed, failed, rolled_back
     proposal_id: str = Column(String(36), ForeignKey("evolution_proposals.id"))
     description: str = Column(Text, nullable=False)
-    metadata: dict = Column(JSON, default={})
+    event_metadata: dict = Column('metadata', JSON, default={})
     
     # System state snapshots
     system_state_before: dict = Column(JSON, nullable=True)

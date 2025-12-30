@@ -3,7 +3,7 @@ Data models for the evolution engine.
 Supports proposal generation, validation, and execution tracking.
 """
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Dict, Any, Literal
 from enum import Enum
 from datetime import datetime
@@ -52,7 +52,8 @@ class ConfidenceScore(BaseModel):
     reasoning: str = ""
     calculated_at: datetime = Field(default_factory=datetime.now)
     
-    @validator('overall')
+    @field_validator('overall')
+    @classmethod
     def validate_overall(cls, v):
         if not 0.0 <= v <= 1.0:
             raise ValueError('Overall confidence must be between 0.0 and 1.0')
