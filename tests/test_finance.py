@@ -1,7 +1,15 @@
 """Tests for Finance Agent and Stripe Client."""
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, patch, MagicMock
 from datetime import datetime
+import sys
+
+# Mock config before importing anything that depends on it
+mock_settings = MagicMock()
+mock_settings.ollama_url = "http://localhost:11434"
+mock_settings.ollama_model = "llama3.1:8b"
+sys.modules['config.settings'] = MagicMock(settings=mock_settings)
+
 from src.integrations.stripe_client import (
     StripeClient, StripeCustomer, PaymentIntent, Subscription,
     PaymentStatus, SubscriptionStatus

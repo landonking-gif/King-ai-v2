@@ -298,14 +298,20 @@ class FinanceAgent(SubAgent):
             
             available = sum(b["amount"] for b in balance.get("available", []))
             pending = sum(b["amount"] for b in balance.get("pending", []))
-            mrr = len(subscriptions) * 2999  # Placeholder calculation
             
+            # Calculate MRR from actual subscription data
+            # Note: This is a simplified calculation. In production, you'd query
+            # subscription prices from Stripe to get accurate MRR values
+            mrr = len(subscriptions) * 2999  # TODO: Calculate from actual subscription prices
+            
+            # TODO: Implement churn_rate calculation based on subscription cancellations
+            # TODO: Implement average_order_value from payment intent history
             metrics = RevenueMetrics(
                 total_revenue=available / 100,
                 monthly_recurring=mrr / 100,
                 active_subscriptions=len(subscriptions),
-                churn_rate=0.0,
-                average_order_value=0.0,
+                churn_rate=0.0,  # Placeholder - needs historical data
+                average_order_value=0.0,  # Placeholder - needs payment history
                 pending_payouts=pending / 100,
             )
             
