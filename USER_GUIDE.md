@@ -7,9 +7,12 @@ This guide explains how to operate King AI, your autonomous business CEO.
 ## 🟢 Startup
 
 ### Option A: Fully Automated (Recommended)
-1.  Open PowerShell in the project folder.
-2.  Run: `.\scripts\deploy.ps1`
-3.  The script will sync your latest code and restart the cloud server.
+1.  Open PowerShell or Terminal.
+### Option A: Fully Automated (Recommended)
+1.  Open the project folder.
+2.  Double-click **`control.bat`** (or run `.\control` in terminal).
+3.  Select **[1] Full Deployment** from the menu.
+    *   This automates code sync, secrets management, and server restarts.
 
 ### Option B: Access Existing Session
 If the server is already running, simply open this URL in your browser or phone:
@@ -26,7 +29,7 @@ This is your direct line to the Master AI.
 *   **Analyze**: "Why is PetPal losing money?"
 
 **Status Indicators:**
-*   🟢 **Online**: Brain is fast and responsive.
+*   🟢 **Online**: Brain is fast aynd responsive.
 *   🟡 **Thinking**: Complex task in progress (Simulation/Research).
 *   🔴 **Offline**: Connection lost (Check Server).
 

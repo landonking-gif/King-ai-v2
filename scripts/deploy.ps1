@@ -14,22 +14,33 @@ if (-not (Test-Path ".git")) {
     git commit -m "Initial commit"
 }
 
-# 1. Sync to GitHub
-Write-Host "`n[1/3] Syncing Local Changes to GitHub..." -ForegroundColor Yellow
+# 1. Sync to GitHub (Best Effort)
+Write-Host "`n[1/3] Syncing Local Changes..." -ForegroundColor Yellow
 git add .
 $commitMsg = Read-Host "Enter Commit Message (Default: 'Auto-deploy update')"
 if ([string]::IsNullOrWhiteSpace($commitMsg)) { $commitMsg = "Auto-deploy update" }
 git commit -m "$commitMsg"
-git push
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Git Push Failed! Aborting." -ForegroundColor Red
-    exit
+
+# Try pushing if remote exists
+$hasRemote = git remote -v
+if ($hasRemote) {
+    git push
+    if ($LASTEXITCODE -ne 0) { Write-Host "Warning: Git Push Failed." -ForegroundColor Red }
+} else {
+    Write-Host "Note: No Git remote configured. Skipping push." -ForegroundColor Gray
 }
 
-# 2. Trigger Remote Update
-Write-Host "`n[2/3] Triggering Remote Update on AWS..." -ForegroundColor Yellow
-$RemoteCommand = "cd king-ai-v2 && git pull && ./start.sh"
+# 2. Deploy to AWS (SCP)
+Write-Host "`n[2/3] Deploying to AWS..." -ForegroundColor Yellow
 
+# Create Archive
+tar -czf king-ai-v2.tar.gz --exclude="node_modules" --exclude="venv" --exclude=".git" --exclude=".pytest_cache" src dashboard scripts config tests alembic.ini pyproject.toml README.md docker-compose.yml Dockerfile .env
+
+# Upload
+scp -o StrictHostKeyChecking=no -i $PEM_FILE king-ai-v2.tar.gz ubuntu@${AWS_IP}:/home/ubuntu/king-ai-v2.tar.gz
+
+# Extract & Restart
+$RemoteCommand = "mkdir -p king-ai-v2 && tar -xzf king-ai-v2.tar.gz -C king-ai-v2 && cd king-ai-v2 && chmod +x start.sh && ./start.sh"
 ssh -o StrictHostKeyChecking=no -i $PEM_FILE ubuntu@$AWS_IP $RemoteCommand
 
 if ($LASTEXITCODE -eq 0) {
@@ -37,5 +48,8 @@ if ($LASTEXITCODE -eq 0) {
     Write-Host "   Backend API: http://$AWS_IP:8000" -ForegroundColor Gray
     Write-Host "   Dashboard:   http://$AWS_IP:5173" -ForegroundColor Gray
 } else {
-    Write-Host "`n❌ Remote Deployment Failed. Check SSH connection." -ForegroundColor Red
+    Write-Host "`n❌ Remote Deployment Failed." -ForegroundColor Red
 }
+
+# Cleanup
+Remove-Item king-ai-v2.tar.gz -ErrorAction SilentlyContinue

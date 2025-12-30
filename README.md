@@ -4,15 +4,22 @@
 
 King AI v2 is a sophisticated autonomous agent system designed to plan, launch, and manage digital businesses. It features a "Dual-Brain" architecture that runs powerful LLMs on a dedicated AWS GPU while maintaining a responsive, glassmorphic React dashboard for the user.
 
-## 🚀 Quick Start (User)
+## 🚀 Quick Start (Master Controller)
+We use a unified "Master Controller" script to handle deployments, server connections, and updates.
 
-**Already Deployed?**
-Access your dashboard anywhere: **http://44.212.96.61:5173**
+**Prerequisites:**
+- Node.js installed locally.
 
-**Local Development:**
-1.  **Clone**: `git clone <repo>`
-2.  **Install**: `pip install -r requirements.txt`
-3.  **Run**: `python cli.py start` (Starts both API and Dashboard)
+**Usage:**
+```bash
+.\control.bat
+```
+(Or simply double-click the file in Explorer)
+
+This interactive control center allows you to:
+1.  **Full Deploy**: Sync secrets, code, and restart services.
+2.  **Quick Sync**: Push code changes without restarting everything.
+3.  **Monitor**: Stream live logs from the AWS empire.
 
 ## 📚 Documentation
 *   [User Guide](USER_GUIDE.md): For operators (How to use the CEO Chat, Empire Overview).

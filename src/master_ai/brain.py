@@ -261,8 +261,41 @@ Provide a data-driven response. Use specific numbers (revenue, costs, status) fo
         proposal = await self.evolution.propose_improvement(context)
         
         if proposal and proposal["is_beneficial"]:
+            # 1. Verify in Sandbox logic
             self._evolution_count_this_hour += 1
-            await self._save_evolution_proposal(proposal)
+            
+            # Extract file path and new code from proposal
+            # Assuming proposal structure: {"changes": {"path/to/file.py": "new_code"}}
+            # Note: The Evolution prompt structure usually returns a 'changes' dict.
+            # We might need to handle multiple files, but for MVP we handle the first one.
+            
+            changes = proposal.get("changes", {})
+            if not changes:
+                return
+
+            # Instantiate Sandbox
+            from src.utils.sandbox import Sandbox
+            sandbox = Sandbox()
+            sandbox.create_sandbox(list(changes.keys()))
+            
+            all_patches_applied = True
+            for file_path, new_code in changes.items():
+                if not sandbox.apply_patch(file_path, new_code):
+                    all_patches_applied = False
+                    break
+            
+            if all_patches_applied:
+                # Run Tests
+                test_result = sandbox.run_tests()
+                if test_result["success"]:
+                    # Verified! Save for user
+                    proposal["confidence"] = 0.95 # Boost confidence
+                    await self._save_evolution_proposal(proposal)
+                else:
+                    # Failed tests - Discard or Log
+                    print(f"Proposed evolution failed sandbox tests: {test_result['output'][:200]}...")
+            
+            sandbox.cleanup()
     
     async def _create_approval_task(self, step: dict) -> dict:
         """Persists a high-risk task that requires human intervention."""

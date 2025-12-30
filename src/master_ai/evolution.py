@@ -18,9 +18,14 @@ class EvolutionEngine:
         """
         Analyze system and propose beneficial changes.
         """
+        from src.master_ai.kpi_monitor import kpi_monitor
+        
+        # Gather real-time data
+        health_report = await kpi_monitor.get_system_health()
+        
         prompt = EVOLUTION_PROMPT.format(
             context=context,
-            performance="Recent performance metrics would go here..." # Placeholder
+            performance=health_report
         )
         
         response = await self.ollama.complete(prompt)
