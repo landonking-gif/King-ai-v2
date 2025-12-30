@@ -4,7 +4,7 @@ from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
-from src.api.routes import chat, businesses, approvals, evolution
+from src.api.routes import chat, businesses, approvals, evolution, health
 from src.master_ai.brain import MasterAI
 from src.database.connection import init_db
 
@@ -47,6 +47,7 @@ app.add_middleware(
 )
 
 # Routes
+app.include_router(health.router, prefix="/api/health", tags=["health"])
 app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
 app.include_router(businesses.router, prefix="/api/businesses", tags=["businesses"])
 app.include_router(approvals.router, prefix="/api/approvals", tags=["approvals"])
