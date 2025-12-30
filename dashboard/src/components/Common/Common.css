@@ -1,112 +1,61 @@
-/* Health Badge */
-.health-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
-  border-radius: 4px;
-  background: color-mix(in srgb, var(--health-color) 15%, transparent);
-  border: 1px solid var(--health-color);
-}
-
-.health-score {
-  font-weight: 600;
-  color: var(--health-color);
-}
-
-.health-label {
-  font-size: 0.85em;
-  color: var(--health-color);
-}
-
-/* Progress Bar */
-.progress-container {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.progress-bar {
-  flex: 1;
-  height: 8px;
-  background: #e0e0e0;
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.progress-fill {
-  height: 100%;
-  transition: width 0.3s ease;
-}
-
-.progress-percent {
-  font-size: 0.85em;
-  min-width: 40px;
-  text-align: right;
-}
-
-/* Data Table */
-.data-table-container {
-  overflow-x: auto;
-}
-
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.data-table th,
-.data-table td {
-  padding: 12px;
-  text-align: left;
-  border-bottom: 1px solid #e0e0e0;
-}
-
-.data-table th {
-  background: #f5f5f5;
-  font-weight: 600;
-}
-
-.data-table th.sortable {
-  cursor: pointer;
-}
-
-.data-table th.sortable:hover {
-  background: #eee;
-}
-
-.data-table tr.clickable {
-  cursor: pointer;
-}
-
-.data-table tr.clickable:hover {
-  background: #f9f9f9;
-}
-
-.table-pagination {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 16px;
-  padding: 16px;
-}
+/* Common Components Styles */
 
 /* Status Indicator */
 .status-indicator {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--status-color) 15%, transparent);
+  font-size: 12px;
+}
+
+.status-label {
   color: var(--status-color);
+  font-weight: 600;
 }
 
-.status-indicator.small { font-size: 0.8em; }
-.status-indicator.large { font-size: 1.2em; }
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+.status-icon {
+  font-size: 14px;
 }
 
-.status-indicator .status-icon {
-  animation: pulse 2s infinite;
+/* Data Table */
+.data-table-container {
+  overflow-x: auto;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+}
+
+.data-table thead {
+  background: #f5f5f5;
+}
+
+.data-table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  color: #333;
+  border-bottom: 2px solid #ddd;
+}
+
+.data-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #eee;
+}
+
+.data-table tbody tr:hover {
+  background: #f9f9f9;
+}
+
+.empty-row {
+  text-align: center;
+  padding: 40px;
+  color: #999;
 }

@@ -1,0 +1,232 @@
+/* Approval Queue */
+.approval-queue {
+  padding: 20px;
+}
+
+.queue-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.queue-header h2 {
+  margin: 0;
+}
+
+.count-badge {
+  background: #e74c3c;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-weight: 600;
+}
+
+.filter-tabs {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.filter-tab {
+  padding: 6px 12px;
+  border: 1px solid #ddd;
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  text-transform: capitalize;
+}
+
+.filter-tab.active {
+  background: #3498db;
+  color: white;
+  border-color: #3498db;
+}
+
+/* Empty Queue */
+.empty-queue {
+  text-align: center;
+  padding: 60px 20px;
+  color: #95a5a6;
+}
+
+.empty-icon {
+  font-size: 48px;
+  display: block;
+  margin-bottom: 16px;
+}
+
+/* Approval Card */
+.approval-card {
+  background: white;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  border-left: 4px solid #95a5a6;
+}
+
+.approval-card.risk-critical { border-left-color: #c0392b; }
+.approval-card.risk-high { border-left-color: #e74c3c; }
+.approval-card.risk-medium { border-left-color: #f39c12; }
+.approval-card.risk-low { border-left-color: #27ae60; }
+
+.card-main {
+  display: flex;
+  align-items: center;
+  padding: 16px;
+  cursor: pointer;
+}
+
+.card-main:hover {
+  background: #f9f9f9;
+}
+
+.card-icon {
+  font-size: 24px;
+  margin-right: 16px;
+}
+
+.card-content {
+  flex: 1;
+}
+
+.card-title {
+  margin: 0 0 4px 0;
+  font-size: 16px;
+}
+
+.card-desc {
+  margin: 0;
+  color: #666;
+  font-size: 14px;
+}
+
+.card-meta {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: #999;
+}
+
+.expand-icon {
+  color: #999;
+  margin-left: 16px;
+}
+
+/* Card Details */
+.card-details {
+  padding: 16px;
+  border-top: 1px solid #eee;
+  background: #fafafa;
+}
+
+.risk-factors h4,
+.payload-preview h4 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  color: #666;
+}
+
+.risk-factor {
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  border-radius: 4px;
+  background: white;
+  border-left: 3px solid #95a5a6;
+}
+
+.risk-factor.severity-critical { border-left-color: #c0392b; }
+.risk-factor.severity-high { border-left-color: #e74c3c; }
+.risk-factor.severity-medium { border-left-color: #f39c12; }
+
+.factor-category {
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  color: #666;
+}
+
+.payload-preview pre {
+  background: white;
+  padding: 12px;
+  border-radius: 4px;
+  overflow: auto;
+  max-height: 200px;
+  font-size: 12px;
+}
+
+/* Action Form */
+.action-form {
+  margin-top: 16px;
+}
+
+.action-form textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  resize: vertical;
+  margin-bottom: 12px;
+}
+
+.action-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.btn {
+  padding: 10px 24px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.btn-approve {
+  background: #27ae60;
+  color: white;
+}
+
+.btn-reject {
+  background: #e74c3c;
+  color: white;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Risk Badge */
+.risk-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--risk-color) 15%, transparent);
+  font-size: 12px;
+}
+
+.risk-label {
+  color: var(--risk-color);
+  font-weight: 600;
+}
+
+/* Loading */
+.loading {
+  text-align: center;
+  padding: 40px;
+  color: #999;
+}
+
+/* Approval History */
+.approval-history {
+  padding: 20px;
+}
+
+.approval-history h2 {
+  margin: 0 0 20px 0;
+}
