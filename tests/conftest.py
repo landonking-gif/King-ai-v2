@@ -2,7 +2,7 @@
 import pytest
 import os
 
-# Set up test environment variables before any imports
+# Set up environment variables for testing before any imports
 os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost:5432/test")
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379")
 os.environ.setdefault("OLLAMA_URL", "http://localhost:11434")

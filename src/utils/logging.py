@@ -60,8 +60,8 @@ def get_logger(name: str = None):
         name: Optional logger name for context
         
     Returns:
-        Structured logger instance
+        Bound logger instance
     """
     if name:
-        return structlog.get_logger().bind(component=name)
+        return structlog.get_logger().bind(logger=name)
     return structlog.get_logger()
