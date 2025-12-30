@@ -54,10 +54,10 @@ class MasterAI:
         self.llm_router = LLMRouter()
         
         # Specialized manager components
-        self.context = ContextManager()
-        self.planner = Planner(self.llm_router.ollama)  # Planner still uses ollama directly for now
+        self.context = ContextManager()      # Handles RAG and context window building
+        self.planner = Planner(self.llm_router)  # Uses LLM router for intelligent routing
         self.evolution = EvolutionEngine(self.llm_router.ollama)  # Evolution still uses ollama directly for now
-        self.agent_router = AgentRouter()
+        self.agent_router = AgentRouter()    # Dispatches tasks to sub-agents
         
         # State and rate limiting for autonomous features
         self.autonomous_mode = getattr(settings, 'enable_autonomous_mode', False)

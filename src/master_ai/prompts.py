@@ -101,36 +101,96 @@ If no improvement is needed, respond with:
 }}
 """
 
-INTENT_CLASSIFICATION_PROMPT = """Classify the user's intent and extract relevant parameters.
 
-USER INPUT: "{user_input}"
+TASK_DECOMPOSITION_PROMPT = """Decompose this goal into concrete, executable tasks.
 
-CURRENT CONTEXT (for reference):
+GOAL: {goal}
+
+CURRENT EMPIRE STATE:
 {context}
 
-Analyze the input and respond with JSON:
+RISK PROFILE: {risk_profile}
+AVAILABLE AGENTS: {available_agents}
+EXTRACTED PARAMETERS: {parameters}
+
+Create a plan with specific tasks. For each task specify:
+- name: Clear, action-oriented name
+- description: What exactly needs to be done
+- agent: Which agent handles it ({available_agents})
+- priority: 1-10 (1 = highest priority)
+- duration_minutes: Estimated time
+- risk_level: low, medium, high, or critical
+- input: Parameters needed for the task
+
+Consider:
+1. What research is needed first?
+2. What setup/infrastructure is required?
+3. What content or assets need creation?
+4. What financial/legal review is needed?
+5. How should tasks be ordered for efficiency?
+
+Respond with JSON:
 {{
-    "type": "conversation" | "command" | "query",
-    "action": null | "start_business" | "stop_business" | "analyze_business" | "optimize_business" | "create_content" | "research_market" | "generate_report" | "propose_evolution",
-    "parameters": {{
-        // Extracted parameters relevant to the action
-        // e.g., "business_type": "dropshipping", "niche": "pet products"
-    }},
-    "confidence": 0.0-1.0,
-    "reasoning": "Brief explanation of why this classification"
+    "goal_summary": "Brief summary of the goal",
+    "tasks": [
+        {{
+            "name": "Task name",
+            "description": "Detailed description",
+            "agent": "agent_name",
+            "priority": 1-10,
+            "duration_minutes": 5-60,
+            "risk_level": "low|medium|high|critical",
+            "input": {{...task parameters...}}
+        }}
+    ],
+    "total_estimated_minutes": 60,
+    "risk_assessment": "Overall risk assessment"
 }}
+"""
 
-DEFINITIONS:
-- "conversation": General interaction, greetings, philosophical discussion, or unclear intent
-- "command": Request to CREATE, START, STOP, MODIFY, or OPTIMIZE something in the empire
-- "query": Request for DATA, STATUS, REPORTS, or INFORMATION about existing state
 
-EXAMPLES:
-- "Hello, how are you?" -> type: conversation
-- "Start a new dropshipping store for pet products" -> type: command, action: start_business
-- "How much revenue did we make yesterday?" -> type: query
-- "Optimize our marketing spend" -> type: command, action: optimize_business
-- "What businesses are currently active?" -> type: query
+REACT_PLANNING_PROMPT = """You are using the ReAct (Reason-Act-Think) pattern to plan.
 
-Respond with valid JSON only.
+GOAL: {goal}
+CONTEXT: {context}
+
+Previous steps:
+{previous_steps}
+
+Current iteration: {iteration}
+
+Think step by step:
+1. THOUGHT: What do I know? What do I need to find out?
+2. ACTION: What specific action should I take next?
+3. (After action) OBSERVATION: What did I learn?
+
+If you have enough information to create the full plan, respond with:
+THOUGHT: I have enough information to create the plan.
+FINAL PLAN:
+[Your complete plan in JSON format]
+
+Otherwise, respond with:
+THOUGHT: [Your reasoning]
+ACTION: [The action to take]
+ACTION_INPUT: [Parameters for the action as JSON]
+"""
+
+
+REPLAN_PROMPT = """A task in your plan failed. Create an alternative approach.
+
+ORIGINAL GOAL: {goal}
+FAILED TASK: {failed_task}
+FAILURE REASON: {failure_reason}
+PREVIOUS PLAN: {previous_plan}
+
+CONTEXT:
+{context}
+
+Create an alternative plan that:
+1. Avoids the approach that failed
+2. Achieves the same goal through a different method
+3. Is more conservative to reduce risk of another failure
+4. May break the failed step into smaller, safer steps
+
+Respond with the same JSON task format as before.
 """
