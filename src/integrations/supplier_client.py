@@ -118,6 +118,7 @@ class AliExpressClient(BaseSupplierClient):
     """AliExpress Affiliate/Dropshipping API client."""
 
     BASE_URL = "https://api.aliexpress.com/v2"
+    DEFAULT_STOCK_QUANTITY = 999  # Default stock for AliExpress products (API doesn't provide actual stock)
 
     def __init__(self, app_key: str, app_secret: str, tracking_id: str = ""):
         super().__init__(app_key, app_secret)
@@ -125,6 +126,10 @@ class AliExpressClient(BaseSupplierClient):
         self._rate_limit_delay = 0.5
 
     def _sign_request(self, params: dict) -> str:
+        """
+        Sign request using MD5 as required by AliExpress API.
+        Note: MD5 is used here because it's mandated by the AliExpress API specification.
+        """
         sorted_params = sorted(params.items())
         sign_str = self.api_secret + "".join(f"{k}{v}" for k, v in sorted_params) + self.api_secret
         return hashlib.md5(sign_str.encode()).hexdigest().upper()
@@ -172,7 +177,7 @@ class AliExpressClient(BaseSupplierClient):
                 price=float(item.get("target_sale_price", 0)),
                 currency=item.get("target_sale_price_currency", "USD"),
                 shipping_cost=0.0,
-                stock_quantity=999,
+                stock_quantity=self.DEFAULT_STOCK_QUANTITY,
                 images=[item.get("product_main_image_url", "")],
                 category=str(item.get("first_level_category_id", "")),
                 supplier_url=item.get("product_detail_url", ""),

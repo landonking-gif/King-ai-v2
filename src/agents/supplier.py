@@ -43,6 +43,10 @@ class SupplierAgent(SubAgent):
 
     name = "supplier"
     description = "Handles supplier integration, product sourcing, and dropshipping operations."
+    
+    # Configuration constants
+    MAX_DISPLAY_STOCK = 100  # Cap stock display to avoid showing excessive quantities
+    SIGNIFICANT_PRICE_CHANGE_THRESHOLD = 0.50  # Minimum price change to flag (in currency units)
 
     def __init__(self):
         super().__init__()
@@ -149,7 +153,7 @@ class SupplierAgent(SubAgent):
             "variants": [{
                 "price": str(sell_price),
                 "sku": f"{supplier_type.value}:{product.product_id}",
-                "inventory_quantity": min(product.stock_quantity, 100),
+                "inventory_quantity": min(product.stock_quantity, self.MAX_DISPLAY_STOCK),
                 "inventory_management": "shopify",
             }],
             "images": [{"src": img} for img in product.images[:5]],
@@ -193,7 +197,7 @@ class SupplierAgent(SubAgent):
 
                 try:
                     stock = await client.get_stock(product_id)
-                    stock = min(stock, 100)  # Cap display stock
+                    stock = min(stock, self.MAX_DISPLAY_STOCK)  # Cap display stock
                     
                     await shopify.update_inventory(
                         variant.get("inventory_item_id"),
@@ -311,7 +315,7 @@ class SupplierAgent(SubAgent):
                     new_rec_price = self._calculate_price(supplier_product.total_cost)
                     price_diff = abs(current_price - new_rec_price)
                     
-                    if price_diff > 0.50:  # Only flag significant changes
+                    if price_diff > self.SIGNIFICANT_PRICE_CHANGE_THRESHOLD:
                         changes.append(ProductMatch(
                             store_product_id=str(product.get("id")),
                             supplier_product=supplier_product,

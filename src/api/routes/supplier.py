@@ -12,6 +12,8 @@ logger = get_logger(__name__)
 router = APIRouter(prefix="/supplier", tags=["supplier"])
 
 # Shared agent instance
+# Note: This is a stateful singleton. In production, consider using proper
+# dependency injection with async context management if concurrent state isolation is needed.
 _agent: Optional[SupplierAgent] = None
 
 
