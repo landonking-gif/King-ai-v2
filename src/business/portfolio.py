@@ -13,6 +13,25 @@ from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
+# Performance calculation weights
+PROFIT_WEIGHT = 0.5
+HEALTH_SCORE_WEIGHT = 0.5
+
+# Ranking weights
+PROFIT_RANKING_WEIGHT = 0.4
+GROWTH_RANKING_WEIGHT = 0.3
+HEALTH_RANKING_WEIGHT = 0.3
+
+# Rebalancing threshold
+REBALANCE_THRESHOLD = 0.05  # 5% difference threshold
+
+# Stage bonuses for growth strategy
+STAGE_BONUSES = {
+    "ideation": 1.5,
+    "validation": 1.3,
+    "growth": 1.2,
+}
+
 
 class PortfolioManager:
     """Manage portfolios of businesses."""
@@ -202,7 +221,7 @@ class PortfolioManager:
         # Rank by composite score
         for i, perf in enumerate(sorted(
             performances,
-            key=lambda x: (x.profit * 0.4 + x.growth_rate * 0.3 + x.health_score * 0.3),
+            key=lambda x: (x.profit * PROFIT_RANKING_WEIGHT + x.growth_rate * GROWTH_RANKING_WEIGHT + x.health_score * HEALTH_RANKING_WEIGHT),
             reverse=True
         )):
             perf.rank = i + 1
@@ -246,7 +265,7 @@ class PortfolioManager:
             if current.locked:
                 action = "maintain"
                 reason = "Allocation is locked"
-            elif abs(diff) < 0.05:
+            elif abs(diff) < REBALANCE_THRESHOLD:
                 action = "maintain"
                 reason = "Within acceptable range"
             elif diff > 0:
@@ -303,14 +322,14 @@ class PortfolioManager:
     ) -> dict[str, float]:
         """Calculate weights based on performance."""
         total_score = sum(
-            p.profit * 0.5 + p.health_score * 0.5
+            p.profit * PROFIT_WEIGHT + p.health_score * HEALTH_SCORE_WEIGHT
             for p in performances
         )
         if total_score <= 0:
             return {p.business_id: 1.0 / len(performances) for p in performances}
         
         return {
-            p.business_id: (p.profit * 0.5 + p.health_score * 0.5) / total_score
+            p.business_id: (p.profit * PROFIT_WEIGHT + p.health_score * HEALTH_SCORE_WEIGHT) / total_score
             for p in performances
         }
 
@@ -321,7 +340,7 @@ class PortfolioManager:
         # Favor high growth + early stage
         scores = {}
         for p in performances:
-            stage_bonus = {"ideation": 1.5, "validation": 1.3, "growth": 1.2}.get(p.stage, 1.0)
+            stage_bonus = STAGE_BONUSES.get(p.stage, 1.0)
             scores[p.business_id] = max(0, p.growth_rate) * stage_bonus + 10
         
         total = sum(scores.values())
