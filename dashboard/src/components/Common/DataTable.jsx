@@ -9,7 +9,7 @@ export function DataTable({ columns, data, onRowClick, pageSize = 10 }) {
   const sortedData = useMemo(() => {
     if (!sortColumn) return data;
     
-    return [...data].sort((a, b) => {
+    return data.slice().sort((a, b) => {
       const aVal = a[sortColumn];
       const bVal = b[sortColumn];
       

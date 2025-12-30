@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import './Charts.css';
 
 export function DonutChart({ data, size = 150, thickness = 20 }) {
@@ -32,7 +32,7 @@ export function DonutChart({ data, size = 150, thickness = 20 }) {
   const center = size / 2;
   const radius = (size - thickness) / 2;
   
-  const getArcPath = (startAngle, endAngle) => {
+  const getArcPath = useCallback((startAngle, endAngle) => {
     const startRad = (startAngle * Math.PI) / 180;
     const endRad = (endAngle * Math.PI) / 180;
     
@@ -44,7 +44,7 @@ export function DonutChart({ data, size = 150, thickness = 20 }) {
     const largeArc = endAngle - startAngle > 180 ? 1 : 0;
     
     return `M ${x1} ${y1} A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2}`;
-  };
+  }, [center, radius]);
   
   return (
     <div className="donut-chart-container">
