@@ -2,11 +2,11 @@
 import pytest
 import os
 
-# Set test environment variables before any imports
-os.environ.setdefault('DATABASE_URL', 'sqlite+aiosqlite:///:memory:')
-os.environ.setdefault('OLLAMA_URL', 'http://localhost:11434')
-os.environ.setdefault('OLLAMA_MODEL', 'llama3.1:8b')
-os.environ.setdefault('REDIS_URL', 'redis://localhost:6379')
+# Set test environment variables - these are test-only values
+# and do not represent actual credentials
+os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost:5432/test")
+os.environ.setdefault("OLLAMA_URL", "http://localhost:11434")
+os.environ.setdefault("REDIS_URL", "redis://localhost:6379")
 
 @pytest.fixture
 def mock_ollama():
