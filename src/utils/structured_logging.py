@@ -1,8 +1,18 @@
 """
-Alias module for structured logging.
-Provides backward compatibility with the 'structured_logging' import pattern.
+Structured Logging - Wrapper around structlog for consistent logging.
 """
 
-from src.utils.logging import setup_logging, get_logger, logger
+import structlog
 
-__all__ = ['setup_logging', 'get_logger', 'logger']
+
+def get_logger(name: str):
+    """
+    Get a logger instance with the specified name.
+    
+    Args:
+        name: Logger name (typically module name)
+        
+    Returns:
+        Configured structlog logger
+    """
+    return structlog.get_logger(name)

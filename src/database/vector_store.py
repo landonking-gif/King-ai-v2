@@ -270,60 +270,40 @@ class VectorStore:
             min_score=0.6
         )
         
-        if not memories:
-            return ""
-        
-        # Build context with token budget
-        context_parts = []
-        current_tokens = 0
-        chars_per_token = 4  # Rough estimate
-        
-        for memory in memories:
-            text = memory["text"]
-            estimated_tokens = len(text) // chars_per_token
-            
-            if current_tokens + estimated_tokens > max_tokens:
-                # Truncate this memory to fit
-                remaining_chars = (max_tokens - current_tokens) * chars_per_token
-                if remaining_chars > 100:
-                    text = text[:remaining_chars] + "..."
-                    context_parts.append(f"[{memory['type']}] {text}")
-                break
-            
-            context_parts.append(f"[{memory['type']}] {text}")
-            current_tokens += estimated_tokens
-        
-        return "\n\n".join(context_parts)
+        return [
+            {
+                "id": match.id,
+                "score": match.score,
+                "text": match.metadata.get("text", "")
+            }
+            for match in results.matches
+        ]
     
-    async def delete_memory(self, memory_id: str) -> bool:
-        """Delete a specific memory."""
+    async def upsert(self, id: str, text: str, metadata: Dict[str, Any], embedding: List[float] = None):
+        """
+        Generic upsert method for storing any type of document.
+        
+        Args:
+            id: Unique identifier for the document
+            text: Text content to store
+            metadata: Additional metadata
+            embedding: Optional pre-computed embedding (if None, will need to be computed)
+        """
         if not self.index:
-            return False
+            return None
         
-        try:
-            self.index.delete(ids=[memory_id])
-            logger.info("Deleted memory", memory_id=memory_id)
-            return True
-        except Exception as e:
-            logger.error("Failed to delete memory", error=str(e))
-            return False
-    
-    async def clear_old_memories(
-        self,
-        memory_type: str,
-        older_than_days: int = 30
-    ) -> int:
-        """Clear memories older than specified days."""
-        # Note: Pinecone doesn't support date-based deletion directly
-        # This would require iterating through memories
-        # For now, log a warning
-        logger.warning(
-            "clear_old_memories not fully implemented",
-            memory_type=memory_type,
-            older_than_days=older_than_days
+        # For now, we'll store without embedding if not provided
+        # In production, you'd want to compute embeddings here
+        if embedding is None:
+            # Mock embedding - in production, generate from text
+            embedding = [0.0] * 1536  # Standard OpenAI embedding size
+        
+        metadata["text"] = text
+        
+        return self.index.upsert(
+            vectors=[{
+                "id": id,
+                "values": embedding,
+                "metadata": metadata
+            }]
         )
-        return 0
-
-
-# Singleton instance
-vector_store = VectorStore()
