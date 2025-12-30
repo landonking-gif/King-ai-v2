@@ -4,7 +4,7 @@ Analyzes code for quality, security, and best practices.
 """
 
 from typing import Optional, List, Dict, Any
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 
 from src.agents.base import SubAgent
