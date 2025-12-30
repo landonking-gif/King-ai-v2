@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://king:password@postgres:5432/kingai
+      - REDIS_URL=redis://redis:6379
+      - OLLAMA_URL=http://host.docker.internal:11434
+      - OLLAMA_MODEL=llama3.1:8b
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./src:/app/src # Hot reload in dev
+
+  postgres:
+    image: postgres:16
+    environment:
+      - POSTGRES_USER=king
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=kingai
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+volumes:
+  pgdata:

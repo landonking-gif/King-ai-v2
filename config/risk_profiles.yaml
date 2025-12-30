@@ -1,0 +1,30 @@
+conservative:
+  max_spend_without_approval: 50
+  require_approval_for:
+    - legal_actions
+    - financial_transactions
+    - external_api_calls
+    - code_modifications
+  autonomous_actions_allowed:
+    - research
+    - analysis
+    - planning
+
+moderate:
+  max_spend_without_approval: 500
+  require_approval_for:
+    - legal_actions
+    - code_modifications
+  autonomous_actions_allowed:
+    - research
+    - analysis
+    - planning
+    - content_creation
+    - small_purchases
+
+aggressive:
+  max_spend_without_approval: 5000
+  require_approval_for:
+    - legal_actions
+  autonomous_actions_allowed:
+    - all

@@ -1,0 +1,14 @@
+name: Micro-SaaS Bootstrap
+type: saas
+stages:
+  - name: Discovery
+    steps:
+      - research: "Identify developer pain points"
+  - name: Implementation
+    steps:
+      - code_generator: "Build MVP backend"
+      - code_generator: "Build React frontend"
+  - name: Operation
+    steps:
+      - analytics: "Track user retention"
+      - finance: "Setup Stripe billing"

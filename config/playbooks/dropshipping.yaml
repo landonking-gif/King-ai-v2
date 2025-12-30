@@ -1,0 +1,15 @@
+name: Dropshipping MVP
+type: dropshipping
+stages:
+  - name: Discovery
+    steps:
+      - research: "Find trending pet products"
+      - analysis: "Calculate profit margins"
+  - name: Setup
+    steps:
+      - commerce: "Setup Shopify store"
+      - content: "Generate product descriptions"
+  - name: Operation
+    steps:
+      - commerce: "Automate order fulfillment"
+      - analytics: "Monitor conversion rates"

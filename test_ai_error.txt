@@ -1,0 +1,41 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.14.2, pytest-9.0.2, pluggy-1.6.0
+rootdir: C:\Users\dmilner.AGV-040318-PC\Downloads\landon\king-ai-v2
+configfile: pyproject.toml
+plugins: anyio-4.12.0, asyncio-1.3.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 5 items
+
+tests\test_master_ai.py .....                                            [100%]
+
+============================== warnings summary ===============================
+config\settings.py:13
+  C:\Users\dmilner.AGV-040318-PC\Downloads\landon\king-ai-v2\config\settings.py:13: PydanticDeprecatedSince20: Using extra keyword arguments on `Field` is deprecated and will be removed. Use `json_schema_extra` instead. (Extra keys: 'env'). Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    database_url: str = Field(..., env="DATABASE_URL")
+
+config\settings.py:15
+  C:\Users\dmilner.AGV-040318-PC\Downloads\landon\king-ai-v2\config\settings.py:15: PydanticDeprecatedSince20: Using extra keyword arguments on `Field` is deprecated and will be removed. Use `json_schema_extra` instead. (Extra keys: 'env'). Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    redis_url: str = Field(default="redis://localhost:6379", env="REDIS_URL")
+
+config\settings.py:19
+  C:\Users\dmilner.AGV-040318-PC\Downloads\landon\king-ai-v2\config\settings.py:19: PydanticDeprecatedSince20: Using extra keyword arguments on `Field` is deprecated and will be removed. Use `json_schema_extra` instead. (Extra keys: 'env'). Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    ollama_url: str = Field(..., env="OLLAMA_URL")
+
+config\settings.py:21
+  C:\Users\dmilner.AGV-040318-PC\Downloads\landon\king-ai-v2\config\settings.py:21: PydanticDeprecatedSince20: Using extra keyword arguments on `Field` is deprecated and will be removed. Use `json_schema_extra` instead. (Extra keys: 'env'). Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    ollama_model: str = Field(default="llama3.1:8b", env="OLLAMA_MODEL")
+
+config\settings.py:25
+  C:\Users\dmilner.AGV-040318-PC\Downloads\landon\king-ai-v2\config\settings.py:25: PydanticDeprecatedSince20: Using extra keyword arguments on `Field` is deprecated and will be removed. Use `json_schema_extra` instead. (Extra keys: 'env'). Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    pinecone_api_key: str | None = Field(default=None, env="PINECONE_API_KEY")
+
+config\settings.py:27
+  C:\Users\dmilner.AGV-040318-PC\Downloads\landon\king-ai-v2\config\settings.py:27: PydanticDeprecatedSince20: Using extra keyword arguments on `Field` is deprecated and will be removed. Use `json_schema_extra` instead. (Extra keys: 'env'). Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    pinecone_index: str = Field(default="king-ai", env="PINECONE_INDEX")
+
+config\settings.py:5
+  C:\Users\dmilner.AGV-040318-PC\Downloads\landon\king-ai-v2\config\settings.py:5: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class Settings(BaseSettings):
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================= 5 passed, 7 warnings in 26.80s ========================
