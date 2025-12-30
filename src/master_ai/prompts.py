@@ -40,6 +40,28 @@ CONSTRAINTS:
 - You must log all significant decisions and actions
 """
 
+INTENT_CLASSIFICATION_PROMPT = """Classify the user's intent to determine the appropriate response.
+
+USER INPUT: {user_input}
+
+CONTEXT: {context}
+
+Analyze the user's request and respond with a JSON object:
+{{
+    "intent": "query" | "command" | "planning" | "analysis" | "modification",
+    "confidence": 0.0-1.0,
+    "requires_planning": true/false,
+    "suggested_agent": "agent_name" | null
+}}
+
+Intent types:
+- query: User asking for information
+- command: User requesting an action
+- planning: User wants to create/execute a plan
+- analysis: User wants data analysis or insights
+- modification: User wants to change the system
+"""
+
 PLANNING_PROMPT = """Break down this goal into concrete, actionable steps.
 
 GOAL: {goal}
