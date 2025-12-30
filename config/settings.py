@@ -1,6 +1,6 @@
 from pydantic_settings import BaseSettings
 from pydantic import Field
-from typing import Literal
+from typing import Literal, Optional
 
 class Settings(BaseSettings):
     """
@@ -9,38 +9,70 @@ class Settings(BaseSettings):
     """
     
     # --- Database Settings ---
-    # The primary PostgreSQL connection string (asyncpg)
     database_url: str = Field(..., env="DATABASE_URL")
-    # Redis connection string for caching and task queueing
     redis_url: str = Field(default="redis://localhost:6379", env="REDIS_URL")
     
-    # --- Ollama / LLM Settings ---
-    # The base URL for the Ollama server (e.g., http://localhost:11434)
-    ollama_url: str = Field(..., env="OLLAMA_URL")
-    # The specific model name to use (e.g., llama3.1:70b or 8b)
+    # --- LLM Provider Settings ---
+    # Primary: vLLM for production
+    vllm_url: Optional[str] = Field(default=None, env="VLLM_URL")
+    vllm_model: str = Field(
+        default="meta-llama/Llama-3.1-70B-Instruct",
+        env="VLLM_MODEL"
+    )
+    
+    # Secondary: Ollama for development/fallback
+    ollama_url: str = Field(default="http://localhost:11434", env="OLLAMA_URL")
     ollama_model: str = Field(default="llama3.1:8b", env="OLLAMA_MODEL")
     
-    # --- Pinecone Settings (Vector Store) ---
-    # Optional API key for Pinecone vector database integration
-    pinecone_api_key: str | None = Field(default=None, env="PINECONE_API_KEY")
-    # The index name to use in Pinecone
+    # Tertiary: Cloud fallbacks (API keys via env)
+    # GEMINI_API_KEY loaded directly from env
+    # ANTHROPIC_API_KEY for future Claude integration
+    
+    # --- Vector Store Settings ---
+    pinecone_api_key: Optional[str] = Field(default=None, env="PINECONE_API_KEY")
     pinecone_index: str = Field(default="king-ai", env="PINECONE_INDEX")
+    pinecone_environment: str = Field(default="us-east-1", env="PINECONE_ENV")
     
     # --- Risk & Evolution Controls ---
-    # Controls how much autonomy the AI has: conservative, moderate, or aggressive
-    risk_profile: Literal["conservative", "moderate", "aggressive"] = "moderate"
-    # Max number of self-modification proposals allowed per hour
-    max_evolutions_per_hour: int = Field(default=5)
+    risk_profile: Literal["conservative", "moderate", "aggressive"] = Field(
+        default="moderate",
+        env="RISK_PROFILE"
+    )
+    max_evolutions_per_hour: int = Field(default=5, env="MAX_EVOLUTIONS_PER_HOUR")
+    evolution_confidence_threshold: float = Field(
+        default=0.8,
+        env="EVOLUTION_CONFIDENCE_THRESHOLD"
+    )
     
     # --- API Server Settings ---
-    # Host for the FastAPI server
-    api_host: str = Field(default="0.0.0.0")
-    # Port for the FastAPI server
-    api_port: int = Field(default=8000)
+    api_host: str = Field(default="0.0.0.0", env="API_HOST")
+    api_port: int = Field(default=8000, env="API_PORT")
+    api_workers: int = Field(default=4, env="API_WORKERS")
+    
+    # --- AWS Settings ---
+    aws_region: str = Field(default="us-east-1", env="AWS_REGION")
+    sqs_inference_queue: Optional[str] = Field(default=None, env="SQS_INFERENCE_QUEUE")
+    s3_artifacts_bucket: Optional[str] = Field(default=None, env="S3_ARTIFACTS_BUCKET")
+    
+    # --- Monitoring Settings ---
+    datadog_enabled: bool = Field(default=False, env="DD_ENABLED")
+    datadog_api_key: Optional[str] = Field(default=None, env="DD_API_KEY")
+    datadog_app_key: Optional[str] = Field(default=None, env="DD_APP_KEY")
+    
+    # --- Security Settings ---
+    jwt_secret: str = Field(default="change-me-in-production", env="JWT_SECRET")
+    jwt_algorithm: str = Field(default="HS256", env="JWT_ALGORITHM")
+    api_rate_limit: int = Field(default=100, env="API_RATE_LIMIT")  # requests per minute
+    
+    # --- Feature Flags ---
+    enable_autonomous_mode: bool = Field(default=False, env="ENABLE_AUTONOMOUS_MODE")
+    enable_self_modification: bool = Field(default=True, env="ENABLE_SELF_MODIFICATION")
+    enable_vllm: bool = Field(default=False, env="ENABLE_VLLM")
     
     class Config:
-        env_file = ".env" # Path to the environment file
-        extra = "ignore" # Ignore extra environment variables not defined here
+        env_file = ".env"
+        extra = "ignore"
 
-# Create a singleton instance of settings to be used across the application
+
+# Singleton instance
 settings = Settings()
