@@ -14,12 +14,41 @@ from src.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
+class ShopifyAPIError(Exception):
+    """Exception raised for Shopify API errors."""
+    
+    def __init__(self, message: str, status_code: int = None, response_body: str = None):
+        super().__init__(message)
+        self.status_code = status_code
+        self.response_body = response_body
+    
+    def __str__(self):
+        if self.status_code:
+            return f"ShopifyAPIError ({self.status_code}): {super().__str__()}"
+        return f"ShopifyAPIError: {super().__str__()}"
+
+
+@dataclass
+class PaginatedResponse:
+    """Response wrapper for paginated Shopify API calls."""
+    items: List[Dict[str, Any]]
+    has_next_page: bool = False
+    next_page_info: Optional[str] = None
+    total_count: Optional[int] = None
+
+
 @dataclass
 class ShopifyConfig:
     """Configuration for Shopify store connection."""
     shop_url: str  # e.g., "mystore.myshopify.com"
-    access_token: str
+    shop_name: str = ""  # Alias for compatibility
+    access_token: str = ""
     api_version: str = "2024-10"
+    
+    def __post_init__(self):
+        # Allow shop_name as alias for shop_url
+        if not self.shop_url and self.shop_name:
+            self.shop_url = f"{self.shop_name}.myshopify.com"
 
 
 class ShopifyClient:

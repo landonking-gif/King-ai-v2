@@ -6,8 +6,33 @@ Handles atomic file operations with backup capabilities.
 import os
 import shutil
 import difflib
-from typing import List
-from dataclasses import dataclass
+from pathlib import Path
+from datetime import datetime
+from typing import List, Tuple, Dict, Optional
+from dataclasses import dataclass, field
+from enum import Enum
+from uuid import uuid4
+
+try:
+    from src.utils.ast_parser import ASTParser
+except ImportError:
+    ASTParser = None
+
+try:
+    from src.utils.logging import get_logger
+    logger = get_logger(__name__)
+except ImportError:
+    import logging
+    logger = logging.getLogger(__name__)
+
+
+class PatchStatus(Enum):
+    """Status of a code patch."""
+    PENDING = "pending"
+    VALIDATED = "validated"
+    APPLIED = "applied"
+    FAILED = "failed"
+    ROLLED_BACK = "rolled_back"
 
 
 @dataclass
@@ -18,15 +43,70 @@ class Patch:
     new_content: str
 
 
+@dataclass
+class CodePatch:
+    """Represents a single file patch with metadata."""
+    file_path: str
+    original_content: str
+    new_content: str
+    description: str = ""
+    status: PatchStatus = field(default=PatchStatus.PENDING)
+    applied_at: Optional[datetime] = None
+    error: Optional[str] = None
+    
+    @property
+    def diff(self) -> str:
+        """Generate unified diff between original and new content."""
+        original_lines = self.original_content.splitlines(keepends=True)
+        new_lines = self.new_content.splitlines(keepends=True)
+        diff_result = difflib.unified_diff(
+            original_lines, 
+            new_lines,
+            fromfile=f"a/{self.file_path}",
+            tofile=f"b/{self.file_path}"
+        )
+        return ''.join(diff_result)
+    
+    @property
+    def stats(self) -> Dict[str, int]:
+        """Return statistics about the patch."""
+        original_lines = set(self.original_content.splitlines())
+        new_lines = set(self.new_content.splitlines())
+        
+        additions = len(new_lines - original_lines)
+        deletions = len(original_lines - new_lines)
+        
+        return {
+            "additions": additions,
+            "deletions": deletions,
+            "files": 1
+        }
+
+
+@dataclass
 class PatchSet:
     """Collection of patches to apply."""
-    
-    def __init__(self):
-        self.patches: List[Patch] = []
+    patches: List[CodePatch] = field(default_factory=list)
+    id: str = field(default_factory=lambda: str(uuid4()))
+    description: str = ""
+    status: PatchStatus = field(default=PatchStatus.PENDING)
+    created_at: datetime = field(default_factory=datetime.now)
+    applied_at: Optional[datetime] = None
+    backup_dir: Optional[str] = None
     
     def add_patch(self, file_path: str, old_content: str, new_content: str):
         """Add a patch to the set."""
-        self.patches.append(Patch(file_path, old_content, new_content))
+        self.patches.append(CodePatch(file_path, old_content, new_content))
+    
+    @property
+    def total_stats(self) -> Dict[str, int]:
+        """Aggregate statistics for all patches."""
+        total = {"additions": 0, "deletions": 0, "files": len(self.patches)}
+        for patch in self.patches:
+            stats = patch.stats
+            total["additions"] += stats["additions"]
+            total["deletions"] += stats["deletions"]
+        return total
 
 
 class CodePatcher:
