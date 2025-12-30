@@ -9,7 +9,7 @@ from src.business.playbook_models import (
     PlaybookDefinition, PlaybookRun, TaskDefinition, TaskExecution,
     TaskStatus, TriggerType
 )
-from src.utils.logging import get_logger
+from src.utils.structured_logging import get_logger
 
 logger = get_logger(__name__)
 

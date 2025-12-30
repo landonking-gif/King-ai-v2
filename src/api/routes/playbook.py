@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from src.business.playbook_models import PlaybookType, TriggerType
 from src.business.playbook_loader import PlaybookLoader
 from src.business.playbook_executor import PlaybookExecutor
-from src.utils.logging import get_logger
+from src.utils.structured_logging import get_logger
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/playbooks", tags=["playbooks"])
