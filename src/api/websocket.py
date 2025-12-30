@@ -118,7 +118,8 @@ class ConnectionManager:
         
         # Handle ping/pong
         if msg_type == "ping":
-            self._connection_meta[connection_id]["last_ping"] = datetime.utcnow().isoformat()
+            if connection_id in self._connection_meta:
+                self._connection_meta[connection_id]["last_ping"] = datetime.utcnow().isoformat()
             await self.send_to_connection(connection_id, {"type": "pong"})
             return
 
