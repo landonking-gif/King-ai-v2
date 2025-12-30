@@ -74,7 +74,7 @@ class TestApprovalManager:
             action_type=ApprovalType.FINANCIAL,
             title="Action 1",
             description="",
-            payload={},
+            payload={"amount": 500},  # Above auto-approve threshold
         )
         await manager.create_request(
             business_id="biz_1",
