@@ -364,12 +364,18 @@ class AnalyticsAgent(SubAgent):
             elif action == "kpis":
                 return await self.get_kpis(business_id)
             elif action == "trends":
+                metric = task.get("metric")
+                if not metric:
+                    return {"success": False, "error": "Missing required parameter: metric"}
                 return await self.get_trends(
-                    business_id, task["metric"], task.get("days", 30)
+                    business_id, metric, task.get("days", 30)
                 )
             elif action == "compare":
+                metrics = task.get("metrics")
+                if not metrics:
+                    return {"success": False, "error": "Missing required parameter: metrics"}
                 return await self.compare_periods(
-                    business_id, task["metrics"], task.get("days", 30)
+                    business_id, metrics, task.get("days", 30)
                 )
             elif action == "alerts":
                 return await self.check_alerts(business_id)

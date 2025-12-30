@@ -6,17 +6,22 @@ from fastapi import APIRouter, HTTPException, Query, Depends
 from pydantic import BaseModel, Field
 from src.agents.analytics import AnalyticsAgent
 from src.utils.logging import get_logger
+from threading import Lock
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
 _agent: Optional[AnalyticsAgent] = None
+_agent_lock = Lock()
 
 
 def get_agent() -> AnalyticsAgent:
     global _agent
     if _agent is None:
-        _agent = AnalyticsAgent()
+        with _agent_lock:
+            # Double-check locking pattern
+            if _agent is None:
+                _agent = AnalyticsAgent()
     return _agent
 
 
