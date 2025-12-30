@@ -3,7 +3,7 @@ Code Templates System - Reusable code templates and scaffolding.
 Provides structured templates for common code patterns.
 """
 
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Optional
 from dataclasses import dataclass, field
 from enum import Enum
 
