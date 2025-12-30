@@ -187,8 +187,11 @@ class DependencyAnalyzer:
             for path in possible_paths:
                 if (self.project_root / path).exists():
                     return path
+            
+            # Log unresolved internal imports
+            logger.debug(f"Could not resolve import '{imp.module}' from {from_file}")
         
-        return imp.module  # Return module name as-is if not found
+        return imp.module  # Return module name for external/stdlib imports
     
     def analyze_impact(
         self,
