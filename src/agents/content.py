@@ -399,7 +399,7 @@ Tagline: [Tagline]
         prompt = f"""Improve the following content to address these SEO issues:
 
 Issues:
-{chr(10).join(f'- {issue}' for issue in improvements)}
+{'\n'.join(f'- {issue}' for issue in improvements)}
 
 Current Title: {content.title}
 Current Meta: {content.meta_description}

@@ -83,6 +83,9 @@ class SEOAnalyzer:
     # Keyword extraction settings
     MIN_KEYWORD_LENGTH = 3  # Minimum characters for keyword extraction
     
+    # Compiled regex patterns for performance
+    _HEADING_PATTERN = re.compile(r'^#{1,6}\s|<h[1-6]>', re.MULTILINE | re.IGNORECASE)
+    
     def __init__(self):
         """Initialize SEO analyzer."""
         # Common stop words to exclude from keyword analysis
@@ -245,8 +248,7 @@ class SEOAnalyzer:
             issues.append(f"Content could be longer ({word_count} words, ideal: 1500+)")
         
         # Check for headings
-        heading_pattern = r'^#{1,6}\s|<h[1-6]>'
-        has_headings = bool(re.search(heading_pattern, content, re.MULTILINE | re.IGNORECASE))
+        has_headings = bool(self._HEADING_PATTERN.search(content))
         if not has_headings and word_count > 500:
             score -= 15
             issues.append("Content lacks headings for structure")
@@ -290,6 +292,25 @@ class SEOAnalyzer:
         
         return max(0, score), issues
     
+    @staticmethod
+    def _count_syllables(word: str) -> int:
+        """Count syllables in a word (simplified algorithm)."""
+        word = word.lower()
+        count = 0
+        vowels = 'aeiouy'
+        prev_vowel = False
+        
+        for char in word:
+            is_vowel = char in vowels
+            if is_vowel and not prev_vowel:
+                count += 1
+            prev_vowel = is_vowel
+        
+        if word.endswith('e'):
+            count -= 1
+        
+        return max(1, count)
+    
     def calculate_readability(self, text: str) -> ReadabilityScore:
         """Calculate readability metrics."""
         # Clean and split text
@@ -301,25 +322,7 @@ class SEOAnalyzer:
         if not sentences or not words:
             return ReadabilityScore(0, 0, 0, 0, 0)
         
-        # Count syllables (simplified)
-        def count_syllables(word: str) -> int:
-            word = word.lower()
-            count = 0
-            vowels = 'aeiouy'
-            prev_vowel = False
-            
-            for char in word:
-                is_vowel = char in vowels
-                if is_vowel and not prev_vowel:
-                    count += 1
-                prev_vowel = is_vowel
-            
-            if word.endswith('e'):
-                count -= 1
-            
-            return max(1, count)
-        
-        total_syllables = sum(count_syllables(w) for w in words)
+        total_syllables = sum(self._count_syllables(w) for w in words)
         total_words = len(words)
         total_sentences = len(sentences)
         
@@ -329,7 +332,7 @@ class SEOAnalyzer:
         avg_word_length = sum(len(w) for w in words) / total_words
         
         # Complex words (3+ syllables)
-        complex_words = sum(1 for w in words if count_syllables(w) >= 3)
+        complex_words = sum(1 for w in words if self._count_syllables(w) >= 3)
         complex_percentage = (complex_words / total_words) * 100
         
         # Flesch Reading Ease
