@@ -80,6 +80,9 @@ class SEOAnalyzer:
     IDEAL_KEYWORD_DENSITY = (1.0, 3.0)
     IDEAL_CONTENT_LENGTH = 1500
     
+    # Keyword extraction settings
+    MIN_KEYWORD_LENGTH = 3  # Minimum characters for keyword extraction
+    
     def __init__(self):
         """Initialize SEO analyzer."""
         # Common stop words to exclude from keyword analysis
@@ -351,7 +354,7 @@ class SEOAnalyzer:
         top_n: int = 10
     ) -> List[Dict[str, Any]]:
         """Extract potential keywords from text."""
-        words = re.findall(r'\b[a-zA-Z]{3,}\b', text.lower())
+        words = re.findall(rf'\b[a-zA-Z]{{{self.MIN_KEYWORD_LENGTH},}}\b', text.lower())
         words = [w for w in words if w not in self.stop_words]
         
         # Count frequencies

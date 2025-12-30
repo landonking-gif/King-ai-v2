@@ -16,6 +16,9 @@ from src.utils.seo_utils import SEOAnalyzer, ReadabilityScore
 class TestSEOAnalyzer:
     """Tests for SEO analyzer."""
     
+    # Test constants
+    KEYWORD_DENSITY_TEST_REPEATS = 100  # Number of times to repeat keyword for density test
+    
     @pytest.fixture
     def analyzer(self):
         return SEOAnalyzer()
@@ -83,7 +86,7 @@ Data science uses Python extensively. Machine learning with Python is popular.
     
     def test_keyword_density_check(self, analyzer):
         """Test keyword density analysis."""
-        content = "keyword " * 100  # 100% density
+        content = "keyword " * self.KEYWORD_DENSITY_TEST_REPEATS  # 100% density
         
         score, issues = analyzer._analyze_keywords(
             content, "keyword", "keyword", ["keyword"]
