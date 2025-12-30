@@ -21,7 +21,8 @@ class Sandbox:
              self.project_root = Path(__file__).parent.parent.parent.absolute()
              
         self.temp_dir = None
-        self.patcher = CodePatcher()
+        # Patcher will be initialized when sandbox is created
+        self.patcher = None
 
     def create_sandbox(self, target_files: list[str]):
         """
@@ -30,6 +31,9 @@ class Sandbox:
         symlinks, but for safety/speed, we'll try to keep it minimal or copy 'src'.
         """
         self.temp_dir = Path(tempfile.mkdtemp(prefix="king_ai_sandbox_"))
+        
+        # Initialize patcher with the sandbox directory
+        self.patcher = CodePatcher(str(self.temp_dir))
         
         # Determine strict copying vs full src copy
         # For Python imports to work reliably during tests, we usually need the whole 'src' structure.
@@ -55,14 +59,28 @@ class Sandbox:
         """
         if not self.temp_dir:
             raise RuntimeError("Sandbox not created. Call create_sandbox() first.")
-            
-        # Path inside sandbox
-        target = self.temp_dir / relative_file_path
         
-        # Patcher expects absolute path
+        if not self.patcher:
+            raise RuntimeError("Patcher not initialized. Call create_sandbox() first.")
+            
+        # Create and apply patch using new API
         try:
-             result = self.patcher.apply_patch(str(target.absolute()), new_code)
-             return result["success"]
+            patch = self.patcher.create_patch(
+                relative_file_path,
+                new_code,
+                description="Sandbox test patch"
+            )
+            
+            # Validate before applying
+            is_valid, errors = self.patcher.validate_patch(patch)
+            if not is_valid:
+                print(f"Sandbox Patch Validation Failed: {', '.join(errors)}")
+                return False
+            
+            # Apply the patch
+            success = self.patcher.apply_patch(patch)
+            return success
+            
         except Exception as e:
             print(f"Sandbox Patch Failed: {e}")
             return False
