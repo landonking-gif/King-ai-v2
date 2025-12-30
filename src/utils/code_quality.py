@@ -12,6 +12,9 @@ import structlog
 
 logger = structlog.get_logger("code_quality")
 
+# Constants
+MAX_ISSUES_REPORTED = 10
+
 
 @dataclass
 class QualityMetrics:
@@ -93,7 +96,7 @@ class CodeQualityAnalyzer:
         try:
             tree = ast.parse(source)
             metrics.cyclomatic_complexity = self._calculate_complexity(tree)
-        except:
+        except (SyntaxError, ValueError):
             pass
         
         # Docstring coverage
@@ -133,7 +136,7 @@ class CodeQualityAnalyzer:
         """Analyze type hint coverage."""
         try:
             tree = ast.parse(source)
-        except:
+        except (SyntaxError, ValueError):
             return 0.0
         
         total_params = 0
@@ -172,4 +175,4 @@ class CodeQualityAnalyzer:
             if len(func.args) > 7:
                 issues.append(f"Function '{func.full_name}' has too many arguments ({len(func.args)})")
         
-        return issues[:10]  # Limit to 10 issues
+        return issues[:MAX_ISSUES_REPORTED]

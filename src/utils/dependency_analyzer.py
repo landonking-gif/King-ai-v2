@@ -309,7 +309,7 @@ class DependencyAnalyzer:
             warnings.append(f"High impact: {len(affected_files)} files affected")
         
         if 'brain.py' in file_path:
-            warnings.append("CRITICAL: Changes to Master AI brain require extra review")
+            warnings.append("CRITICAL: Changes to master AI brain require extra review")
         
         if any('__init__' in f for f in changed_functions):
             warnings.append("Constructor changes may break dependent code")
