@@ -8,7 +8,8 @@ from dataclasses import dataclass
 from enum import Enum
 
 from src.utils.ollama_client import OllamaClient
-from src.utils.code_analyzer import CodeAnalyzer, FunctionInfo, ClassInfo
+from src.utils.code_analyzer import CodeAnalyzer
+from src.utils.ast_parser import FunctionInfo, ClassInfo
 from src.utils.logging import get_logger
 
 logger = get_logger("test_generator")

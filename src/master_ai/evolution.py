@@ -57,6 +57,11 @@ class EvolutionEngine:
         
         # Active proposals
         self._active_proposals: Dict[str, EvolutionProposal] = {}
+        
+        # Daily limit for proposals (spec: 1 per day)
+        self._daily_proposal_count = 0
+        self._last_proposal_date = None
+        self._max_daily_proposals = 1  # Spec requirement
     
     async def propose_improvement(
         self,
@@ -77,6 +82,18 @@ class EvolutionEngine:
         Returns:
             Generated proposal
         """
+        # Check daily limit
+        today = datetime.now().date()
+        if self._last_proposal_date != today:
+            self._daily_proposal_count = 0
+            self._last_proposal_date = today
+        
+        if self._daily_proposal_count >= self._max_daily_proposals:
+            raise ValueError(
+                f"Daily proposal limit reached ({self._max_daily_proposals}/day). "
+                "Try again tomorrow."
+            )
+        
         # Handle legacy interface - if called with just context string
         if goal is None and isinstance(context, str):
             # Use old EVOLUTION_PROMPT format
@@ -171,6 +188,9 @@ class EvolutionEngine:
         
         # Add to active proposals
         self._active_proposals[proposal.id] = proposal
+        
+        # Increment counter after successful proposal
+        self._daily_proposal_count += 1
         
         logger.info(
             "Proposal generated",

@@ -5,9 +5,65 @@ Provides a simple interface to get logger instances with context.
 
 import structlog
 from contextvars import ContextVar
+from typing import Optional
 
 # Context variable for request-scoped logging
 _request_context: ContextVar[dict] = ContextVar('request_context', default={})
+
+
+class EnhancedLogger:
+    """
+    Enhanced logger wrapper that adds custom logging methods.
+    Wraps structlog's bound logger with additional methods.
+    """
+    
+    def __init__(self, logger, name: str = None):
+        self._logger = logger
+        self._name = name
+    
+    def __getattr__(self, name):
+        """Delegate attribute access to the wrapped logger."""
+        return getattr(self._logger, name)
+    
+    def llm_call(
+        self,
+        provider: str,
+        model: str,
+        prompt_tokens: int,
+        completion_tokens: int,
+        latency_ms: float,
+        success: bool,
+        error: Optional[str] = None
+    ):
+        """
+        Log an LLM API call with structured data.
+        
+        Args:
+            provider: LLM provider (e.g., "ollama", "openai")
+            model: Model name used
+            prompt_tokens: Number of input tokens
+            completion_tokens: Number of output tokens
+            latency_ms: Call latency in milliseconds
+            success: Whether the call succeeded
+            error: Error message if failed
+        """
+        event_data = {
+            "event": "llm_call",
+            "provider": provider,
+            "model": model,
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "total_tokens": prompt_tokens + completion_tokens,
+            "latency_ms": round(latency_ms, 2),
+            "success": success
+        }
+        if error:
+            event_data["error"] = error
+        
+        if success:
+            self._logger.info("LLM call completed", **event_data)
+        else:
+            self._logger.error("LLM call failed", **event_data)
 
 
 def get_logger(name: str = None):
@@ -18,12 +74,12 @@ def get_logger(name: str = None):
         name: Logger name (typically module name)
         
     Returns:
-        Structured logger with context binding
+        Enhanced structured logger with context binding
     """
     logger = structlog.get_logger()
     if name:
         logger = logger.bind(logger_name=name)
-    return logger
+    return EnhancedLogger(logger, name)
 
 
 def set_request_context(**kwargs):
