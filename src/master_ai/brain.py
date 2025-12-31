@@ -464,9 +464,95 @@ If the data is not available, say so clearly.
             await asyncio.sleep(6 * 60 * 60)
     
     async def _check_business_health(self, context: str):
-        """Analyze business unit performance and suggest optimizations."""
-        # TODO: Implement in Part 3
-        pass
+        """
+        Analyze business unit performance and suggest optimizations.
+        Checks health metrics across all active businesses and triggers
+        automated responses for underperforming units.
+        """
+        from src.database.connection import get_db_session
+        from src.database.models import BusinessUnit
+        from src.business.lifecycle import LifecycleEngine
+        from datetime import datetime, timedelta
+        
+        try:
+            async with get_db_session() as session:
+                # Get all active businesses
+                from sqlalchemy import select
+                from src.database.models import BusinessStatus
+                
+                result = await session.execute(
+                    select(BusinessUnit).where(
+                        BusinessUnit.status.in_([
+                            BusinessStatus.LAUNCH.value,
+                            BusinessStatus.OPTIMIZATION.value,
+                            BusinessStatus.SCALING.value
+                        ])
+                    )
+                )
+                businesses = result.scalars().all()
+                
+                health_issues = []
+                
+                for business in businesses:
+                    # Check revenue trends
+                    if hasattr(business, 'monthly_revenue') and business.monthly_revenue:
+                        if business.monthly_revenue < 100:  # Very low revenue
+                            health_issues.append({
+                                "business_id": business.id,
+                                "issue": "low_revenue",
+                                "severity": "high",
+                                "suggested_action": "review_marketing_strategy"
+                            })
+                    
+                    # Check for stale businesses (no activity in 7 days)
+                    if business.updated_at:
+                        days_inactive = (datetime.utcnow() - business.updated_at).days
+                        if days_inactive > 7:
+                            health_issues.append({
+                                "business_id": business.id,
+                                "issue": "stale_business",
+                                "severity": "medium",
+                                "days_inactive": days_inactive,
+                                "suggested_action": "review_and_reactivate"
+                            })
+                    
+                    # Check profitability
+                    if hasattr(business, 'profit_margin') and business.profit_margin:
+                        if business.profit_margin < 10:
+                            health_issues.append({
+                                "business_id": business.id,
+                                "issue": "low_margin",
+                                "severity": "high",
+                                "suggested_action": "optimize_pricing_or_costs"
+                            })
+                
+                # Log and take action on critical issues
+                if health_issues:
+                    logger.warning(
+                        "Business health issues detected",
+                        issue_count=len(health_issues),
+                        high_severity=len([i for i in health_issues if i["severity"] == "high"])
+                    )
+                    
+                    # Queue tasks for critical issues
+                    for issue in health_issues:
+                        if issue["severity"] == "high":
+                            await self._queue_health_remediation(issue)
+                else:
+                    logger.info("All businesses healthy", business_count=len(businesses))
+                    
+        except Exception as e:
+            logger.error("Business health check failed", error=str(e))
+    
+    async def _queue_health_remediation(self, issue: dict):
+        """Queue a remediation task for a business health issue."""
+        logger.info(
+            "Queuing health remediation",
+            business_id=issue["business_id"],
+            issue=issue["issue"],
+            action=issue["suggested_action"]
+        )
+        # In a full implementation, this would create a task for the router
     
     async def _consider_evolution(self, context: str):
         """

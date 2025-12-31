@@ -36,11 +36,65 @@ class FinancialHealth:
     recommendations: list[str]
 
 
+# Function schema for LLM function-calling
+FUNCTION_SCHEMA = {
+    "name": "banking_agent",
+    "description": "Banking operations via Plaid - account management, transactions, cash flow analysis",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "action": {
+                "type": "string",
+                "enum": ["create_link_token", "exchange_token", "get_accounts", 
+                         "get_transactions", "get_balances", "analyze_cash_flow",
+                         "get_financial_health", "sync_accounts", "categorize_transactions"],
+                "description": "The banking action to perform"
+            },
+            "business_id": {
+                "type": "string",
+                "description": "Business ID for multi-tenant operations"
+            },
+            "account_id": {
+                "type": "string",
+                "description": "Bank account ID for account-specific operations"
+            },
+            "date_range": {
+                "type": "object",
+                "properties": {
+                    "start_date": {"type": "string", "format": "date"},
+                    "end_date": {"type": "string", "format": "date"}
+                },
+                "description": "Date range for transaction queries"
+            },
+            "transaction_categories": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Filter transactions by category"
+            },
+            "min_amount": {
+                "type": "number",
+                "description": "Minimum transaction amount filter"
+            },
+            "max_amount": {
+                "type": "number",
+                "description": "Maximum transaction amount filter"
+            },
+            "public_token": {
+                "type": "string",
+                "description": "Plaid public token from Link flow"
+            }
+        },
+        "required": ["action", "business_id"]
+    }
+}
+
+
 class BankingAgent(SubAgent):
     """Agent for banking operations and financial analysis."""
 
     name = "banking"
     description = "Manages banking operations, account linking, transaction analysis, and financial health"
+    FUNCTION_SCHEMA = FUNCTION_SCHEMA
 
     def __init__(self):
         super().__init__()

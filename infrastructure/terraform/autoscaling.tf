@@ -136,11 +136,14 @@ resource "aws_launch_template" "gpu_inference" {
     systemctl enable ollama
     systemctl start ollama
     
-    # Start vLLM server for high-throughput
-    python -m vllm.entrypoints.openai.api_server \
+    # Start vLLM server for high-throughput (port 8080 matches ALB target group)
+    nohup python -m vllm.entrypoints.openai.api_server \
       --model meta-llama/Llama-3.1-70B-Instruct \
       --tensor-parallel-size 8 \
-      --port 8080 &
+      --host 0.0.0.0 \
+      --port 8080 \
+      --max-model-len 32768 \
+      --gpu-memory-utilization 0.9 &
     
     # Signal ready to ALB
     curl -X PUT "http://169.254.169.254/latest/api/token" \
@@ -247,6 +250,17 @@ resource "aws_cloudwatch_metric_alarm" "queue_depth_low" {
   }
 }
 
+# SQS Dead Letter Queue for failed inference messages
+resource "aws_sqs_queue" "inference_dlq" {
+  name                       = "king-ai-inference-dlq"
+  message_retention_seconds  = 1209600  # 14 days retention for debugging
+  
+  tags = {
+    Environment = var.environment
+    Purpose     = "dead-letter-queue"
+  }
+}
+
 # SQS Queue for inference requests
 resource "aws_sqs_queue" "inference_queue" {
   name                       = "king-ai-inference-queue"
@@ -256,7 +270,30 @@ resource "aws_sqs_queue" "inference_queue" {
   receive_wait_time_seconds  = 10
   visibility_timeout_seconds = 300
 
+  # Send failed messages to DLQ after 3 attempts
+  redrive_policy = jsonencode({
+    deadLetterTargetArn = aws_sqs_queue.inference_dlq.arn
+    maxReceiveCount     = 3
+  })
+
   tags = {
     Environment = var.environment
+  }
+}
+
+# CloudWatch alarm for DLQ messages (indicates processing failures)
+resource "aws_cloudwatch_metric_alarm" "dlq_messages" {
+  alarm_name          = "king-ai-dlq-has-messages"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "ApproximateNumberOfMessagesVisible"
+  namespace           = "AWS/SQS"
+  period              = 300
+  statistic           = "Sum"
+  threshold           = 0
+  alarm_description   = "Alert when messages appear in DLQ - indicates inference failures"
+
+  dimensions = {
+    QueueName = aws_sqs_queue.inference_dlq.name
   }
 }

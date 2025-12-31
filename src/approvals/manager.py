@@ -337,3 +337,26 @@ class ApprovalManager:
             if action_type in policy.action_types:
                 return policy
         return None
+
+    async def expire_old_requests(self) -> int:
+        """
+        Expire requests that have passed their expiry time.
+        
+        Returns:
+            Number of requests that were expired.
+        """
+        count = 0
+        for request in self._requests.values():
+            if request.status in (ApprovalStatus.PENDING, ApprovalStatus.PARTIAL) and request.is_expired:
+                request.status = ApprovalStatus.EXPIRED
+                count += 1
+                logger.info(f"Expired approval request: {request.id} - {request.title}")
+                
+                # Trigger expired hooks
+                for hook in self._hooks.get("request_expired", []):
+                    try:
+                        await hook(request)
+                    except Exception as e:
+                        logger.error(f"Error in expired hook: {e}")
+        
+        return count

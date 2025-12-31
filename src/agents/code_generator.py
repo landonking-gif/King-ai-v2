@@ -19,6 +19,55 @@ from src.utils.code_analyzer import CodeAnalyzer
 from src.utils.metrics import TASKS_EXECUTED
 
 
+# Function schema for LLM function-calling
+FUNCTION_SCHEMA = {
+    "name": "code_generator_agent",
+    "description": "Generates and modifies source code for business applications using LLM and templates",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "action": {
+                "type": "string",
+                "enum": ["create", "modify", "optimize", "refactor", "document", "test", "analyze"],
+                "description": "The code generation action to perform"
+            },
+            "description": {
+                "type": "string",
+                "description": "Natural language description of what code to generate or how to modify"
+            },
+            "language": {
+                "type": "string",
+                "enum": ["python", "javascript", "typescript", "sql", "yaml", "json", "html", "css"],
+                "description": "Target programming language"
+            },
+            "existing_code": {
+                "type": "string",
+                "description": "Existing code to modify, optimize, or refactor"
+            },
+            "template_type": {
+                "type": "string",
+                "enum": ["api_endpoint", "model", "service", "test", "migration", "config"],
+                "description": "Type of code template to use as base"
+            },
+            "file_path": {
+                "type": "string",
+                "description": "Target file path for the generated code"
+            },
+            "constraints": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Constraints or requirements for the generated code"
+            },
+            "context": {
+                "type": "object",
+                "description": "Additional context like variable names, function signatures, etc."
+            }
+        },
+        "required": ["action", "description", "language"]
+    }
+}
+
+
 class GenerationMode(str, Enum):
     """Code generation modes."""
     CREATE = "create"  # Create new code
@@ -72,6 +121,7 @@ class CodeGeneratorAgent(SubAgent):
     
     name = "code_generator"
     description = "Generates and modifies source code for business applications."
+    FUNCTION_SCHEMA = FUNCTION_SCHEMA
     
     # Prompts for different generation modes
     PROMPTS = {

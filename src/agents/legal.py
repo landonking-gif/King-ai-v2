@@ -14,11 +14,75 @@ from src.legal.templates import (
 from src.utils.metrics import TASKS_EXECUTED
 
 
+# Function schema for LLM function-calling
+FUNCTION_SCHEMA = {
+    "name": "legal_agent",
+    "description": "Legal document generation, compliance checking, and contract management",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "action": {
+                "type": "string",
+                "enum": ["generate_document", "check_compliance", "create_contract", 
+                         "review_contract", "sign_contract", "void_contract",
+                         "get_document", "list_documents", "analyze_risk"],
+                "description": "The legal action to perform"
+            },
+            "document_type": {
+                "type": "string",
+                "enum": ["privacy_policy", "terms_of_service", "refund_policy", 
+                         "cookie_policy", "disclaimer", "nda", "service_agreement"],
+                "description": "Type of legal document to generate"
+            },
+            "compliance_framework": {
+                "type": "string",
+                "enum": ["gdpr", "ccpa", "hipaa", "pci_dss", "sox", "general"],
+                "description": "Compliance framework to check against"
+            },
+            "variables": {
+                "type": "object",
+                "description": "Variables to populate in document templates",
+                "properties": {
+                    "company_name": {"type": "string"},
+                    "website_url": {"type": "string"},
+                    "email": {"type": "string"},
+                    "effective_date": {"type": "string", "format": "date"},
+                    "jurisdiction": {"type": "string"},
+                    "gdpr_compliant": {"type": "boolean"}
+                }
+            },
+            "contract_id": {
+                "type": "string",
+                "description": "Contract ID for contract operations"
+            },
+            "document_id": {
+                "type": "string",
+                "description": "Document ID for document retrieval"
+            },
+            "parties": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string"},
+                        "type": {"type": "string"},
+                        "email": {"type": "string"}
+                    }
+                },
+                "description": "Parties involved in the contract"
+            }
+        },
+        "required": ["action"]
+    }
+}
+
+
 class LegalAgent(SubAgent):
     """Agent for legal document generation and compliance."""
 
     name = "legal"
     description = "Ensures business compliance and analyzes legal documents."
+    FUNCTION_SCHEMA = FUNCTION_SCHEMA
 
     def __init__(self):
         super().__init__()

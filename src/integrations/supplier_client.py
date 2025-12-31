@@ -370,12 +370,262 @@ class CJDropshippingClient(BaseSupplierClient):
         )
 
 
+class SpocketClient(BaseSupplierClient):
+    """
+    Spocket API client for US/EU dropshipping.
+    
+    Spocket specializes in US and EU suppliers with faster shipping times
+    compared to Asian suppliers. Premium products with 30-60% margins.
+    """
+
+    BASE_URL = "https://app.spocket.co/api/v1"
+
+    def __init__(self, api_key: str, store_id: str = "", **kwargs):
+        super().__init__(api_key, "")
+        self.store_id = store_id
+        self._rate_limit_delay = 0.5
+        
+        # Update headers for Spocket
+        self.client = httpx.AsyncClient(
+            timeout=30.0,
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            }
+        )
+
+    async def _request(
+        self, endpoint: str, method: str = "GET", params: dict = None, json_data: dict = None
+    ) -> dict:
+        """Make authenticated request to Spocket API."""
+        await self._rate_limit()
+        
+        url = f"{self.BASE_URL}{endpoint}"
+        
+        try:
+            if method == "GET":
+                resp = await self.client.get(url, params=params)
+            elif method == "POST":
+                resp = await self.client.post(url, json=json_data)
+            elif method == "PUT":
+                resp = await self.client.put(url, json=json_data)
+            else:
+                raise ValueError(f"Unsupported method: {method}")
+            
+            resp.raise_for_status()
+            return resp.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Spocket API error: {e.response.status_code} - {e.response.text}")
+            raise
+        except Exception as e:
+            logger.error(f"Spocket request failed: {e}")
+            raise
+
+    async def search_products(
+        self, query: str, category: str = "", page: int = 1, limit: int = 20
+    ) -> list[SupplierProduct]:
+        """
+        Search for products in Spocket catalog.
+        
+        Spocket offers:
+        - US/EU suppliers with 2-5 day shipping
+        - Pre-vetted suppliers
+        - Branded invoicing
+        """
+        params = {
+            "search": query,
+            "page": page,
+            "per_page": min(limit, 50),
+        }
+        
+        if category:
+            params["category"] = category
+        
+        # Add filters for quality suppliers
+        params["supplier_location"] = "us,eu,ca,uk"  # Fast shipping regions
+        params["min_reviews"] = 4  # Minimum rating
+        
+        data = await self._request("/products", "GET", params)
+        products = []
+        
+        for item in data.get("products", []):
+            # Calculate shipping based on supplier location
+            supplier_location = item.get("supplier_location", "").lower()
+            if supplier_location in ["us", "ca"]:
+                shipping_days = (2, 5)
+                shipping_cost = 4.99
+            elif supplier_location in ["eu", "uk"]:
+                shipping_days = (3, 7)
+                shipping_cost = 5.99
+            else:
+                shipping_days = (7, 14)
+                shipping_cost = 3.99
+            
+            products.append(SupplierProduct(
+                supplier_id="spocket",
+                supplier_type=SupplierType.SPOCKET,
+                product_id=str(item.get("id", "")),
+                title=item.get("title", ""),
+                description=item.get("description", ""),
+                price=float(item.get("retail_price", 0)),
+                currency="USD",
+                shipping_cost=shipping_cost,
+                shipping_days=shipping_days,
+                stock_quantity=item.get("inventory_quantity", 100),
+                images=[img.get("src", "") for img in item.get("images", [])],
+                variants=item.get("variants", []),
+                category=item.get("category", ""),
+                supplier_url=item.get("spocket_url", ""),
+            ))
+        
+        return products
+
+    async def get_product(self, product_id: str) -> Optional[SupplierProduct]:
+        """Get detailed product information."""
+        try:
+            data = await self._request(f"/products/{product_id}", "GET")
+            product = data.get("product", {})
+            
+            if not product:
+                return None
+            
+            supplier_location = product.get("supplier_location", "").lower()
+            if supplier_location in ["us", "ca"]:
+                shipping_days = (2, 5)
+                shipping_cost = 4.99
+            elif supplier_location in ["eu", "uk"]:
+                shipping_days = (3, 7)
+                shipping_cost = 5.99
+            else:
+                shipping_days = (7, 14)
+                shipping_cost = 3.99
+            
+            return SupplierProduct(
+                supplier_id="spocket",
+                supplier_type=SupplierType.SPOCKET,
+                product_id=str(product.get("id", "")),
+                title=product.get("title", ""),
+                description=product.get("description", ""),
+                price=float(product.get("retail_price", 0)),
+                currency="USD",
+                shipping_cost=shipping_cost,
+                shipping_days=shipping_days,
+                stock_quantity=product.get("inventory_quantity", 100),
+                images=[img.get("src", "") for img in product.get("images", [])],
+                variants=product.get("variants", []),
+                category=product.get("category", ""),
+                supplier_url=product.get("spocket_url", ""),
+            )
+        except Exception as e:
+            logger.error(f"Failed to get Spocket product {product_id}: {e}")
+            return None
+
+    async def get_stock(self, product_id: str) -> int:
+        """Get current stock level for a product."""
+        product = await self.get_product(product_id)
+        return product.stock_quantity if product else 0
+
+    async def place_order(
+        self, items: list[dict], shipping_address: dict
+    ) -> SupplierOrder:
+        """
+        Place an order with Spocket for fulfillment.
+        
+        Args:
+            items: List of items with product_id, variant_id, quantity
+            shipping_address: Shipping destination details
+        """
+        order_data = {
+            "order": {
+                "line_items": [
+                    {
+                        "product_id": item["product_id"],
+                        "variant_id": item.get("variant_id"),
+                        "quantity": item.get("quantity", 1),
+                    }
+                    for item in items
+                ],
+                "shipping_address": {
+                    "first_name": shipping_address.get("first_name", ""),
+                    "last_name": shipping_address.get("last_name", ""),
+                    "address1": shipping_address.get("address1", ""),
+                    "address2": shipping_address.get("address2", ""),
+                    "city": shipping_address.get("city", ""),
+                    "province": shipping_address.get("province", ""),
+                    "country": shipping_address.get("country", "US"),
+                    "zip": shipping_address.get("zip", ""),
+                    "phone": shipping_address.get("phone", ""),
+                },
+                "branded_invoice": True,  # Spocket feature
+            }
+        }
+        
+        if self.store_id:
+            order_data["order"]["store_id"] = self.store_id
+        
+        data = await self._request("/orders", "POST", json_data=order_data)
+        result = data.get("order", {})
+        
+        return SupplierOrder(
+            order_id=str(result.get("id", "")),
+            supplier_type=SupplierType.SPOCKET,
+            supplier_order_id=result.get("spocket_order_id"),
+            status=result.get("status", "processing"),
+            items=items,
+            shipping_address=shipping_address,
+            total_cost=float(result.get("total", 0)),
+        )
+
+    async def get_order_status(self, order_id: str) -> SupplierOrder:
+        """Get order status and tracking information."""
+        data = await self._request(f"/orders/{order_id}", "GET")
+        order = data.get("order", {})
+        
+        return SupplierOrder(
+            order_id=order_id,
+            supplier_type=SupplierType.SPOCKET,
+            supplier_order_id=order.get("spocket_order_id"),
+            status=order.get("status", "unknown"),
+            tracking_number=order.get("tracking_number"),
+            tracking_url=order.get("tracking_url"),
+            shipped_at=datetime.fromisoformat(order["shipped_at"]) if order.get("shipped_at") else None,
+        )
+
+    async def import_to_store(self, product_id: str, store_id: str = None) -> dict:
+        """
+        Import a product to connected store (Shopify, WooCommerce, etc.).
+        
+        Spocket handles the product sync automatically.
+        """
+        data = {
+            "product_id": product_id,
+            "store_id": store_id or self.store_id,
+        }
+        
+        result = await self._request("/products/import", "POST", json_data=data)
+        return result
+
+    async def get_shipping_rates(
+        self, product_id: str, destination_country: str = "US"
+    ) -> list[dict]:
+        """Get available shipping rates for a product."""
+        params = {
+            "product_id": product_id,
+            "destination": destination_country,
+        }
+        
+        data = await self._request("/shipping/rates", "GET", params)
+        return data.get("rates", [])
+
+
 class SupplierClientFactory:
     """Factory for creating supplier clients."""
 
     _clients: dict[SupplierType, type[BaseSupplierClient]] = {
         SupplierType.ALIEXPRESS: AliExpressClient,
         SupplierType.CJ_DROPSHIPPING: CJDropshippingClient,
+        SupplierType.SPOCKET: SpocketClient,
     }
 
     @classmethod

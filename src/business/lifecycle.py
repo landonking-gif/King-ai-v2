@@ -35,9 +35,10 @@ class BasicLifecycleEngine:
     def get_next_status(self, current_status: BusinessStatus) -> BusinessStatus | None:
         """
         Returns the next logical stage for a business unit.
+        Returns None for terminal states (REPLICATION, SUNSET).
         """
-        if current_status == BusinessStatus.SUNSET:
-            return BusinessStatus.SUNSET
+        if current_status in (BusinessStatus.SUNSET, BusinessStatus.REPLICATION):
+            return None
         return self.TRANSITIONS.get(current_status)
 
     def is_failed(self, status: BusinessStatus) -> bool:

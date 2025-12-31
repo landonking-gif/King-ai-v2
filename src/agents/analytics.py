@@ -1,6 +1,7 @@
 """
 Analytics Agent - Data-driven insight generation.
 Expert in pattern recognition, market trends, and KPI monitoring.
+Integrates with Google Analytics 4 for web analytics data.
 """
 
 import uuid
@@ -13,6 +14,7 @@ from src.analytics.models import (
     KPI, Alert, Report, TimeSeries, TimeGranularity, MetricCategory
 )
 from src.analytics.collector import MetricsCollector, STANDARD_METRICS
+from src.integrations.google_analytics_client import GoogleAnalyticsClient, get_ga_client
 from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -21,21 +23,163 @@ logger = get_logger(__name__)
 class AnalyticsAgent(SubAgent):
     """
     Data scientist agent for business intelligence.
+    Integrates with internal metrics and Google Analytics 4.
     """
     name = "analytics"
-    description = "Performs data analysis and provides actionable business insights."
+    description = "Performs data analysis and provides actionable business insights with Google Analytics integration."
     
-    def __init__(self):
+    # Function calling schema for LLM integration
+    FUNCTION_SCHEMA = {
+        "name": "analytics",
+        "description": "Analyze business metrics, KPIs, and web analytics. Integrates with Google Analytics 4 for traffic and e-commerce data.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "enum": [
+                        "dashboard", "kpis", "trends", "compare_periods",
+                        "alerts", "generate_report", "record_metric",
+                        "ga_traffic", "ga_ecommerce", "ga_top_products",
+                        "ga_sources", "ga_funnel", "ga_realtime"
+                    ],
+                    "description": "The analytics operation to perform"
+                },
+                "business_id": {
+                    "type": "string",
+                    "description": "The business unit ID"
+                },
+                "metric_name": {
+                    "type": "string",
+                    "description": "Name of the metric to analyze"
+                },
+                "days": {
+                    "type": "integer",
+                    "default": 30,
+                    "description": "Number of days to analyze"
+                },
+                "granularity": {
+                    "type": "string",
+                    "enum": ["hourly", "daily", "weekly", "monthly"],
+                    "default": "daily"
+                }
+            },
+            "required": ["action", "business_id"]
+        }
+    }
+    
+    def __init__(self, ga_property_id: str = None):
         super().__init__()
         self.collector = MetricsCollector()
         self._kpi_targets: dict[str, dict[str, float]] = {}  # business_id -> {kpi: target}
         self._alerts: list[Alert] = []
+        self._ga_clients: dict[str, GoogleAnalyticsClient] = {}
+        self._default_ga_property = ga_property_id
+
+    def get_ga_client(self, business_id: str) -> GoogleAnalyticsClient:
+        """Get or create GA4 client for a business."""
+        if business_id not in self._ga_clients:
+            # In production, property ID would come from business config
+            self._ga_clients[business_id] = get_ga_client(self._default_ga_property)
+        return self._ga_clients[business_id]
 
     def set_kpi_target(self, business_id: str, kpi_name: str, target: float):
         """Set a KPI target for a business."""
         if business_id not in self._kpi_targets:
             self._kpi_targets[business_id] = {}
         self._kpi_targets[business_id][kpi_name] = target
+
+    # =========================================================================
+    # Google Analytics 4 Integration Methods
+    # =========================================================================
+    
+    async def get_ga_traffic_metrics(
+        self,
+        business_id: str,
+        days: int = 30,
+    ) -> dict:
+        """Get Google Analytics traffic metrics."""
+        try:
+            ga = self.get_ga_client(business_id)
+            start_date = date.today() - timedelta(days=days)
+            result = await ga.get_traffic_metrics(start_date=start_date)
+            
+            if result.get("success"):
+                TASKS_EXECUTED.labels(agent=self.name, status="success").inc()
+            return result
+        except Exception as e:
+            TASKS_EXECUTED.labels(agent=self.name, status="failed").inc()
+            return {"success": False, "error": str(e)}
+
+    async def get_ga_ecommerce_metrics(
+        self,
+        business_id: str,
+        days: int = 30,
+    ) -> dict:
+        """Get Google Analytics e-commerce metrics."""
+        try:
+            ga = self.get_ga_client(business_id)
+            start_date = date.today() - timedelta(days=days)
+            result = await ga.get_ecommerce_metrics(start_date=start_date)
+            
+            if result.get("success"):
+                TASKS_EXECUTED.labels(agent=self.name, status="success").inc()
+            return result
+        except Exception as e:
+            TASKS_EXECUTED.labels(agent=self.name, status="failed").inc()
+            return {"success": False, "error": str(e)}
+
+    async def get_ga_top_products(
+        self,
+        business_id: str,
+        days: int = 30,
+        limit: int = 10,
+    ) -> dict:
+        """Get top performing products from Google Analytics."""
+        try:
+            ga = self.get_ga_client(business_id)
+            start_date = date.today() - timedelta(days=days)
+            return await ga.get_top_products(start_date=start_date, limit=limit)
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    async def get_ga_traffic_sources(
+        self,
+        business_id: str,
+        days: int = 30,
+    ) -> dict:
+        """Get traffic acquisition breakdown from Google Analytics."""
+        try:
+            ga = self.get_ga_client(business_id)
+            start_date = date.today() - timedelta(days=days)
+            return await ga.get_traffic_sources(start_date=start_date)
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    async def get_ga_conversion_funnel(
+        self,
+        business_id: str,
+        days: int = 30,
+    ) -> dict:
+        """Get e-commerce conversion funnel from Google Analytics."""
+        try:
+            ga = self.get_ga_client(business_id)
+            start_date = date.today() - timedelta(days=days)
+            return await ga.get_conversion_funnel(start_date=start_date)
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    async def get_ga_realtime(self, business_id: str) -> dict:
+        """Get real-time active users from Google Analytics."""
+        try:
+            ga = self.get_ga_client(business_id)
+            return await ga.get_realtime_users()
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    # =========================================================================
+    # Internal Analytics Methods
+    # =========================================================================
 
     async def get_dashboard_metrics(self, business_id: str) -> dict:
         """Get key metrics for dashboard display."""
