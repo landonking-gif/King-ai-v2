@@ -491,14 +491,49 @@ If the data is not available, say so clearly.
             logger.debug("Evolution rate limit reached")
             return
         
-        # Ask LLM for a proposal
-        proposal = await self.evolution.propose_improvement(context)
+        # Build context for evolution proposal
+        evolution_context = {
+            "business_state": context,
+            "recent_actions": [],
+            "performance_metrics": {},
+            "risk_profile": getattr(settings, 'risk_profile', 'moderate')
+        }
         
-        if proposal and proposal.get("is_beneficial"):
+        # Ask LLM for a proposal
+        proposal = await self.evolution.propose_improvement(
+            context=str(evolution_context),
+            goal="Improve system performance and efficiency"
+        )
+        
+        # Handle both EvolutionProposal object and legacy dict format
+        from src.master_ai.evolution_models import EvolutionProposal, ProposalStatus
+        
+        if proposal:
             self._evolution_count_this_hour += 1
             
+            # Check if it's the new EvolutionProposal type or legacy dict
+            if isinstance(proposal, EvolutionProposal):
+                is_beneficial = proposal.status != ProposalStatus.REJECTED
+                confidence = proposal.confidence_score.overall if proposal.confidence_score else 0.0
+                proposal_data = {
+                    "id": proposal.id,
+                    "type": proposal.proposal_type.value,
+                    "description": proposal.description,
+                    "changes": {c.file_path: c.new_content for c in proposal.changes if c.new_content},
+                    "confidence": confidence,
+                    "is_beneficial": is_beneficial
+                }
+            else:
+                # Legacy dict format
+                is_beneficial = proposal.get("is_beneficial", False)
+                confidence = proposal.get("confidence", 0)
+                proposal_data = proposal
+            
+            if not is_beneficial:
+                logger.info("Evolution proposal not beneficial, skipping")
+                return
+            
             # Validate confidence threshold
-            confidence = proposal.get("confidence", 0)
             evolution_threshold = getattr(settings, "evolution_confidence_threshold", 0.8)
             if not isinstance(evolution_threshold, (int, float)):
                 evolution_threshold = 0.8
@@ -511,7 +546,7 @@ If the data is not available, say so clearly.
                 return
             
             # Process in sandbox
-            await self._process_evolution_proposal(proposal)
+            await self._process_evolution_proposal(proposal_data)
     
     async def _process_evolution_proposal(self, proposal: dict):
         """Process a validated evolution proposal through sandbox testing."""

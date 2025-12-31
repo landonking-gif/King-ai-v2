@@ -55,6 +55,30 @@ class Settings(BaseSettings):
     max_evolutions_per_hour: int = Field(default=5)
     # Enable autonomous operation mode (self-driven without user prompts)
     enable_autonomous_mode: bool = Field(default=False)
+    # Enable self-modification capabilities
+    enable_self_modification: bool = Field(default=True)
+    # Confidence threshold for evolution proposals (0.0 - 1.0)
+    evolution_confidence_threshold: float = Field(default=0.8)
+    # Daily limit for evolution proposals
+    evolution_daily_limit: int = Field(default=1)
+    # Sandbox timeout for testing evolution proposals (seconds)
+    evolution_sandbox_timeout: int = Field(default=300)
+    # Require tests to pass before applying evolution
+    evolution_require_tests: bool = Field(default=True)
+    
+    # --- Approval Settings ---
+    # Maximum amount (in dollars) that can be auto-approved
+    max_auto_approve_amount: float = Field(default=100.0)
+    # Hours before an approval request expires
+    approval_expiry_hours: int = Field(default=24)
+    
+    # --- Scheduler Settings ---
+    # Enable background task scheduler
+    enable_scheduler: bool = Field(default=True)
+    # Default interval for KPI review (hours)
+    kpi_review_interval_hours: int = Field(default=6)
+    # Default interval for health checks (hours)
+    health_check_interval_hours: int = Field(default=1)
     
     # --- API Server Settings ---
     # Host for the FastAPI server

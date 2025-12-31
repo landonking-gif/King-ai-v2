@@ -23,22 +23,42 @@ resource "aws_elasticache_subnet_group" "main" {
   subnet_ids = aws_subnet.private[*].id
 }
 
-# ElastiCache Redis Cluster
-resource "aws_elasticache_cluster" "main" {
-  cluster_id           = "king-ai-${var.environment}"
-  engine               = "redis"
-  engine_version       = "7.0"
-  node_type            = var.redis_node_type
-  num_cache_nodes      = 1
-  parameter_group_name = "default.redis7"
-  port                 = 6379
+# ElastiCache Parameter Group
+resource "aws_elasticache_parameter_group" "redis" {
+  name   = "king-ai-redis-params"
+  family = "redis7"
 
-  subnet_group_name    = aws_elasticache_subnet_group.main.name
-  security_group_ids   = [aws_security_group.redis.id]
+  parameter {
+    name  = "maxmemory-policy"
+    value = "volatile-lru"
+  }
+}
 
-  snapshot_retention_limit = 5
-  snapshot_window         = "03:00-05:00"
-  maintenance_window      = "mon:05:00-mon:07:00"
+# ElastiCache Redis Replication Group (HA)
+resource "aws_elasticache_replication_group" "main" {
+  replication_group_id       = "king-ai-${var.environment}-redis"
+  description                = "King AI Redis cluster with HA"
+  node_type                  = var.redis_node_type
+  port                       = 6379
+  parameter_group_name       = aws_elasticache_parameter_group.redis.name
+  subnet_group_name          = aws_elasticache_subnet_group.main.name
+  security_group_ids         = [aws_security_group.redis.id]
+
+  # HA Configuration
+  automatic_failover_enabled = true
+  multi_az_enabled           = true
+  num_cache_clusters         = 3
+
+  # Maintenance
+  maintenance_window         = "mon:05:00-mon:07:00"
+  snapshot_retention_limit   = 7
+  snapshot_window            = "03:00-05:00"
+
+  # Encryption
+  at_rest_encryption_enabled = true
+  transit_encryption_enabled = true
+
+  engine_version             = "7.0"
 
   tags = {
     Name        = "king-ai-redis"

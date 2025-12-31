@@ -551,38 +551,367 @@ class EvolutionEngine:
     
     async def _apply_change(self, change: CodeChange):
         """Apply a single code change."""
-        # This will be implemented in Part 5.5
-        # For now, just log
+        import aiofiles
+        
+        file_path = Path(change.file_path)
+        
         logger.info(
             "Applying change",
-            file=change.file_path,
-            type=change.change_type
+            file=str(file_path),
+            type=str(change.change_type)
         )
+        
+        try:
+            change_type = change.change_type  # It's a string literal: "add", "modify", "delete", "rename"
+            
+            if change_type == "add":
+                # Create new file
+                file_path.parent.mkdir(parents=True, exist_ok=True)
+                async with aiofiles.open(file_path, 'w') as f:
+                    await f.write(change.new_content or "")
+                    
+            elif change_type == "modify":
+                # Modify existing file
+                if not file_path.exists():
+                    raise FileNotFoundError(f"Cannot modify non-existent file: {file_path}")
+                
+                if change.new_content:
+                    async with aiofiles.open(file_path, 'w') as f:
+                        await f.write(change.new_content)
+                elif change.diff:
+                    # Apply diff using code patcher
+                    from src.services.code_patcher import CodePatcher
+                    patcher = CodePatcher()
+                    async with aiofiles.open(file_path, 'r') as f:
+                        original = await f.read()
+                    patched = patcher.apply_diff(original, change.diff)
+                    async with aiofiles.open(file_path, 'w') as f:
+                        await f.write(patched)
+                        
+            elif change_type == "delete":
+                # Delete file (with safety check)
+                if file_path.exists():
+                    # Backup before delete
+                    backup_path = file_path.with_suffix(file_path.suffix + '.bak')
+                    async with aiofiles.open(file_path, 'r') as f:
+                        content = await f.read()
+                    async with aiofiles.open(backup_path, 'w') as f:
+                        await f.write(content)
+                    file_path.unlink()
+                    
+            elif change_type == "rename":
+                # Rename/move file
+                if change.new_content:  # new_content contains new path for renames
+                    new_path = Path(change.new_content)
+                    new_path.parent.mkdir(parents=True, exist_ok=True)
+                    file_path.rename(new_path)
+                    
+            logger.info("Change applied successfully", file=str(file_path))
+            
+        except Exception as e:
+            logger.error("Failed to apply change", file=str(file_path), error=str(e))
+            raise
     
     async def _apply_config_changes(self, config_changes: Dict[str, Any]):
         """Apply configuration changes."""
-        # This will be implemented in Part 5.5
-        logger.info("Applying config changes", changes=config_changes)
+        import yaml
+        import aiofiles
+        
+        logger.info("Applying config changes", changes=list(config_changes.keys()))
+        
+        config_dir = Path("config")
+        
+        for config_key, config_value in config_changes.items():
+            try:
+                if config_key == "risk_profile":
+                    # Update risk_profiles.yaml
+                    risk_file = config_dir / "risk_profiles.yaml"
+                    if risk_file.exists():
+                        async with aiofiles.open(risk_file, 'r') as f:
+                            content = await f.read()
+                        risk_config = yaml.safe_load(content)
+                        
+                        # Merge changes
+                        if isinstance(config_value, dict):
+                            for profile_name, profile_changes in config_value.items():
+                                if profile_name in risk_config.get("profiles", {}):
+                                    risk_config["profiles"][profile_name].update(profile_changes)
+                        
+                        async with aiofiles.open(risk_file, 'w') as f:
+                            await f.write(yaml.dump(risk_config, default_flow_style=False))
+                        
+                elif config_key == "settings":
+                    # Update settings via environment or .env file
+                    env_file = Path(".env")
+                    env_lines = []
+                    
+                    if env_file.exists():
+                        async with aiofiles.open(env_file, 'r') as f:
+                            env_lines = (await f.read()).splitlines()
+                    
+                    # Update or add settings
+                    for setting_key, setting_value in config_value.items():
+                        env_key = setting_key.upper()
+                        found = False
+                        for i, line in enumerate(env_lines):
+                            if line.startswith(f"{env_key}="):
+                                env_lines[i] = f"{env_key}={setting_value}"
+                                found = True
+                                break
+                        if not found:
+                            env_lines.append(f"{env_key}={setting_value}")
+                    
+                    async with aiofiles.open(env_file, 'w') as f:
+                        await f.write('\n'.join(env_lines))
+                        
+                elif config_key == "playbook":
+                    # Update playbook YAML
+                    playbook_name = config_value.get("name", "custom")
+                    playbook_file = config_dir / "playbooks" / f"{playbook_name}.yaml"
+                    
+                    async with aiofiles.open(playbook_file, 'w') as f:
+                        await f.write(yaml.dump(config_value, default_flow_style=False))
+                        
+                logger.info(f"Applied config change: {config_key}")
+                
+            except Exception as e:
+                logger.error(f"Failed to apply config change: {config_key}", error=str(e))
+                raise
     
     async def _create_rollback_data(self, proposal: EvolutionProposal) -> Dict[str, Any]:
         """Create rollback data for the proposal."""
-        # This will be implemented in Part 5.75
-        return {"placeholder": True}
+        import aiofiles
+        
+        rollback_data = {
+            "proposal_id": proposal.id,
+            "created_at": datetime.utcnow().isoformat(),
+            "original_files": {},
+            "deleted_files": {},
+            "created_files": [],
+            "config_backup": {},
+            "git_commit": None
+        }
+        
+        # Backup original file contents
+        for change in proposal.changes:
+            file_path = Path(change.file_path)
+            change_type = change.change_type  # It's already a string literal
+            
+            if change_type in ("modify", "delete"):
+                if file_path.exists():
+                    try:
+                        async with aiofiles.open(file_path, 'r') as f:
+                            rollback_data["original_files"][str(file_path)] = await f.read()
+                    except Exception as e:
+                        logger.warning(f"Could not backup file {file_path}: {e}")
+                        
+            elif change_type == "add":
+                rollback_data["created_files"].append(str(file_path))
+        
+        # Backup config if there are config changes
+        if proposal.configuration_changes:
+            config_files = ["config/settings.py", "config/risk_profiles.yaml", ".env"]
+            for config_file in config_files:
+                config_path = Path(config_file)
+                if config_path.exists():
+                    try:
+                        async with aiofiles.open(config_path, 'r') as f:
+                            rollback_data["config_backup"][config_file] = await f.read()
+                    except Exception:
+                        pass
+        
+        # Get current git commit for reference
+        try:
+            from src.services.git_manager import GitManager
+            git = GitManager()
+            status = await git.get_status()
+            rollback_data["git_commit"] = status.get("head_commit")
+        except Exception:
+            pass  # Git not available
+        
+        logger.info("Created rollback data", proposal_id=proposal.id, 
+                    files_backed_up=len(rollback_data["original_files"]))
+        
+        return rollback_data
     
     async def _rollback_proposal(self, proposal: EvolutionProposal):
         """Rollback a failed proposal."""
-        # This will be implemented in Part 5.75
+        import aiofiles
+        
         logger.warning("Rolling back proposal", proposal_id=proposal.id)
+        
+        # Get rollback data from proposal metadata
+        rollback_data = proposal.metadata.get("rollback_data", {})
+        
+        if not rollback_data:
+            logger.error("No rollback data available", proposal_id=proposal.id)
+            return
+        
+        errors = []
+        
+        # Restore original files
+        for file_path, original_content in rollback_data.get("original_files", {}).items():
+            try:
+                async with aiofiles.open(file_path, 'w') as f:
+                    await f.write(original_content)
+                logger.info(f"Restored file: {file_path}")
+            except Exception as e:
+                errors.append(f"Failed to restore {file_path}: {e}")
+        
+        # Delete created files
+        for file_path in rollback_data.get("created_files", []):
+            try:
+                path = Path(file_path)
+                if path.exists():
+                    path.unlink()
+                logger.info(f"Deleted created file: {file_path}")
+            except Exception as e:
+                errors.append(f"Failed to delete {file_path}: {e}")
+        
+        # Restore config backups
+        for config_file, backup_content in rollback_data.get("config_backup", {}).items():
+            try:
+                async with aiofiles.open(config_file, 'w') as f:
+                    await f.write(backup_content)
+                logger.info(f"Restored config: {config_file}")
+            except Exception as e:
+                errors.append(f"Failed to restore config {config_file}: {e}")
+        
+        # Update proposal status
+        proposal.status = ProposalStatus.ROLLED_BACK
+        await self._persist_proposal(proposal)
+        
+        if errors:
+            logger.error("Rollback completed with errors", errors=errors)
+        else:
+            logger.info("Rollback completed successfully", proposal_id=proposal.id)
     
     async def _validate_execution(self, proposal: EvolutionProposal) -> bool:
         """Validate that execution was successful."""
-        # This will be implemented in Part 5.5
+        import aiofiles
+        
+        logger.info("Validating execution", proposal_id=proposal.id)
+        
+        validation_errors = []
+        
+        # Check all modified/created files exist and are valid
+        for change in proposal.changes:
+            file_path = Path(change.file_path)
+            change_type = change.change_type  # It's already a string literal
+            
+            if change_type == "delete":
+                if file_path.exists():
+                    validation_errors.append(f"File should be deleted but exists: {file_path}")
+                continue
+                
+            if change_type in ("add", "modify"):
+                if not file_path.exists():
+                    validation_errors.append(f"File should exist but doesn't: {file_path}")
+                    continue
+                
+                # Validate Python syntax for .py files
+                if file_path.suffix == '.py':
+                    try:
+                        async with aiofiles.open(file_path, 'r') as f:
+                            content = await f.read()
+                        ast.parse(content)
+                    except SyntaxError as e:
+                        validation_errors.append(f"Syntax error in {file_path}: {e}")
+        
+        # Run sandbox tests if available
+        if self.sandbox:
+            try:
+                test_result = await self.sandbox.run_tests(
+                    test_files=["tests/"],
+                    timeout=60
+                )
+                
+                if not test_result.get("success", False):
+                    validation_errors.append(f"Tests failed: {test_result.get('error', 'Unknown')}")
+                    
+            except Exception as e:
+                logger.warning("Sandbox validation skipped", error=str(e))
+        
+        if validation_errors:
+            logger.error("Execution validation failed", errors=validation_errors)
+            proposal.metadata["validation_errors"] = validation_errors
+            return False
+        
+        logger.info("Execution validation passed", proposal_id=proposal.id)
         return True
     
     async def get_similar_proposals(self, proposal: EvolutionProposal) -> List[EvolutionProposal]:
-        """Get historically similar proposals."""
-        # This will be implemented with vector search in Part 3
-        return []
+        """Get historically similar proposals using vector similarity."""
+        try:
+            from src.master_ai.context_memory import VectorStore, EmbeddingClient
+            
+            embedding_client = EmbeddingClient()
+            vector_store = VectorStore(embedding_client)
+            
+            # Create search text from proposal
+            search_text = f"{proposal.proposal_type.value}: {proposal.description}"
+            if proposal.changes:
+                files_changed = [c.file_path for c in proposal.changes[:5]]
+                search_text += f" Files: {', '.join(files_changed)}"
+            
+            # Search for similar proposals
+            similar = await vector_store.search(
+                query=search_text,
+                namespace="evolution_proposals",
+                top_k=5
+            )
+            
+            # Load full proposals from database
+            similar_proposals = []
+            async with get_db() as db:
+                for result in similar:
+                    proposal_id = result.get("metadata", {}).get("proposal_id")
+                    if proposal_id and proposal_id != proposal.id:
+                        db_proposal = await db.get(DBEvolutionProposal, proposal_id)
+                        if db_proposal:
+                            loaded = await self._load_proposal(proposal_id)
+                            if loaded:
+                                similar_proposals.append(loaded)
+            
+            return similar_proposals[:5]
+            
+        except Exception as e:
+            logger.warning("Could not find similar proposals", error=str(e))
+            return []
+    
+    async def _index_proposal(self, proposal: EvolutionProposal):
+        """Index proposal in vector store for similarity search."""
+        try:
+            from src.master_ai.context_memory import VectorStore, EmbeddingClient
+            
+            embedding_client = EmbeddingClient()
+            vector_store = VectorStore(embedding_client)
+            
+            # Create text representation
+            text = f"""
+            Type: {proposal.proposal_type.value}
+            Description: {proposal.description}
+            Impact: {proposal.estimated_impact}
+            Files: {', '.join(c.file_path for c in proposal.changes[:10])}
+            Status: {proposal.status.value if hasattr(proposal.status, 'value') else str(proposal.status)}
+            """
+            
+            await vector_store.store(
+                text=text.strip(),
+                metadata={
+                    "proposal_id": proposal.id,
+                    "type": proposal.proposal_type.value,
+                    "status": proposal.status.value if hasattr(proposal.status, 'value') else str(proposal.status),
+                    "confidence": proposal.confidence_score.overall if proposal.confidence_score else 0.0,
+                    "created_at": proposal.created_at.isoformat() if proposal.created_at else None
+                },
+                namespace="evolution_proposals"
+            )
+            
+            logger.debug("Indexed proposal", proposal_id=proposal.id)
+            
+        except Exception as e:
+            logger.warning("Failed to index proposal", proposal_id=proposal.id, error=str(e))
     
     async def _persist_proposal(self, proposal: EvolutionProposal):
         """Persist proposal to database."""
