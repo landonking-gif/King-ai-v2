@@ -95,3 +95,23 @@ variable "redis_node_type" {
   type        = string
   default     = "cache.r6g.large"
 }
+
+# --- Pinecone Settings (Vector Store) ---
+variable "pinecone_api_key" {
+  description = "Pinecone API key for vector embeddings"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "pinecone_environment" {
+  description = "Pinecone environment (e.g., us-east-1-aws)"
+  type        = string
+  default     = "us-east-1-aws"
+}
+
+variable "pinecone_index_name" {
+  description = "Pinecone index name for King AI embeddings"
+  type        = string
+  default     = "king-ai-embeddings"
+}

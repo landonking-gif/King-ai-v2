@@ -1,7 +1,7 @@
 """Base class for all specialized agents."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Optional
+from typing import Any, Optional, ClassVar
 from enum import Enum
 from dataclasses import dataclass
 from src.utils.ollama_client import OllamaClient
@@ -43,6 +43,10 @@ class SubAgent(ABC):
     name: str = "base"
     description: str = "Base agent"
     
+    # Function calling schema for LLM integration
+    # Override this in subclasses to define agent capabilities
+    FUNCTION_SCHEMA: ClassVar[Optional[dict]] = None
+    
     def __init__(self):
         """Initializes the agent with an Ollama client for local inference."""
         self.ollama = OllamaClient(
@@ -72,6 +76,16 @@ class SubAgent(ABC):
         """
         pass
     
+    @classmethod
+    def get_function_schema(cls) -> Optional[dict]:
+        """
+        Get the function calling schema for this agent.
+        
+        Returns JSON schema that can be used with LLM function calling
+        to enable structured invocation of this agent.
+        """
+        return cls.FUNCTION_SCHEMA
+    
     async def _ask_llm(self, prompt: str) -> str:
         """Helper to query the LLM for agent-specific reasoning."""
         return await self.ollama.complete(prompt)
@@ -98,4 +112,22 @@ class BaseAgent(SubAgent):
         else:
             super().__init__()
             self.llm = self.ollama
+
+
+def get_all_function_schemas() -> list[dict]:
+    """
+    Get function schemas from all registered agents.
+    
+    Returns a list of JSON function definitions suitable for
+    LLM function calling APIs.
+    """
+    # This will be populated when agents are registered
+    from src.agents.router import agent_router
+    
+    schemas = []
+    for name, agent in agent_router.list_agents().items():
+        if hasattr(agent, 'FUNCTION_SCHEMA') and agent.FUNCTION_SCHEMA:
+            schemas.append(agent.FUNCTION_SCHEMA)
+    
+    return schemas
 

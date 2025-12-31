@@ -153,6 +153,39 @@ class ResearchAgent(BaseAgent):
         AgentCapability.DATA_ANALYSIS
     ]
     
+    # Function calling schema for LLM integration
+    FUNCTION_SCHEMA = {
+        "name": "research",
+        "description": "Perform web research and market analysis. Supports web search, market research, competitor analysis, and trend analysis.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "The research query or topic to investigate"
+                },
+                "research_type": {
+                    "type": "string",
+                    "enum": ["web_search", "market_research", "competitor_analysis", "trend_analysis", "product_research", "general_search"],
+                    "description": "Type of research to perform"
+                },
+                "depth": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 3,
+                    "default": 1,
+                    "description": "Research depth: 1=shallow, 2=medium, 3=deep"
+                },
+                "max_sources": {
+                    "type": "integer",
+                    "default": 10,
+                    "description": "Maximum number of sources to analyze"
+                }
+            },
+            "required": ["query"]
+        }
+    }
+    
     def __init__(
         self,
         llm_client: Optional[OllamaClient] = None,

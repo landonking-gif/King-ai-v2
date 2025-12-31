@@ -35,6 +35,47 @@ class FinanceAgent(SubAgent):
     name = "finance"
     description = "Manages financial tracking, payment processing, and profit analysis with Stripe integration."
     
+    # Function calling schema for LLM integration
+    FUNCTION_SCHEMA = {
+        "name": "finance",
+        "description": "Manage financial operations including payment processing, subscriptions, revenue tracking, and P&L analysis via Stripe integration.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "enum": [
+                        "create_customer", "get_customer", "create_payment",
+                        "create_subscription", "cancel_subscription", "upgrade_subscription",
+                        "process_refund", "get_revenue_metrics", "create_invoice"
+                    ],
+                    "description": "The financial operation to perform"
+                },
+                "business_id": {
+                    "type": "string",
+                    "description": "The business unit ID for this operation"
+                },
+                "amount": {
+                    "type": "number",
+                    "description": "Amount in cents for payments/refunds"
+                },
+                "customer_id": {
+                    "type": "string",
+                    "description": "Stripe customer ID (for existing customer operations)"
+                },
+                "email": {
+                    "type": "string",
+                    "description": "Customer email (for new customer creation)"
+                },
+                "price_id": {
+                    "type": "string",
+                    "description": "Stripe price ID (for subscription operations)"
+                }
+            },
+            "required": ["action", "business_id"]
+        }
+    }
+    
     def __init__(self):
         super().__init__()
         self._clients: dict[str, StripeClient] = {}

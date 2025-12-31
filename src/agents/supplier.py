@@ -38,11 +38,72 @@ class SourcedProduct:
     tags: list[str]
 
 
+# Function schema for LLM function-calling
+FUNCTION_SCHEMA = {
+    "name": "supplier_agent",
+    "description": "Supplier integration for dropshipping - product sourcing, order fulfillment, inventory sync",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "action": {
+                "type": "string",
+                "enum": ["search_products", "get_product_details", "import_product",
+                         "sync_inventory", "place_order", "track_order", 
+                         "check_stock", "update_pricing", "list_suppliers"],
+                "description": "The supplier action to perform"
+            },
+            "supplier_type": {
+                "type": "string",
+                "enum": ["aliexpress", "spocket", "cjdropshipping", "printful"],
+                "description": "Which supplier platform to use"
+            },
+            "search_query": {
+                "type": "string",
+                "description": "Product search query"
+            },
+            "product_id": {
+                "type": "string",
+                "description": "Supplier product ID"
+            },
+            "order_id": {
+                "type": "string",
+                "description": "Order ID for tracking"
+            },
+            "min_margin": {
+                "type": "number",
+                "description": "Minimum profit margin percentage (default 30%)"
+            },
+            "max_price": {
+                "type": "number",
+                "description": "Maximum product cost from supplier"
+            },
+            "shipping_info": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "address": {"type": "string"},
+                    "city": {"type": "string"},
+                    "country": {"type": "string"},
+                    "postal_code": {"type": "string"}
+                },
+                "description": "Shipping details for order fulfillment"
+            },
+            "quantity": {
+                "type": "integer",
+                "description": "Quantity to order or check stock for"
+            }
+        },
+        "required": ["action"]
+    }
+}
+
+
 class SupplierAgent(SubAgent):
     """Agent for supplier integration and dropshipping operations."""
 
     name = "supplier"
     description = "Handles supplier integration, product sourcing, and dropshipping operations."
+    FUNCTION_SCHEMA = FUNCTION_SCHEMA
     
     # Configuration constants
     MAX_DISPLAY_STOCK = 100  # Cap stock display to avoid showing excessive quantities

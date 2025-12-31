@@ -4,8 +4,9 @@ from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
-from src.api.routes import chat, businesses, approvals, evolution, health, playbook, portfolio
+from src.api.routes import chat, businesses, approvals, evolution, health, playbook, portfolio, system
 from src.api.routes import scheduler as scheduler_routes
+from src.api.middleware import RateLimitMiddleware, RateLimitConfig
 from src.master_ai.brain import MasterAI
 from src.database.connection import init_db
 from src.services.scheduler import scheduler, TaskFrequency
@@ -161,6 +162,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Rate Limiting
+if getattr(settings, 'enable_rate_limiting', True):
+    app.add_middleware(
+        RateLimitMiddleware,
+        default_limit=RateLimitConfig(
+            requests=getattr(settings, 'rate_limit_requests', 100),
+            window_seconds=getattr(settings, 'rate_limit_window', 60)
+        ),
+    )
+
 # Routes
 app.include_router(health.router, prefix="/api/health", tags=["health"])
 app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
@@ -170,6 +181,7 @@ app.include_router(evolution.router, prefix="/api/evolution", tags=["evolution"]
 app.include_router(playbook.router, prefix="/api", tags=["playbooks"])
 app.include_router(portfolio.router, prefix="/api", tags=["portfolios"])
 app.include_router(scheduler_routes.router, prefix="/api/scheduler", tags=["scheduler"])
+app.include_router(system.router, tags=["system"])
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):

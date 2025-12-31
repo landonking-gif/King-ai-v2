@@ -29,6 +29,6 @@ output "rds_endpoint" {
 }
 
 output "redis_endpoint" {
-  description = "Endpoint of the ElastiCache Redis cluster"
-  value       = aws_elasticache_cluster.main.cache_nodes[0].address
+  description = "Endpoint of the ElastiCache Redis replication group"
+  value       = aws_elasticache_replication_group.main.primary_endpoint_address
 }

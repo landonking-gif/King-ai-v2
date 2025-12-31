@@ -21,6 +21,69 @@ from src.utils.metrics import TASKS_EXECUTED
 logger = get_logger("commerce_agent")
 
 
+# Function schema for LLM function-calling
+FUNCTION_SCHEMA = {
+    "name": "commerce_agent",
+    "description": "E-commerce operations via Shopify - manages products, inventory, orders, and store analytics",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "action": {
+                "type": "string",
+                "enum": ["create_product", "update_product", "delete_product", "get_product", 
+                         "list_products", "sync_inventory", "get_orders", "fulfill_order",
+                         "get_store_metrics", "update_pricing"],
+                "description": "The commerce action to perform"
+            },
+            "product_id": {
+                "type": "string",
+                "description": "Shopify product ID for product-specific operations"
+            },
+            "product_data": {
+                "type": "object",
+                "description": "Product data including title, description, variants, pricing",
+                "properties": {
+                    "title": {"type": "string"},
+                    "description": {"type": "string"},
+                    "vendor": {"type": "string"},
+                    "product_type": {"type": "string"},
+                    "tags": {"type": "array", "items": {"type": "string"}},
+                    "variants": {"type": "array", "items": {"type": "object"}},
+                    "images": {"type": "array", "items": {"type": "object"}},
+                    "status": {"type": "string", "enum": ["active", "draft", "archived"]}
+                }
+            },
+            "order_id": {
+                "type": "string",
+                "description": "Order ID for order operations"
+            },
+            "order_status": {
+                "type": "string",
+                "enum": ["open", "closed", "cancelled", "any"],
+                "description": "Filter orders by status"
+            },
+            "metrics_period": {
+                "type": "string",
+                "enum": ["today", "week", "month", "quarter", "year"],
+                "description": "Time period for store metrics"
+            },
+            "inventory_updates": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "variant_id": {"type": "string"},
+                        "quantity": {"type": "integer"}
+                    }
+                },
+                "description": "Inventory updates to apply"
+            }
+        },
+        "required": ["action"]
+    }
+}
+
+
 class OrderStatus(str, Enum):
     """Order status types."""
     OPEN = "open"

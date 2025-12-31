@@ -1,0 +1,232 @@
+# Kong Declarative Configuration for King AI v2
+# This file configures Kong API Gateway with JWT authentication and rate limiting
+_format_version: "3.0"
+_transform: true
+
+# =============================================================================
+# Services - Backend API endpoints
+# =============================================================================
+services:
+  # Main API Service
+  - name: king-ai-api
+    url: http://api:8000
+    connect_timeout: 60000
+    write_timeout: 60000
+    read_timeout: 300000  # 5 min for LLM responses
+    retries: 3
+    routes:
+      - name: api-route
+        paths:
+          - /api
+        strip_path: true
+        preserve_host: false
+    plugins:
+      - name: jwt
+        config:
+          claims_to_verify:
+            - exp
+          key_claim_name: iss
+          secret_is_base64: false
+          run_on_preflight: true
+      - name: rate-limiting
+        config:
+          minute: 100
+          hour: 1000
+          policy: local
+          fault_tolerant: true
+          hide_client_headers: false
+      - name: cors
+        config:
+          origins:
+            - "*"
+          methods:
+            - GET
+            - POST
+            - PUT
+            - DELETE
+            - OPTIONS
+          headers:
+            - Accept
+            - Authorization
+            - Content-Type
+          exposed_headers:
+            - X-RateLimit-Limit-Minute
+            - X-RateLimit-Remaining-Minute
+          credentials: true
+          max_age: 3600
+      - name: request-size-limiting
+        config:
+          allowed_payload_size: 10  # 10 MB max request size
+
+  # Inference Service (GPU cluster)
+  - name: king-ai-inference
+    url: http://inference:8080
+    connect_timeout: 60000
+    write_timeout: 120000
+    read_timeout: 600000  # 10 min for complex inference
+    retries: 2
+    routes:
+      - name: inference-route
+        paths:
+          - /inference
+          - /v1/completions
+          - /v1/chat/completions
+        strip_path: false
+    plugins:
+      - name: jwt
+        config:
+          claims_to_verify:
+            - exp
+      - name: rate-limiting
+        config:
+          minute: 30  # Lower rate limit for expensive inference
+          hour: 500
+          policy: local
+      - name: request-termination
+        enabled: false  # Enable for maintenance mode
+        config:
+          status_code: 503
+          message: "Inference service under maintenance"
+
+  # WebSocket Service for real-time updates
+  - name: king-ai-websocket
+    url: http://api:8000
+    routes:
+      - name: ws-route
+        paths:
+          - /ws
+        protocols:
+          - ws
+          - wss
+    plugins:
+      - name: jwt
+        config:
+          claims_to_verify:
+            - exp
+
+  # Health Check (no auth required)
+  - name: king-ai-health
+    url: http://api:8000
+    routes:
+      - name: health-route
+        paths:
+          - /health
+          - /ready
+          - /live
+        strip_path: false
+
+# =============================================================================
+# Consumers - API clients with credentials
+# =============================================================================
+consumers:
+  # Master AI internal consumer
+  - username: master-ai
+    custom_id: master-ai-internal
+    jwt_secrets:
+      - key: master-ai
+        algorithm: HS256
+        # Secret should be set via environment variable in production
+        
+  # Dashboard consumer
+  - username: dashboard
+    custom_id: king-ai-dashboard
+    jwt_secrets:
+      - key: dashboard
+        algorithm: HS256
+
+  # External API consumer (for integrations)
+  - username: external-api
+    custom_id: external-integrations
+    jwt_secrets:
+      - key: external
+        algorithm: HS256
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 50
+          hour: 500
+
+# =============================================================================
+# Upstreams - Load balancing configuration
+# =============================================================================
+upstreams:
+  - name: api-upstream
+    algorithm: round-robin
+    slots: 10000
+    healthchecks:
+      active:
+        healthy:
+          interval: 5
+          successes: 2
+        unhealthy:
+          interval: 5
+          http_failures: 3
+        http_path: /health
+        timeout: 3
+      passive:
+        healthy:
+          successes: 2
+        unhealthy:
+          http_failures: 3
+    targets:
+      - target: api:8000
+        weight: 100
+
+  - name: inference-upstream
+    algorithm: least-connections  # Best for LLM inference
+    slots: 10000
+    healthchecks:
+      active:
+        healthy:
+          interval: 10
+          successes: 1
+        unhealthy:
+          interval: 5
+          http_failures: 2
+        http_path: /health
+        timeout: 5
+      passive:
+        healthy:
+          successes: 1
+        unhealthy:
+          http_failures: 2
+    targets:
+      - target: inference:8080
+        weight: 100
+
+# =============================================================================
+# Global Plugins
+# =============================================================================
+plugins:
+  # Request/Response logging
+  - name: file-log
+    config:
+      path: /var/log/kong/access.log
+      reopen: true
+  
+  # Prometheus metrics
+  - name: prometheus
+    config:
+      status_code_metrics: true
+      latency_metrics: true
+      bandwidth_metrics: true
+      upstream_health_metrics: true
+
+  # Bot detection
+  - name: bot-detection
+    enabled: false  # Enable in production
+    config:
+      deny:
+        - "curl"
+        - "wget"
+      allow:
+        - "postman"
+        - "insomnia"
+
+  # IP restriction (configure for production)
+  - name: ip-restriction
+    enabled: false
+    config:
+      allow:
+        - "10.0.0.0/8"  # VPC internal
+        - "172.16.0.0/12"

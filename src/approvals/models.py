@@ -217,6 +217,5 @@ class ApprovalPolicy:
     auto_approve_below: Optional[float] = None  # Auto-approve if $ below
     require_two_approvers: bool = False
     expiry_hours: int = 24
-    expiry_hours: int = 24
     notify_on_create: bool = True
     escalate_after_hours: int = 4

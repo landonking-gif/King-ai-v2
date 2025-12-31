@@ -965,9 +965,67 @@ class EvolutionEngine:
         return None
     
     async def _record_history(self, proposal: EvolutionProposal, event_type: str):
-        """Record evolution event in history."""
-        # This will be implemented in Part 5.75
-        pass
+        """
+        Record evolution event in history for audit and analysis.
+        Stores events to database and maintains in-memory recent history.
+        """
+        from src.database.connection import get_db_session
+        from datetime import datetime
+        import json
+        
+        try:
+            event_record = {
+                "proposal_id": proposal.id,
+                "proposal_type": proposal.proposal_type.value if proposal.proposal_type else "unknown",
+                "event_type": event_type,
+                "timestamp": datetime.utcnow().isoformat(),
+                "status": proposal.status.value if proposal.status else "unknown",
+                "confidence_score": proposal.confidence_score.overall if proposal.confidence_score else 0.0,
+                "description": proposal.description[:500] if proposal.description else "",
+            }
+            
+            # Update metrics
+            if event_type == "executed":
+                self.metrics.successful_executions += 1
+            elif event_type == "failed":
+                self.metrics.failed_executions += 1
+            elif event_type == "rejected":
+                self.metrics.rejected_proposals += 1
+            
+            # Store in database
+            async with get_db_session() as session:
+                from sqlalchemy import text
+                
+                await session.execute(
+                    text("""
+                        INSERT INTO evolution_history 
+                        (proposal_id, event_type, event_data, created_at)
+                        VALUES (:proposal_id, :event_type, :event_data, :created_at)
+                        ON CONFLICT (proposal_id, event_type) DO UPDATE
+                        SET event_data = :event_data, created_at = :created_at
+                    """),
+                    {
+                        "proposal_id": proposal.id,
+                        "event_type": event_type,
+                        "event_data": json.dumps(event_record),
+                        "created_at": datetime.utcnow()
+                    }
+                )
+                await session.commit()
+                
+            logger.info(
+                "Evolution history recorded",
+                proposal_id=proposal.id,
+                event_type=event_type
+            )
+            
+        except Exception as e:
+            # Don't fail the main flow if history recording fails
+            logger.warning(
+                "Failed to record evolution history",
+                proposal_id=proposal.id,
+                error=str(e)
+            )
     
     def get_metrics(self) -> EvolutionMetrics:
         """Get evolution metrics."""

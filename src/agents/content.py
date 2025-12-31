@@ -1,6 +1,7 @@
 """
 Content Agent - AI-powered content generation and optimization.
 Creates SEO-optimized blog posts, marketing copy, and social media content.
+Integrates with DALL-E for AI-generated images.
 """
 
 import re
@@ -13,6 +14,14 @@ from src.agents.base import SubAgent
 from src.utils.seo_utils import SEOAnalyzer, SEOScore
 from src.utils.metrics import TASKS_EXECUTED
 from src.utils.logging import logger
+
+# DALL-E integration
+try:
+    from src.integrations.dalle_client import dalle_client, GeneratedImage
+    DALLE_AVAILABLE = True
+except ImportError:
+    DALLE_AVAILABLE = False
+    dalle_client = None
 
 
 class ContentType(str, Enum):
@@ -49,6 +58,8 @@ class ContentRequest:
     call_to_action: Optional[str] = None
     include_sections: List[str] = field(default_factory=list)
     brand_guidelines: Optional[str] = None
+    generate_images: bool = True  # Auto-generate images with DALL-E
+    image_style: str = "professional photography"
 
 
 @dataclass
@@ -62,6 +73,8 @@ class GeneratedContent:
     seo_score: Optional[SEOScore] = None
     sections: List[Dict[str, str]] = field(default_factory=list)
     social_snippets: List[str] = field(default_factory=list)
+    featured_image_url: Optional[str] = None  # DALL-E generated image
+    additional_images: List[str] = field(default_factory=list)  # Section images
     
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -72,18 +85,67 @@ class GeneratedContent:
             "content_type": self.content_type.value,
             "seo_score": self.seo_score.to_dict() if self.seo_score else None,
             "sections": self.sections,
-            "social_snippets": self.social_snippets
+            "social_snippets": self.social_snippets,
+            "featured_image_url": self.featured_image_url,
+            "additional_images": self.additional_images,
         }
 
 
 class ContentAgent(SubAgent):
     """
-    Agent for generating SEO-optimized content.
+    Agent for generating SEO-optimized content with AI images.
     Creates various types of marketing and blog content.
+    Integrates with DALL-E for automatic image generation.
     """
     
     name = "content"
-    description = "Generates SEO-optimized blog posts, marketing copy, and social media content."
+    description = "Generates SEO-optimized blog posts, marketing copy, social media content, and AI-generated images."
+    
+    # Function calling schema for LLM integration
+    FUNCTION_SCHEMA = {
+        "name": "content",
+        "description": "Generate SEO-optimized content including blog posts, product descriptions, marketing copy, and social media posts. Automatically generates images using DALL-E.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "topic": {
+                    "type": "string",
+                    "description": "The main topic or subject of the content"
+                },
+                "content_type": {
+                    "type": "string",
+                    "enum": ["blog_post", "landing_page", "product_description", "email_marketing", "social_media", "ad_copy", "press_release"],
+                    "default": "blog_post"
+                },
+                "keywords": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Target SEO keywords"
+                },
+                "tone": {
+                    "type": "string",
+                    "enum": ["professional", "casual", "friendly", "authoritative", "humorous", "urgent", "inspirational"],
+                    "default": "professional"
+                },
+                "word_count": {
+                    "type": "integer",
+                    "default": 1500,
+                    "description": "Target word count"
+                },
+                "generate_images": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Whether to generate images using DALL-E"
+                },
+                "image_style": {
+                    "type": "string",
+                    "default": "professional photography",
+                    "description": "Style for DALL-E image generation"
+                }
+            },
+            "required": ["topic"]
+        }
+    }
     
     # SEO optimization threshold
     MIN_SEO_SCORE_THRESHOLD = 70  # Minimum acceptable SEO score before improvement attempts
@@ -215,6 +277,7 @@ Tagline: [Tagline]
         """Initialize content agent."""
         super().__init__()
         self.seo_analyzer = SEOAnalyzer()
+        self.dalle_enabled = DALLE_AVAILABLE and dalle_client is not None
     
     async def execute(self, task: dict) -> dict:
         """Execute a content generation task."""
@@ -234,7 +297,9 @@ Tagline: [Tagline]
                 target_audience=task_data.get("audience", "general"),
                 call_to_action=task_data.get("cta"),
                 include_sections=task_data.get("sections", []),
-                brand_guidelines=task_data.get("brand_guidelines")
+                brand_guidelines=task_data.get("brand_guidelines"),
+                generate_images=task_data.get("generate_images", True),
+                image_style=task_data.get("image_style", "professional photography"),
             )
             
             content = await self.generate(request)
@@ -247,7 +312,8 @@ Tagline: [Tagline]
                 "metadata": {
                     "type": "content_generation",
                     "word_count": content.word_count,
-                    "seo_score": content.seo_score.overall_score if content.seo_score else None
+                    "seo_score": content.seo_score.overall_score if content.seo_score else None,
+                    "has_images": content.featured_image_url is not None,
                 }
             }
             
@@ -267,7 +333,7 @@ Tagline: [Tagline]
             request: Content generation request
             
         Returns:
-            Generated content
+            Generated content with optional AI-generated images
         """
         logger.info(
             f"Generating {request.content_type.value} content",
@@ -301,14 +367,67 @@ Tagline: [Tagline]
         if request.content_type == ContentType.BLOG_POST:
             content.social_snippets = await self._generate_social_snippets(content)
         
+        # Generate images using DALL-E
+        if request.generate_images and self.dalle_enabled:
+            await self._generate_images(content, request)
+        
         logger.info(
             f"Content generated",
             type=request.content_type.value,
             words=content.word_count,
-            seo_score=content.seo_score.overall_score if content.seo_score else None
+            seo_score=content.seo_score.overall_score if content.seo_score else None,
+            has_images=content.featured_image_url is not None
         )
         
         return content
+
+    async def _generate_images(self, content: GeneratedContent, request: ContentRequest) -> None:
+        """
+        Generate images for content using DALL-E.
+        
+        Args:
+            content: The generated content to add images to
+            request: Original content request with image style preferences
+        """
+        if not self.dalle_enabled or dalle_client is None:
+            return
+        
+        try:
+            # Generate featured image based on content type
+            if request.content_type == ContentType.BLOG_POST:
+                image = await dalle_client.generate_blog_illustration(
+                    content.title,
+                    style=request.image_style
+                )
+                content.featured_image_url = image.url if image else None
+                
+            elif request.content_type == ContentType.PRODUCT_DESCRIPTION:
+                image = await dalle_client.generate_product_image(
+                    request.topic,
+                    style=request.image_style
+                )
+                content.featured_image_url = image.url if image else None
+                
+            elif request.content_type == ContentType.SOCIAL_MEDIA:
+                image = await dalle_client.generate(
+                    f"Social media post visual for: {request.topic}. Style: {request.image_style}. Vibrant, eye-catching, shareable.",
+                    size="1024x1024"
+                )
+                content.featured_image_url = image.url if image else None
+                
+            elif request.content_type == ContentType.LANDING_PAGE:
+                # Generate hero image for landing page
+                image = await dalle_client.generate(
+                    f"Hero banner image for landing page about: {request.topic}. Style: {request.image_style}. Professional, modern, inspiring trust.",
+                    size="1792x1024"  # Wide format for hero
+                )
+                content.featured_image_url = image.url if image else None
+                
+            logger.info(f"Generated featured image for {request.content_type.value}")
+            
+        except Exception as e:
+            logger.warning(f"Failed to generate images: {e}")
+            # Don't fail the whole content generation if images fail
     
     def _build_prompt(self, request: ContentRequest) -> str:
         """Build generation prompt from request."""
