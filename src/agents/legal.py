@@ -520,6 +520,36 @@ Generate the complete document in markdown format."""
             # Fallback to legacy behavior for backward compatibility
             description = task.get("description", "Legal check")
             input_data = task.get("input_data", {})
+
+            # Heuristic: route legacy "compliance" tasks to deterministic checks
+            # so tests and offline execution don't require an LLM.
+            desc_lower = (description or "").lower()
+            if "gdpr" in desc_lower:
+                data_practices = {
+                    "has_privacy_policy": bool(input_data.get("privacy_policy")) or bool(input_data.get("has_privacy_policy")),
+                    "has_cookie_consent": bool(input_data.get("cookie_consent")) or bool(input_data.get("has_cookie_consent")),
+                    "data_deletion_process": bool(input_data.get("data_deletion_process")),
+                    "dpo_appointed": bool(input_data.get("dpo_appointed")),
+                }
+                return await self.check_compliance(
+                    business_id=input_data.get("business_id", ""),
+                    frameworks=[ComplianceFramework.GDPR],
+                    website_url=input_data.get("website_url"),
+                    data_practices=data_practices,
+                )
+
+            if "ccpa" in desc_lower:
+                data_practices = {
+                    "has_privacy_policy": bool(input_data.get("privacy_policy")) or bool(input_data.get("has_privacy_policy")),
+                    "opt_out_mechanism": bool(input_data.get("opt_out_mechanism")),
+                    "data_inventory": bool(input_data.get("data_inventory")),
+                }
+                return await self.check_compliance(
+                    business_id=input_data.get("business_id", ""),
+                    frameworks=[ComplianceFramework.CCPA],
+                    website_url=input_data.get("website_url"),
+                    data_practices=data_practices,
+                )
             
             prompt = f"""
             ### TASK: LEGAL & COMPLIANCE

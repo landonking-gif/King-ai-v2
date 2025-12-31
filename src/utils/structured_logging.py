@@ -47,8 +47,10 @@ class EnhancedLogger:
             success: Whether the call succeeded
             error: Error message if failed
         """
+        # NOTE: structlog reserves the key "event" for the log message.
+        # Passing an "event" kwarg causes "multiple values for argument 'event'".
         event_data = {
-            "event": "llm_call",
+            "event_type": "llm_call",
             "provider": provider,
             "model": model,
             "prompt_tokens": prompt_tokens,
@@ -82,13 +84,19 @@ def get_logger(name: str = None):
     return EnhancedLogger(logger, name)
 
 
-def set_request_context(**kwargs):
+def set_request_context(*args, **kwargs):
     """
     Set request-scoped context for logging.
     
     Args:
+        *args: Optional positional request_id (legacy)
         **kwargs: Key-value pairs to add to request context
     """
+    if args:
+        if len(args) != 1:
+            raise TypeError("set_request_context accepts at most 1 positional argument")
+        kwargs = {"request_id": args[0], **kwargs}
+
     current = _request_context.get()
     _request_context.set({**current, **kwargs})
 

@@ -12,12 +12,15 @@ class KPIMonitor:
     """
     
     def __init__(self):
-        self.redis = redis.from_url(settings.redis_url, decode_responses=True)
+        redis_url = getattr(settings, "redis_url", "redis://localhost:6379")
+        if not isinstance(redis_url, str):
+            redis_url = "redis://localhost:6379"
+
+        self.redis = redis.from_url(redis_url, decode_responses=True)
         self.metrics_prefix = "king_ai:metrics:"
     
     async def record_metric(self, name: str, value: float, tags: Dict[str, str] = None):
         """
-        Record a single metric data point (e.g., api_latency=0.15).
         Stored as specific time-series or simple counters in Redis.
         """
         timestamp = int(time.time())

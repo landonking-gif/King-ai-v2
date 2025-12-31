@@ -211,12 +211,16 @@ class EvolutionEngine:
         constraints: List[str] = None
     ) -> Dict[str, Any]:
         """Generate proposal using LLM."""
+        risk_profile = getattr(settings, "risk_profile", "moderate")
+        if not isinstance(risk_profile, str):
+            risk_profile = "moderate"
+
         prompt = EVOLUTION_PROPOSAL_PROMPT.format(
             goal=goal,
             context=context[:3000],
             proposal_type=proposal_type.value if proposal_type else "auto",
             constraints="\n".join(f"- {c}" for c in (constraints or [])),
-            risk_profile=settings.risk_profile
+            risk_profile=risk_profile
         )
         
         llm_context = TaskContext(

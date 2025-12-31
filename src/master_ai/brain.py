@@ -56,7 +56,8 @@ class MasterAI:
         # Specialized manager components
         self.context = ContextManager()      # Handles RAG and context window building
         self.planner = Planner(self.llm_router)  # Uses LLM router for intelligent routing
-        self.evolution = EvolutionEngine(self.llm_router.ollama)  # Evolution still uses ollama directly for now
+        # EvolutionEngine expects the router interface (not a raw provider client)
+        self.evolution = EvolutionEngine(self.llm_router)
         self.agent_router = AgentRouter()    # Dispatches tasks to sub-agents
         
         # State and rate limiting for autonomous features
@@ -66,10 +67,14 @@ class MasterAI:
         self._total_tokens_today = 0
         self._token_budget_daily = 1_000_000  # 1M tokens per day
         
+        risk_profile = getattr(settings, "risk_profile", "moderate")
+        if not isinstance(risk_profile, str):
+            risk_profile = "moderate"
+
         logger.info(
             "Master AI initialized",
             autonomous_mode=self.autonomous_mode,
-            risk_profile=settings.risk_profile
+            risk_profile=risk_profile
         )
     
     async def process_input(self, user_input: str, request_id: str = None) -> MasterAIResponse:
@@ -477,8 +482,12 @@ If the data is not available, say so clearly.
             self._evolution_count_this_hour = 0
             self._hour_start = now
         
+        max_evolutions = getattr(settings, "max_evolutions_per_hour", 5)
+        if not isinstance(max_evolutions, int):
+            max_evolutions = 5
+
         # Enforce rate limit from settings
-        if self._evolution_count_this_hour >= settings.max_evolutions_per_hour:
+        if self._evolution_count_this_hour >= max_evolutions:
             logger.debug("Evolution rate limit reached")
             return
         
@@ -490,7 +499,9 @@ If the data is not available, say so clearly.
             
             # Validate confidence threshold
             confidence = proposal.get("confidence", 0)
-            evolution_threshold = getattr(settings, 'evolution_confidence_threshold', 0.8)
+            evolution_threshold = getattr(settings, "evolution_confidence_threshold", 0.8)
+            if not isinstance(evolution_threshold, (int, float)):
+                evolution_threshold = 0.8
             if confidence < evolution_threshold:
                 logger.info(
                     "Evolution proposal rejected due to low confidence",

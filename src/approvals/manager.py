@@ -107,6 +107,15 @@ class ApprovalManager:
         expiry_hours = policy.expiry_hours if policy else 24
         expires_at = datetime.utcnow() + timedelta(hours=expiry_hours)
 
+        # Determine required approvers based on policy and risk level
+        required_approvers = 1
+        if policy and getattr(policy, 'require_two_approvers', False):
+            required_approvers = 2
+        
+        # High-risk and critical always require 2 approvers
+        if risk_level in [RiskLevel.HIGH, RiskLevel.CRITICAL]:
+            required_approvers = max(required_approvers, 2)
+
         request = ApprovalRequest(
             id=str(uuid.uuid4()),
             business_id=business_id,
@@ -117,6 +126,7 @@ class ApprovalManager:
             risk_factors=risk_factors or [],
             payload=payload,
             expires_at=expires_at,
+            required_approvers=required_approvers,
             source_plan_id=source_plan_id,
             source_task_id=source_task_id,
         )
@@ -140,42 +150,65 @@ class ApprovalManager:
         notes: str = None,
         modifications: dict = None,
     ) -> Optional[ApprovalRequest]:
-        """Approve a request."""
+        """
+        Add an approval vote to a request.
+        
+        For multi-approver requests, this adds a vote. The request
+        is only fully approved when enough votes are received.
+        """
         request = self._requests.get(request_id)
-        if not request or request.status != ApprovalStatus.PENDING:
+        if not request:
+            return None
+        
+        # Check valid status for voting
+        if request.status not in [ApprovalStatus.PENDING, ApprovalStatus.PARTIAL]:
             return None
 
         if request.is_expired:
             request.status = ApprovalStatus.EXPIRED
             return None
+        
+        # Check if user already voted
+        if request.has_voted(user_id):
+            logger.warning(f"User {user_id} already voted on request {request_id}")
+            return request
 
+        # Handle modifications (single approver case)
         if modifications:
             request.status = ApprovalStatus.MODIFIED
             request.modified_payload = modifications
+            request.reviewed_at = datetime.utcnow()
+            request.reviewed_by = user_id
+            request.review_notes = notes
         else:
-            request.status = ApprovalStatus.APPROVED
-
-        request.reviewed_at = datetime.utcnow()
-        request.reviewed_by = user_id
-        request.review_notes = notes
+            # Add vote using multi-approver logic
+            fully_approved = request.add_vote(user_id, "approve", notes)
+            
+            if fully_approved:
+                logger.info(f"Request {request_id} fully approved")
+            elif request.status == ApprovalStatus.PARTIAL:
+                logger.info(
+                    f"Request {request_id} partially approved: "
+                    f"{request.approval_count}/{request.required_approvers}"
+                )
 
         # Record decision
         self._decisions.append(ApprovalDecision(
             request_id=request_id,
             decision=request.status,
             decided_by=user_id,
-            decided_at=request.reviewed_at,
+            decided_at=datetime.utcnow(),
             notes=notes,
             modifications=modifications,
         ))
 
-        logger.info(f"Approved request: {request_id} by {user_id}")
-
-        for hook in self._hooks["request_approved"]:
-            try:
-                await hook(request)
-            except Exception as e:
-                logger.error(f"Hook error: {e}")
+        if request.status == ApprovalStatus.APPROVED:
+            logger.info(f"Approved request: {request_id} by {user_id}")
+            for hook in self._hooks["request_approved"]:
+                try:
+                    await hook(request)
+                except Exception as e:
+                    logger.error(f"Hook error: {e}")
 
         return request
 
@@ -185,15 +218,21 @@ class ApprovalManager:
         user_id: str,
         notes: str = None,
     ) -> Optional[ApprovalRequest]:
-        """Reject a request."""
+        """
+        Reject a request.
+        
+        Any rejection immediately rejects the entire request,
+        regardless of how many approvals were received.
+        """
         request = self._requests.get(request_id)
-        if not request or request.status != ApprovalStatus.PENDING:
+        if not request:
+            return None
+        
+        if request.status not in [ApprovalStatus.PENDING, ApprovalStatus.PARTIAL]:
             return None
 
-        request.status = ApprovalStatus.REJECTED
-        request.reviewed_at = datetime.utcnow()
-        request.reviewed_by = user_id
-        request.review_notes = notes
+        # Use multi-approver vote logic
+        request.add_vote(user_id, "reject", notes)
 
         self._decisions.append(ApprovalDecision(
             request_id=request_id,
