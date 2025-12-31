@@ -142,12 +142,18 @@ class HistoricalSuccessScorer(ConfidenceComponent):
     
     def score(self, proposal: EvolutionProposal) -> float:
         """Score based on historical data."""
-        # Get similar proposals (will be implemented in Part 3 with vector search)
-        # For now, use a simpler approach
+        # NOTE: This scorer is synchronous, but the engine API is async.
+        # Only use asyncio.run when we're not already inside an event loop;
+        # otherwise return a neutral score to avoid un-awaited coroutine warnings.
+        similar = []
         try:
             import asyncio
-            similar = asyncio.run(self.evolution_engine.get_similar_proposals(proposal))
-        except:
+            try:
+                asyncio.get_running_loop()
+                return 0.5
+            except RuntimeError:
+                similar = asyncio.run(self.evolution_engine.get_similar_proposals(proposal))
+        except Exception:
             similar = []
         
         if not similar:

@@ -25,6 +25,22 @@ class Settings(BaseSettings):
     ollama_url: str = Field(..., validation_alias="OLLAMA_URL")
     # The specific model name to use (e.g., llama3.1:70b or 8b)
     ollama_model: str = Field(default="llama3.1:8b", validation_alias="OLLAMA_MODEL")
+
+    # --- vLLM Settings (Optional) ---
+    # Base URL for a vLLM OpenAI-compatible server
+    vllm_url: Optional[str] = Field(default=None, validation_alias="VLLM_URL")
+    # Model identifier to request from vLLM
+    vllm_model: str = Field(
+        default="meta-llama/Llama-3.1-70B-Instruct",
+        validation_alias="VLLM_MODEL",
+    )
+
+    # --- Claude Settings (Optional) ---
+    # Claude model name (API key is read from ANTHROPIC_API_KEY)
+    claude_model: str = Field(
+        default="claude-3-5-sonnet-20241022",
+        validation_alias="CLAUDE_MODEL",
+    )
     
     # --- Pinecone Settings (Vector Store) ---
     # Optional API key for Pinecone vector database integration

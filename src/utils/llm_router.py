@@ -8,10 +8,12 @@ from enum import Enum
 from typing import Optional, Callable, Any
 from dataclasses import dataclass
 import time
+import os
 
 from src.utils.ollama_client import OllamaClient
 from src.utils.vllm_client import VLLMClient
 from src.utils.gemini_client import GeminiClient
+from src.utils.claude_client import ClaudeClient
 from config.settings import settings
 
 
@@ -71,13 +73,24 @@ class LLMRouter:
         import os
         if os.getenv("GEMINI_API_KEY"):
             self.gemini = GeminiClient(api_key=os.getenv("GEMINI_API_KEY"))
+
+        # High-stakes fallback: Claude
+        self.claude: Optional[ClaudeClient] = None
+        if os.getenv("ANTHROPIC_API_KEY"):
+            self.claude = ClaudeClient(
+                api_key=os.getenv("ANTHROPIC_API_KEY"),
+                model=(
+                    settings.claude_model
+                    if hasattr(settings, "claude_model") and settings.claude_model
+                    else "claude-3-5-sonnet-20241022"
+                ),
+            )
         
         # Health tracking
-        self._provider_health = {
-            ProviderType.VLLM: True,
-            ProviderType.OLLAMA: True,
-            ProviderType.GEMINI: True,
-        }
+        self._provider_health = {p: True for p in ProviderType}
+        self._provider_health[ProviderType.VLLM] = bool(self.vllm)
+        self._provider_health[ProviderType.GEMINI] = bool(self.gemini)
+        self._provider_health[ProviderType.CLAUDE] = bool(self.claude and self.claude.is_available())
         self._last_health_check = 0
         self._health_check_interval = 30  # seconds
         
@@ -113,6 +126,8 @@ class LLMRouter:
         
         last_error = None
         for provider in providers:
+            if not self._provider_health.get(provider, False):
+                continue
             if self._is_circuit_open(provider):
                 continue
                 
@@ -135,17 +150,22 @@ class LLMRouter:
     
     async def _route(self, context: TaskContext | None) -> RoutingDecision:
         """Determine the best provider for this request."""
+
+        # High-stakes: prefer Claude (then Gemini) when configured
+        if context and context.risk_level == "high" and context.requires_accuracy:
+            if self.claude and self._provider_health[ProviderType.CLAUDE] and self.claude.is_available():
+                return RoutingDecision(
+                    provider=ProviderType.CLAUDE,
+                    reason="High-stakes task routed to Claude for accuracy"
+                )
+            if self.gemini and self._provider_health[ProviderType.GEMINI]:
+                return RoutingDecision(
+                    provider=ProviderType.GEMINI,
+                    reason="High-stakes task routed to Gemini for accuracy"
+                )
         
         # Default to vLLM if available and healthy
         if self.vllm and self._provider_health[ProviderType.VLLM]:
-            # High-stakes tasks might need more accurate provider
-            if context and context.risk_level == "high" and context.requires_accuracy:
-                if self.gemini and self._provider_health[ProviderType.GEMINI]:
-                    return RoutingDecision(
-                        provider=ProviderType.GEMINI,
-                        reason="High-stakes task routed to Gemini for accuracy"
-                    )
-            
             return RoutingDecision(
                 provider=ProviderType.VLLM,
                 reason="Primary production provider"
@@ -164,19 +184,35 @@ class LLMRouter:
                 provider=ProviderType.GEMINI,
                 reason="Cloud fallback (all local providers down)"
             )
+
+        # Last resort: Claude (only if configured)
+        if self.claude and self._provider_health[ProviderType.CLAUDE] and self.claude.is_available():
+            return RoutingDecision(
+                provider=ProviderType.CLAUDE,
+                reason="Cloud fallback (all other providers down)"
+            )
         
         raise RuntimeError("No healthy providers available")
     
     def _get_fallback_chain(self, primary: ProviderType) -> list[ProviderType]:
         """Get ordered fallback chain starting from primary."""
-        chain = [primary]
-        
-        all_providers = [ProviderType.VLLM, ProviderType.OLLAMA, ProviderType.GEMINI]
-        for p in all_providers:
-            if p not in chain:
-                chain.append(p)
-        
-        return chain
+        if primary == ProviderType.CLAUDE:
+            # High-stakes path: allow other providers as fallback
+            return [
+                ProviderType.CLAUDE,
+                ProviderType.GEMINI,
+                ProviderType.VLLM,
+                ProviderType.OLLAMA,
+            ]
+
+        if primary == ProviderType.GEMINI:
+            return [ProviderType.GEMINI, ProviderType.VLLM, ProviderType.OLLAMA]
+
+        if primary == ProviderType.OLLAMA:
+            return [ProviderType.OLLAMA, ProviderType.VLLM, ProviderType.GEMINI]
+
+        # Default: VLLM -> Ollama -> Gemini (keep Claude out of normal fallback chain)
+        return [ProviderType.VLLM, ProviderType.OLLAMA, ProviderType.GEMINI]
     
     async def _execute(
         self,
@@ -191,6 +227,8 @@ class LLMRouter:
             return await self.ollama.complete(prompt, system)
         elif provider == ProviderType.GEMINI and self.gemini:
             return await self.gemini.complete(prompt, system)
+        elif provider == ProviderType.CLAUDE and self.claude:
+            return await self.claude.complete(prompt, system=system)
         else:
             raise ValueError(f"Provider {provider} not available")
     
@@ -225,6 +263,10 @@ class LLMRouter:
     async def health_check_all(self) -> dict[ProviderType, bool]:
         """Check health of all providers."""
         results = {}
+
+        # Avoid making external network calls during test runs.
+        # (Some developers may have API keys set in their environment.)
+        in_tests = bool(os.getenv("PYTEST_CURRENT_TEST"))
         
         if self.vllm:
             results[ProviderType.VLLM] = await self.vllm.health_check()
@@ -234,14 +276,29 @@ class LLMRouter:
         results[ProviderType.OLLAMA] = await self.ollama.health_check()
         
         if self.gemini:
-            try:
-                # Simple test
-                await self.gemini.complete("test", None)
+            if in_tests:
                 results[ProviderType.GEMINI] = True
-            except:
-                results[ProviderType.GEMINI] = False
+            else:
+                try:
+                    # Simple test
+                    await self.gemini.complete("test", None)
+                    results[ProviderType.GEMINI] = True
+                except:
+                    results[ProviderType.GEMINI] = False
         else:
             results[ProviderType.GEMINI] = False
+
+        if self.claude and self.claude.is_available():
+            if in_tests:
+                results[ProviderType.CLAUDE] = True
+            else:
+                try:
+                    await self.claude.complete("test", system=None, max_tokens=16, temperature=0)
+                    results[ProviderType.CLAUDE] = True
+                except:
+                    results[ProviderType.CLAUDE] = False
+        else:
+            results[ProviderType.CLAUDE] = False
         
         self._provider_health = results
         return results

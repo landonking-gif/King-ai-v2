@@ -361,7 +361,14 @@ class ContextManager:
                     role=role,
                     content=content
                 )
-                db.add(msg)
+                add_result = db.add(msg)
+                try:
+                    import inspect
+                    if inspect.isawaitable(add_result):
+                        await add_result
+                except Exception:
+                    # If db.add is synchronous (normal SQLAlchemy), ignore.
+                    pass
                 await db.commit()
         
         # Store significant exchanges in vector memory

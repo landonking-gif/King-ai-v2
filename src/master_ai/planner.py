@@ -106,7 +106,8 @@ class Planner:
                     "dependencies": [],
                     "estimated_duration": "unknown",
                     "risk_level": "high",
-                    "input": {"original_goal": goal, "error": error}
+                    "input": {"original_goal": goal, "error": error},
+                    "type": "research"  # Alias for backward compatibility
                 }
             ],
             "requires_human_review": True,

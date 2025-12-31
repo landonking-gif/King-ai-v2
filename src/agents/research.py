@@ -11,6 +11,7 @@ from enum import Enum
 import hashlib
 import os
 import httpx
+import inspect
 
 from src.agents.base import BaseAgent, AgentCapability, AgentResult
 from src.utils.web_scraper import WebScraper, ScrapedPage, ContentExtractor
@@ -88,6 +89,7 @@ class SerpAPIClient:
 
 class ResearchType(str, Enum):
     """Types of research tasks."""
+    WEB_SEARCH = "web_search"
     MARKET_RESEARCH = "market_research"
     COMPETITOR_ANALYSIS = "competitor_analysis"
     TREND_ANALYSIS = "trend_analysis"
@@ -177,19 +179,23 @@ class ResearchAgent(BaseAgent):
     
     async def execute(self, task: Dict[str, Any]) -> dict:
         """Execute a research task."""
-        query = ResearchQuery(
-            query=task.get("query", ""),
-            research_type=ResearchType(task.get("type", "general_search")),
-            depth=task.get("depth", 1),
-            max_sources=task.get("max_sources", 10)
-        )
-        
         try:
+            query = ResearchQuery(
+                query=task.get("query", ""),
+                research_type=ResearchType(task.get("type", "general_search")),
+                depth=task.get("depth", 1),
+                max_sources=task.get("max_sources", 10)
+            )
+
             report = await self.research(query)
+
+            report_dict = report.to_dict()
+            if inspect.isawaitable(report_dict):
+                report_dict = await report_dict
             
             return {
                 "success": True,
-                "output": report.to_dict(),
+                "output": report_dict,
                 "error": None,
                 "metadata": {"sources_count": len(report.sources)}
             }

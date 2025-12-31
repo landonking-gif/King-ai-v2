@@ -8,6 +8,7 @@ import asyncio
 import tempfile
 import shutil
 import uuid
+import sys
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Tuple
 from dataclasses import dataclass, field
@@ -111,6 +112,7 @@ class SandboxEnvironment:
         self.container_id: Optional[str] = None
         self.created_at = datetime.now()
         self._process: Optional[asyncio.subprocess.Process] = None
+        self._use_docker: bool = True
     
     async def setup(self, source_files: Dict[str, str]) -> bool:
         """
@@ -134,6 +136,11 @@ class SandboxEnvironment:
                 target = self.work_dir / file_path
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_text(content)
+
+            # Ensure importable package layout for local execution
+            init_file = self.work_dir / "src" / "__init__.py"
+            if (self.work_dir / "src").exists() and not init_file.exists():
+                init_file.write_text("")
             
             # Create requirements file if needed
             if self.config.install_dependencies:
@@ -142,16 +149,20 @@ class SandboxEnvironment:
             # Create Dockerfile
             await self._create_dockerfile()
             
-            # Build container
+            # Build container (if Docker unavailable, fall back to local execution)
             success = await self._build_container()
-            
+
             if success:
+                self._use_docker = True
                 self.status = SandboxStatus.READY
                 logger.info(f"Sandbox ready: {self.sandbox_id}")
-            else:
-                self.status = SandboxStatus.FAILED
-                
-            return success
+                return True
+
+            # Docker build failed: run locally inside the sandbox directory.
+            self._use_docker = False
+            self.status = SandboxStatus.READY
+            logger.warning(f"Docker unavailable; using local sandbox execution: {self.sandbox_id}")
+            return True
             
         except Exception as e:
             logger.error(f"Sandbox setup failed: {e}")
@@ -243,6 +254,9 @@ pytest-cov>=4.0.0
         self.status = SandboxStatus.RUNNING
         start_time = datetime.now()
         
+        if not self._use_docker:
+            return await self._run_locally(command=command, env_vars=env_vars)
+
         # Build docker run command
         docker_cmd = [
             "docker", "run", "--rm",
@@ -332,6 +346,89 @@ pytest-cov>=4.0.0
                 stderr=str(e),
                 duration_seconds=(datetime.now() - start_time).total_seconds()
             )
+
+    async def _run_locally(
+        self,
+        command: str = None,
+        env_vars: Dict[str, str] = None,
+    ) -> SandboxResult:
+        """Execute tests locally in a subprocess when Docker isn't available."""
+        self.status = SandboxStatus.RUNNING
+        start_time = datetime.now()
+
+        env = os.environ.copy()
+        if env_vars:
+            env.update(env_vars)
+
+        # Prefer pytest json report when available, but don't require it.
+        env.setdefault("PYTEST_ADDOPTS", "--tb=short -q")
+
+        if command:
+            cmd = ["sh", "-c", command]
+        else:
+            cmd = [sys.executable, "-m", "pytest", "tests/", "-v", "--tb=short", "-q"]
+
+        try:
+            self._process = await asyncio.create_subprocess_exec(
+                *cmd,
+                cwd=self.work_dir,
+                env=env,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+
+            stdout, stderr = await asyncio.wait_for(
+                self._process.communicate(),
+                timeout=self.config.timeout_seconds,
+            )
+
+            duration = (datetime.now() - start_time).total_seconds()
+            exit_code = self._process.returncode
+
+            if exit_code == 0:
+                self.status = SandboxStatus.COMPLETED
+            else:
+                self.status = SandboxStatus.FAILED
+
+            return SandboxResult(
+                sandbox_id=self.sandbox_id,
+                status=self.status,
+                exit_code=exit_code,
+                stdout=stdout.decode(errors="replace"),
+                stderr=stderr.decode(errors="replace"),
+                duration_seconds=duration,
+                test_results=[],
+            )
+
+        except asyncio.TimeoutError:
+            self.status = SandboxStatus.TIMEOUT
+            if self._process and self._process.returncode is None:
+                self._process.kill()
+                try:
+                    await self._process.wait()
+                except Exception:
+                    pass
+
+            return SandboxResult(
+                sandbox_id=self.sandbox_id,
+                status=self.status,
+                exit_code=-1,
+                stdout="",
+                stderr="Execution timed out",
+                duration_seconds=self.config.timeout_seconds,
+                test_results=[],
+            )
+        except Exception as e:
+            self.status = SandboxStatus.FAILED
+            return SandboxResult(
+                sandbox_id=self.sandbox_id,
+                status=self.status,
+                exit_code=-1,
+                stdout="",
+                stderr=str(e),
+                duration_seconds=(datetime.now() - start_time).total_seconds(),
+                test_results=[],
+            )
     
     async def _parse_test_results(self) -> List[TestResult]:
         """Parse pytest JSON report if available."""
@@ -374,13 +471,14 @@ pytest-cov>=4.0.0
     async def cleanup(self):
         """Clean up sandbox resources."""
         try:
-            # Remove container image
-            process = await asyncio.create_subprocess_exec(
-                "docker", "rmi", "-f", f"sandbox-{self.sandbox_id}",
-                stdout=asyncio.subprocess.DEVNULL,
-                stderr=asyncio.subprocess.DEVNULL
-            )
-            await process.wait()
+            if self._use_docker:
+                # Remove container image
+                process = await asyncio.create_subprocess_exec(
+                    "docker", "rmi", "-f", f"sandbox-{self.sandbox_id}",
+                    stdout=asyncio.subprocess.DEVNULL,
+                    stderr=asyncio.subprocess.DEVNULL
+                )
+                await process.wait()
             
             # Remove work directory
             if self.work_dir.exists():

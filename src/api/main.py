@@ -5,8 +5,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from src.api.routes import chat, businesses, approvals, evolution, health, playbook, portfolio
+from src.api.routes import scheduler as scheduler_routes
 from src.master_ai.brain import MasterAI
 from src.database.connection import init_db
+from src.services.scheduler import scheduler, TaskFrequency
+from config.settings import settings
 
 # Global MasterAI instance - initialized during startup
 master_ai: MasterAI | None = None
@@ -15,7 +18,7 @@ master_ai: MasterAI | None = None
 async def lifespan(app: FastAPI):
     """
     Handles application startup and shutdown events.
-    Initializes the database schema and the Master AI brain.
+    Initializes the database schema, the Master AI brain, and the scheduler.
     """
     global master_ai
     
@@ -25,10 +28,35 @@ async def lifespan(app: FastAPI):
     # Initialize the central brain
     master_ai = MasterAI()
     
+    # Register and start scheduled tasks for autonomous operation
+    if getattr(settings, 'enable_autonomous_mode', False):
+        # Autonomous optimization loop - every 6 hours
+        scheduler.register_task(
+            name="autonomous_optimization",
+            callback=lambda: master_ai._consider_evolution("Scheduled autonomous check"),
+            frequency=TaskFrequency.EVERY_6_HOURS,
+            enabled=True,
+            run_immediately=False,
+            metadata={"description": "Periodic self-improvement analysis"}
+        )
+        
+        # Business health check - hourly
+        scheduler.register_task(
+            name="business_health_check",
+            callback=lambda: master_ai._check_business_health("Scheduled health check"),
+            frequency=TaskFrequency.HOURLY,
+            enabled=True,
+            run_immediately=False,
+            metadata={"description": "Monitor business unit KPIs"}
+        )
+        
+        # Start the scheduler
+        await scheduler.start()
+    
     yield
     
-    # Shutdown
-    # Cleanup if needed
+    # --- Shutdown ---
+    await scheduler.stop()
 
 app = FastAPI(
     title="King AI v2",
@@ -54,6 +82,7 @@ app.include_router(approvals.router, prefix="/api/approvals", tags=["approvals"]
 app.include_router(evolution.router, prefix="/api/evolution", tags=["evolution"])
 app.include_router(playbook.router, prefix="/api", tags=["playbooks"])
 app.include_router(portfolio.router, prefix="/api", tags=["portfolios"])
+app.include_router(scheduler_routes.router, prefix="/api/scheduler", tags=["scheduler"])
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):

@@ -91,11 +91,15 @@ class ReActPlanner:
         )
         
         # Build planning context
+        risk_profile = getattr(settings, "risk_profile", "moderate")
+        if not isinstance(risk_profile, str):
+            risk_profile = "moderate"
+
         planning_context = PlanningContext(
             goal=goal,
             user_input=goal,
             empire_state=context or "",
-            risk_profile=settings.risk_profile,
+            risk_profile=risk_profile,
             available_agents=self.available_agents
         )
         

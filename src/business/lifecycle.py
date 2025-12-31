@@ -36,6 +36,8 @@ class BasicLifecycleEngine:
         """
         Returns the next logical stage for a business unit.
         """
+        if current_status == BusinessStatus.SUNSET:
+            return BusinessStatus.SUNSET
         return self.TRANSITIONS.get(current_status)
 
     def is_failed(self, status: BusinessStatus) -> bool:

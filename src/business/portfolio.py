@@ -40,6 +40,67 @@ class PortfolioManager:
         self._portfolios: dict[str, Portfolio] = {}
         self._business_data: dict[str, dict] = {}  # Mock business data
 
+    def _count_stages(self, business_units: list) -> dict[str, int]:
+        """Count businesses by lifecycle status.
+
+        Expects items with a `.status` attribute (e.g., BusinessStatus).
+        Returns lowercase status names mapped to counts.
+        """
+        counts: dict[str, int] = {}
+        for unit in business_units:
+            status = getattr(unit, "status", None)
+            status_value = None
+            if status is None:
+                continue
+            # BusinessStatus is an Enum with `.value`
+            status_value = getattr(status, "value", None)
+            if not isinstance(status_value, str):
+                status_value = str(status).lower()
+            key = status_value.lower()
+            counts[key] = counts.get(key, 0) + 1
+        return counts
+
+    async def get_total_stats(self) -> dict:
+        """Get aggregate stats across all businesses.
+
+        Uses the database when available; falls back to in-memory mock metrics.
+        """
+        try:
+            from sqlalchemy import select, func
+            from src.database.models import BusinessUnit
+            from src.database.connection import get_db
+
+            async with get_db() as db:
+                result = await db.execute(
+                    select(
+                        func.sum(BusinessUnit.total_revenue).label("total_revenue"),
+                        func.sum(BusinessUnit.total_expenses).label("total_expenses"),
+                        func.count(BusinessUnit.id).label("count"),
+                    )
+                )
+                row = result.first()
+
+                total_revenue = (row.total_revenue or 0) if row else 0
+                total_expenses = (row.total_expenses or 0) if row else 0
+                business_count = (row.count or 0) if row else 0
+
+                return {
+                    "total_revenue": total_revenue,
+                    "total_expenses": total_expenses,
+                    "total_profit": total_revenue - total_expenses,
+                    "business_count": business_count,
+                }
+        except Exception:
+            # Minimal fallback: aggregate what we can from mock data
+            total_revenue = sum(v.get("revenue", 0) for v in self._business_data.values())
+            total_expenses = sum(v.get("expenses", 0) for v in self._business_data.values())
+            return {
+                "total_revenue": total_revenue,
+                "total_expenses": total_expenses,
+                "total_profit": total_revenue - total_expenses,
+                "business_count": len(self._business_data),
+            }
+
     async def create_portfolio(
         self,
         name: str,
