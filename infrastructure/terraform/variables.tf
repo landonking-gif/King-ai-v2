@@ -34,6 +34,12 @@ variable "gpu_min_instances" {
   default     = 2
 }
 
+variable "gpu_max_instances" {
+  description = "Maximum number of GPU instances for auto-scaling"
+  type        = number
+  default     = 8
+}
+
 variable "gpu_instance_count" {
   description = "Number of GPU instances to deploy"
   type        = number
@@ -43,13 +49,39 @@ variable "gpu_instance_count" {
 variable "ollama_model" {
   description = "Ollama model to deploy"
   type        = string
-  default     = "llama2:13b"
+  default     = "llama3.1:70b"
 }
 
 variable "vllm_model" {
   description = "vLLM model to deploy"
   type        = string
-  default     = "meta-llama/Llama-2-13b-hf"
+  default     = "meta-llama/Meta-Llama-3.1-70B-Instruct"
+}
+
+variable "vpn_cidr" {
+  description = "CIDR block for VPN access (SSH, admin)"
+  type        = string
+  default     = "10.100.0.0/16"
+}
+
+variable "acm_certificate_arn" {
+  description = "ARN of ACM certificate for HTTPS"
+  type        = string
+  default     = ""
+}
+
+variable "datadog_api_key" {
+  description = "Datadog API key"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "datadog_app_key" {
+  description = "Datadog Application key"
+  type        = string
+  sensitive   = true
+  default     = ""
 }
 
 variable "db_instance_class" {

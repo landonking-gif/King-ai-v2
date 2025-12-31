@@ -52,7 +52,14 @@ function App() {
 
         if (approvalRes.ok) {
           const approvalData = await approvalRes.json();
-          setApprovals(Array.isArray(approvalData) ? approvalData : []);
+          // Handle both array format and {requests: [...]} format
+          if (Array.isArray(approvalData)) {
+            setApprovals(approvalData);
+          } else if (approvalData.requests) {
+            setApprovals(approvalData.requests);
+          } else {
+            setApprovals([]);
+          }
         }
 
         if (schedRes.ok) {
@@ -117,9 +124,16 @@ function App() {
   // Approval handlers
   const handleApprove = async (id) => {
     try {
-      await fetch(`${API_BASE}/approvals/${id}/approve`, { method: 'POST' });
+      await fetch(`${API_BASE}/approvals/${id}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: 'dashboard_user' })
+      });
       const approvalRes = await fetch(`${API_BASE}/approvals/pending`);
-      if (approvalRes.ok) setApprovals(await approvalRes.json());
+      if (approvalRes.ok) {
+        const data = await approvalRes.json();
+        setApprovals(Array.isArray(data) ? data : (data.requests || []));
+      }
     } catch (err) {
       console.error('Failed to approve request:', err);
     }
@@ -127,9 +141,16 @@ function App() {
 
   const handleReject = async (id) => {
     try {
-      await fetch(`${API_BASE}/approvals/${id}/reject`, { method: 'POST' });
+      await fetch(`${API_BASE}/approvals/${id}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: 'dashboard_user', reason: 'Rejected via dashboard' })
+      });
       const approvalRes = await fetch(`${API_BASE}/approvals/pending`);
-      if (approvalRes.ok) setApprovals(await approvalRes.json());
+      if (approvalRes.ok) {
+        const data = await approvalRes.json();
+        setApprovals(Array.isArray(data) ? data : (data.requests || []));
+      }
     } catch (err) {
       console.error('Failed to reject request:', err);
     }

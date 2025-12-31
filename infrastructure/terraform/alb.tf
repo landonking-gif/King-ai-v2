@@ -36,7 +36,7 @@ resource "aws_security_group" "alb" {
 # Application Load Balancer
 resource "aws_lb" "main" {
   name               = "king-ai-alb"
-  internal           = false
+  internal           = true
   load_balancer_type = "application"
   security_groups    = [aws_security_group.alb.id]
   subnets            = aws_subnet.public[*].id
