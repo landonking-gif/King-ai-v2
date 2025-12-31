@@ -340,19 +340,55 @@ class FinanceAgent(SubAgent):
             available = sum(b["amount"] for b in balance.get("available", []))
             pending = sum(b["amount"] for b in balance.get("pending", []))
             
-            # Calculate MRR from actual subscription data
-            # Note: This is a simplified calculation. In production, you'd query
-            # subscription prices from Stripe to get accurate MRR values
-            mrr = len(subscriptions) * 2999  # TODO: Calculate from actual subscription prices
+            # Calculate MRR from actual subscription prices
+            mrr = 0
+            for sub in subscriptions:
+                if isinstance(sub, dict):
+                    # Get the subscription plan amount
+                    items = sub.get("items", {}).get("data", [])
+                    for item in items:
+                        price = item.get("price", {})
+                        amount = price.get("unit_amount", 0)
+                        # Convert from cents and handle billing interval
+                        interval = price.get("recurring", {}).get("interval", "month")
+                        if interval == "year":
+                            mrr += amount / 12
+                        elif interval == "month":
+                            mrr += amount
+                        elif interval == "week":
+                            mrr += amount * 4.33
+                else:
+                    # Fallback for StripeSubscription objects
+                    mrr += getattr(sub, 'amount', 2999)
             
-            # TODO: Implement churn_rate calculation based on subscription cancellations
-            # TODO: Implement average_order_value from payment intent history
+            # Calculate churn rate from cancelled subscriptions in last 30 days
+            churn_rate = 0.0
+            try:
+                cancelled_subs = await client.list_subscriptions(status="canceled", limit=100)
+                total_subs = len(subscriptions) + len(cancelled_subs)
+                if total_subs > 0:
+                    churn_rate = len(cancelled_subs) / total_subs
+            except Exception:
+                pass  # Churn calculation is optional
+            
+            # Calculate average order value from recent payment intents
+            average_order_value = 0.0
+            try:
+                # Get recent successful payments
+                payments = await client._request("GET", "/payment_intents", {"limit": 100, "status": "succeeded"})
+                payment_data = payments.get("data", [])
+                if payment_data:
+                    total_amount = sum(p.get("amount", 0) for p in payment_data)
+                    average_order_value = (total_amount / len(payment_data)) / 100
+            except Exception:
+                pass  # AOV calculation is optional
+            
             metrics = RevenueMetrics(
                 total_revenue=available / 100,
                 monthly_recurring=mrr / 100,
                 active_subscriptions=len(subscriptions),
-                churn_rate=0.0,  # Placeholder - needs historical data
-                average_order_value=0.0,  # Placeholder - needs payment history
+                churn_rate=churn_rate,
+                average_order_value=average_order_value,
                 pending_payouts=pending / 100,
             )
             

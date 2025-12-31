@@ -1,0 +1,135 @@
+# Vanta configuration for King AI v2
+# Compliance monitoring and security controls
+
+# Agent Configuration
+agent:
+  name: king-ai-v2
+  environment: production
+  
+# Compliance Frameworks
+frameworks:
+  - soc2
+  - gdpr
+  - ccpa
+  - pci-dss
+  
+# Integrations
+integrations:
+  aws:
+    enabled: true
+    accounts:
+      - account_id: "${AWS_ACCOUNT_ID}"
+        regions:
+          - us-east-1
+          - us-west-2
+    services:
+      - ec2
+      - rds
+      - s3
+      - iam
+      - cloudtrail
+      - guardduty
+      - config
+      - kms
+      
+  github:
+    enabled: true
+    organization: "${GITHUB_ORG}"
+    repositories:
+      - king-ai-v2
+    checks:
+      - branch_protection
+      - code_review_required
+      - signed_commits
+      - vulnerability_alerts
+      
+  datadog:
+    enabled: true
+    api_key: "${DATADOG_API_KEY}"
+    
+# Security Controls
+controls:
+  access_management:
+    mfa_required: true
+    password_policy:
+      min_length: 14
+      require_uppercase: true
+      require_lowercase: true
+      require_numbers: true
+      require_symbols: true
+      max_age_days: 90
+    session_timeout_minutes: 30
+    
+  encryption:
+    at_rest:
+      enabled: true
+      algorithm: AES-256
+    in_transit:
+      enabled: true
+      min_tls_version: "1.2"
+      
+  logging:
+    enabled: true
+    retention_days: 365
+    immutable: true
+    types:
+      - access_logs
+      - audit_logs
+      - security_logs
+      - application_logs
+      
+  network:
+    vpc_flow_logs: true
+    security_groups_audit: true
+    public_access_blocked: true
+    
+  backup:
+    enabled: true
+    frequency: daily
+    retention_days: 30
+    cross_region: true
+    encrypted: true
+    
+# Alerting
+alerts:
+  security_incidents:
+    severity: high
+    channels:
+      - email
+      - slack
+    recipients:
+      - security@company.com
+      
+  compliance_violations:
+    severity: medium
+    channels:
+      - email
+    recipients:
+      - compliance@company.com
+      
+  policy_changes:
+    severity: low
+    channels:
+      - slack
+      
+# Evidence Collection
+evidence:
+  auto_collect: true
+  frequency: weekly
+  types:
+    - access_reviews
+    - vulnerability_scans
+    - penetration_tests
+    - security_training
+    - incident_response
+    - change_management
+    
+# Reporting
+reporting:
+  schedule: monthly
+  recipients:
+    - ciso@company.com
+    - cto@company.com
+  formats:
+    - pdf
+    - csv

@@ -1,0 +1,77 @@
+# Snyk configuration for King AI v2
+# Security scanning for dependencies and container images
+
+version: v1.0.0
+
+# General settings
+severity-threshold: high
+fail-on: upgradable
+
+# File patterns to include
+include:
+  - pyproject.toml
+  - requirements*.txt
+  - Dockerfile
+  - docker-compose.yml
+  - package.json
+  - package-lock.json
+
+# File patterns to exclude  
+exclude:
+  - "**/__pycache__/**"
+  - "**/node_modules/**"
+  - "**/.venv/**"
+  - "**/tests/**"
+  - "**/docs/**"
+
+# Language-specific settings
+python:
+  skip-unresolved: false
+  prune-repeated-subdependencies: true
+  
+javascript:
+  skip-unresolved: false
+  
+# Container scanning
+container:
+  severity-threshold: high
+  exclude-base-image-vulns: false
+  
+# Code scanning (SAST)
+code:
+  severity-threshold: high
+  enabled: true
+  
+# Infrastructure as Code scanning
+iac:
+  severity-threshold: medium
+  enabled: true
+  
+# Custom rules
+custom-rules:
+  - rule-id: KING-001
+    title: "Hardcoded API Keys"
+    severity: critical
+    pattern: "(api_key|apikey|api-key)\\s*[=:]\\s*['\"][a-zA-Z0-9]{20,}['\"]"
+    
+  - rule-id: KING-002
+    title: "Hardcoded Secrets"
+    severity: critical
+    pattern: "(secret|password|passwd|pwd)\\s*[=:]\\s*['\"][^'\"]{8,}['\"]"
+    
+  - rule-id: KING-003
+    title: "Eval Usage"
+    severity: high
+    pattern: "\\beval\\s*\\("
+    
+  - rule-id: KING-004
+    title: "Exec Usage"
+    severity: high
+    pattern: "\\bexec\\s*\\("
+
+# Reporting
+reports:
+  - format: json
+    output: .snyk/report.json
+  - format: sarif
+    output: .snyk/report.sarif

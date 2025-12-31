@@ -1,15 +1,123 @@
 name: Dropshipping MVP
 type: dropshipping
+description: Complete playbook for launching a dropshipping business from discovery to operation
+
+# Budget allocation per stage
+budget:
+  discovery: 100
+  validation: 250
+  setup: 1000
+  operation: 500
+  optimization: 300
+  total: 2150
+
+# Success criteria for stage transitions
+criteria:
+  discovery_to_validation:
+    - metric: products_researched
+      operator: ">="
+      value: 10
+    - metric: profit_margin_avg
+      operator: ">="
+      value: 0.3
+  validation_to_setup:
+    - metric: supplier_confirmed
+      operator: "=="
+      value: true
+    - metric: market_demand_score
+      operator: ">="
+      value: 0.6
+  setup_to_operation:
+    - metric: store_live
+      operator: "=="
+      value: true
+    - metric: products_listed
+      operator: ">="
+      value: 5
+  operation_to_optimization:
+    - metric: orders_count
+      operator: ">="
+      value: 10
+    - metric: revenue
+      operator: ">="
+      value: 500
+
 stages:
   - name: Discovery
+    timeout_hours: 72
+    budget: 100
     steps:
-      - research: "Find trending pet products"
-      - analysis: "Calculate profit margins"
+      - id: research_products
+        agent: research
+        action: "Find trending pet products with high profit potential"
+        parameters:
+          research_type: market
+          depth: 2
+          max_sources: 10
+      - id: analyze_margins
+        agent: research
+        action: "Calculate profit margins for top candidates"
+        depends_on: [research_products]
+        parameters:
+          research_type: competitor
+          
+  - name: Validation
+    timeout_hours: 48
+    budget: 250
+    steps:
+      - id: find_suppliers
+        agent: supplier
+        action: "Source reliable suppliers for selected products"
+        parameters:
+          min_margin: 0.3
+          suppliers: [aliexpress, cj]
+      - id: validate_demand
+        agent: analytics
+        action: "Validate market demand using search trends"
+        depends_on: [find_suppliers]
+        
   - name: Setup
+    timeout_hours: 96
+    budget: 1000
     steps:
-      - commerce: "Setup Shopify store"
-      - content: "Generate product descriptions"
+      - id: setup_store
+        agent: commerce
+        action: "Setup Shopify store with selected niche theme"
+        parameters:
+          platform: shopify
+      - id: generate_content
+        agent: content
+        action: "Generate product descriptions and images"
+        depends_on: [setup_store]
+        parameters:
+          content_type: product_description
+          generate_images: true
+      - id: setup_payments
+        agent: finance
+        action: "Configure Stripe payment processing"
+        depends_on: [setup_store]
+        
   - name: Operation
+    timeout_hours: null  # Ongoing
+    budget: 500
     steps:
-      - commerce: "Automate order fulfillment"
-      - analytics: "Monitor conversion rates"
+      - id: automate_fulfillment
+        agent: commerce
+        action: "Automate order fulfillment with supplier integration"
+      - id: monitor_metrics
+        agent: analytics
+        action: "Monitor conversion rates and key metrics"
+        parameters:
+          kpis: [conversion_rate, aov, roas]
+          
+  - name: Optimization
+    timeout_hours: 168
+    budget: 300
+    steps:
+      - id: analyze_performance
+        agent: analytics
+        action: "Analyze underperforming products and campaigns"
+      - id: optimize_listings
+        agent: content
+        action: "Optimize product listings based on performance data"
+        depends_on: [analyze_performance]

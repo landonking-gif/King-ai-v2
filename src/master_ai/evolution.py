@@ -509,6 +509,371 @@ class EvolutionEngine:
         
         return proposal.execution_result
     
+    async def execute_architecture_update(
+        self,
+        proposal: EvolutionProposal,
+        dry_run: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Execute an architecture update proposal (arch_update type).
+        
+        Handles infrastructure changes like:
+        - Adding/removing agents
+        - Modifying service dependencies
+        - Updating Terraform infrastructure
+        - Reconfiguring integration endpoints
+        
+        Args:
+            proposal: The architecture update proposal
+            dry_run: If True, validate without applying changes
+            
+        Returns:
+            Execution result with planned/applied changes
+        """
+        if proposal.proposal_type != ProposalType.INFRASTRUCTURE_UPDATE:
+            raise ValueError(
+                f"Expected INFRASTRUCTURE_UPDATE proposal, got {proposal.proposal_type}"
+            )
+        
+        logger.info(
+            "Processing architecture update",
+            proposal_id=proposal.id,
+            dry_run=dry_run
+        )
+        
+        results = {
+            "proposal_id": proposal.id,
+            "dry_run": dry_run,
+            "changes_planned": [],
+            "changes_applied": [],
+            "errors": [],
+            "warnings": []
+        }
+        
+        # Parse architecture changes from proposal
+        arch_changes = proposal.configuration_changes.get("architecture", {})
+        
+        # 1. Handle agent additions/removals
+        if "agents" in arch_changes:
+            agent_changes = await self._process_agent_changes(
+                arch_changes["agents"],
+                dry_run=dry_run
+            )
+            results["changes_planned"].extend(agent_changes.get("planned", []))
+            results["changes_applied"].extend(agent_changes.get("applied", []))
+            results["warnings"].extend(agent_changes.get("warnings", []))
+        
+        # 2. Handle service dependency changes
+        if "services" in arch_changes:
+            service_changes = await self._process_service_changes(
+                arch_changes["services"],
+                dry_run=dry_run
+            )
+            results["changes_planned"].extend(service_changes.get("planned", []))
+            results["changes_applied"].extend(service_changes.get("applied", []))
+        
+        # 3. Handle Terraform infrastructure changes
+        if "terraform" in arch_changes:
+            tf_changes = await self._process_terraform_changes(
+                arch_changes["terraform"],
+                dry_run=dry_run
+            )
+            results["changes_planned"].extend(tf_changes.get("planned", []))
+            results["changes_applied"].extend(tf_changes.get("applied", []))
+            results["warnings"].extend(tf_changes.get("warnings", []))
+        
+        # 4. Handle integration endpoint updates
+        if "integrations" in arch_changes:
+            integration_changes = await self._process_integration_changes(
+                arch_changes["integrations"],
+                dry_run=dry_run
+            )
+            results["changes_planned"].extend(integration_changes.get("planned", []))
+            results["changes_applied"].extend(integration_changes.get("applied", []))
+        
+        # Update proposal status
+        if not dry_run and not results["errors"]:
+            proposal.status = ProposalStatus.COMPLETED
+            proposal.execution_result = results
+            await self._update_proposal(proposal)
+        
+        logger.info(
+            "Architecture update processed",
+            proposal_id=proposal.id,
+            planned_count=len(results["changes_planned"]),
+            applied_count=len(results["changes_applied"]),
+            error_count=len(results["errors"])
+        )
+        
+        return results
+    
+    async def _process_agent_changes(
+        self,
+        agent_config: Dict[str, Any],
+        dry_run: bool = True
+    ) -> Dict[str, list]:
+        """Process agent addition/removal/modification."""
+        results = {"planned": [], "applied": [], "warnings": []}
+        
+        # Add new agents
+        for agent_name, config in agent_config.get("add", {}).items():
+            change = {
+                "type": "add_agent",
+                "agent_name": agent_name,
+                "config": config
+            }
+            results["planned"].append(change)
+            
+            if not dry_run:
+                # Create agent file from template
+                agent_file = Path(f"src/agents/{agent_name}.py")
+                if not agent_file.exists():
+                    agent_template = self._generate_agent_template(agent_name, config)
+                    agent_file.write_text(agent_template)
+                    
+                    # Update router to include new agent
+                    await self._register_agent_in_router(agent_name)
+                    results["applied"].append(change)
+                else:
+                    results["warnings"].append(
+                        f"Agent file already exists: {agent_file}"
+                    )
+        
+        # Remove agents
+        for agent_name in agent_config.get("remove", []):
+            change = {"type": "remove_agent", "agent_name": agent_name}
+            results["planned"].append(change)
+            
+            if not dry_run:
+                agent_file = Path(f"src/agents/{agent_name}.py")
+                if agent_file.exists():
+                    # Create backup
+                    backup_file = agent_file.with_suffix(".py.bak")
+                    backup_file.write_text(agent_file.read_text())
+                    agent_file.unlink()
+                    results["applied"].append(change)
+        
+        return results
+    
+    async def _process_service_changes(
+        self,
+        service_config: Dict[str, Any],
+        dry_run: bool = True
+    ) -> Dict[str, list]:
+        """Process service dependency changes."""
+        results = {"planned": [], "applied": []}
+        
+        for service_name, config in service_config.items():
+            change = {
+                "type": "update_service",
+                "service_name": service_name,
+                "config": config
+            }
+            results["planned"].append(change)
+            
+            if not dry_run:
+                # Update docker-compose.yml if needed
+                if "docker" in config:
+                    await self._update_docker_compose(service_name, config["docker"])
+                results["applied"].append(change)
+        
+        return results
+    
+    async def _process_terraform_changes(
+        self,
+        tf_config: Dict[str, Any],
+        dry_run: bool = True
+    ) -> Dict[str, list]:
+        """Process Terraform infrastructure changes."""
+        results = {"planned": [], "applied": [], "warnings": []}
+        
+        for resource_type, resources in tf_config.items():
+            for resource_name, config in resources.items():
+                change = {
+                    "type": "terraform_resource",
+                    "resource_type": resource_type,
+                    "resource_name": resource_name,
+                    "config": config
+                }
+                results["planned"].append(change)
+                
+                if not dry_run:
+                    # Generate Terraform HCL for the resource
+                    tf_file = Path(f"infrastructure/terraform/{resource_type}_{resource_name}.tf")
+                    tf_content = self._generate_terraform_resource(
+                        resource_type, resource_name, config
+                    )
+                    tf_file.write_text(tf_content)
+                    results["applied"].append(change)
+                    
+                    # Add warning about needing terraform apply
+                    results["warnings"].append(
+                        f"Run 'terraform plan' and 'terraform apply' to provision {resource_name}"
+                    )
+        
+        return results
+    
+    async def _process_integration_changes(
+        self,
+        integration_config: Dict[str, Any],
+        dry_run: bool = True
+    ) -> Dict[str, list]:
+        """Process integration endpoint changes."""
+        results = {"planned": [], "applied": []}
+        
+        for integration_name, config in integration_config.items():
+            change = {
+                "type": "update_integration",
+                "integration_name": integration_name,
+                "config": config
+            }
+            results["planned"].append(change)
+            
+            if not dry_run:
+                # Update integration configuration
+                integration_file = Path(f"src/integrations/{integration_name}.py")
+                if integration_file.exists():
+                    # Update config in settings
+                    await self._update_integration_settings(integration_name, config)
+                results["applied"].append(change)
+        
+        return results
+    
+    def _generate_agent_template(self, agent_name: str, config: Dict) -> str:
+        """Generate Python code for a new agent."""
+        class_name = ''.join(word.title() for word in agent_name.split('_')) + 'Agent'
+        description = config.get("description", f"Agent for {agent_name} operations")
+        
+        return f'''"""
+{class_name} - {description}
+
+Auto-generated by Evolution Engine architecture update.
+"""
+
+from typing import Any, Dict, Optional
+from src.agents.base import SubAgent
+from src.utils.structured_logging import get_logger
+
+logger = get_logger(__name__)
+
+
+class {class_name}(SubAgent):
+    """
+    {description}
+    """
+    
+    NAME = "{agent_name}"
+    DESCRIPTION = "{description}"
+    
+    FUNCTION_SCHEMA = {{
+        "name": "{agent_name}",
+        "description": "{description}",
+        "parameters": {{
+            "type": "object",
+            "properties": {{
+                "action": {{
+                    "type": "string",
+                    "description": "The action to perform"
+                }},
+                "data": {{
+                    "type": "object",
+                    "description": "Additional data for the action"
+                }}
+            }},
+            "required": ["action"]
+        }}
+    }}
+    
+    async def process(self, task: Dict[str, Any]) -> Dict[str, Any]:
+        """Process a task for {agent_name}."""
+        logger.info(f"Processing {{task.get('name', 'unnamed')}} task")
+        
+        action = task.get("action", "default")
+        data = task.get("data", {{}})
+        
+        # TODO: Implement {agent_name} logic
+        
+        return {{
+            "success": True,
+            "agent": self.NAME,
+            "action": action,
+            "result": "Task processed successfully"
+        }}
+'''
+    
+    def _generate_terraform_resource(
+        self,
+        resource_type: str,
+        resource_name: str,
+        config: Dict
+    ) -> str:
+        """Generate Terraform HCL for a resource."""
+        # Basic resource template
+        config_str = "\n".join(
+            f'  {k} = {json.dumps(v)}'
+            for k, v in config.items()
+        )
+        
+        return f'''# Auto-generated by Evolution Engine
+# Resource: {resource_type}.{resource_name}
+
+resource "{resource_type}" "{resource_name}" {{
+{config_str}
+
+  tags = {{
+    Environment = var.environment
+    ManagedBy   = "evolution-engine"
+  }}
+}}
+'''
+    
+    async def _register_agent_in_router(self, agent_name: str):
+        """Register a new agent in the agent router."""
+        # This would update src/agents/router.py to include the new agent
+        # For safety, we log the instruction rather than modifying
+        logger.info(
+            "New agent requires registration in router",
+            agent_name=agent_name,
+            instruction=f"Add 'from src.agents.{agent_name} import {agent_name.title()}Agent' to router.py"
+        )
+    
+    async def _update_docker_compose(self, service_name: str, config: Dict):
+        """Update docker-compose.yml with service changes."""
+        import yaml
+        import aiofiles
+        
+        compose_file = Path("docker-compose.yml")
+        if compose_file.exists():
+            async with aiofiles.open(compose_file, 'r') as f:
+                compose = yaml.safe_load(await f.read())
+            
+            if "services" not in compose:
+                compose["services"] = {}
+            
+            compose["services"][service_name] = config
+            
+            async with aiofiles.open(compose_file, 'w') as f:
+                await f.write(yaml.dump(compose, default_flow_style=False))
+    
+    async def _update_integration_settings(self, integration_name: str, config: Dict):
+        """Update integration settings in configuration."""
+        import yaml
+        import aiofiles
+        
+        # Update settings with new integration config
+        settings_file = Path("config/integrations.yaml")
+        
+        if settings_file.exists():
+            async with aiofiles.open(settings_file, 'r') as f:
+                integrations = yaml.safe_load(await f.read())
+        else:
+            integrations = {}
+        
+        integrations[integration_name] = config
+        
+        async with aiofiles.open(settings_file, 'w') as f:
+            await f.write(yaml.dump(integrations, default_flow_style=False))
+
     async def apply_proposal(self, file_path: str, new_code: str) -> dict:
         """
         Legacy method for backward compatibility.
