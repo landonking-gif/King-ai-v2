@@ -17,6 +17,63 @@ from src.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
+# =============================================================================
+# STATUS MAPPING - Unifies BusinessStatus (DB) with LifecycleStage (Enhanced)
+# =============================================================================
+
+# Maps BusinessStatus (simple 7-state DB model) to LifecycleStage (enhanced 8-state model)
+STATUS_TO_STAGE: dict[BusinessStatus, LifecycleStage] = {
+    BusinessStatus.DISCOVERY: LifecycleStage.IDEATION,
+    BusinessStatus.VALIDATION: LifecycleStage.VALIDATION,
+    BusinessStatus.SETUP: LifecycleStage.LAUNCH,
+    BusinessStatus.OPERATION: LifecycleStage.GROWTH,
+    BusinessStatus.OPTIMIZATION: LifecycleStage.SCALE,
+    BusinessStatus.REPLICATION: LifecycleStage.MATURITY,
+    BusinessStatus.SUNSET: LifecycleStage.EXIT,
+}
+
+# Reverse mapping - LifecycleStage to BusinessStatus
+STAGE_TO_STATUS: dict[LifecycleStage, BusinessStatus] = {
+    LifecycleStage.IDEATION: BusinessStatus.DISCOVERY,
+    LifecycleStage.VALIDATION: BusinessStatus.VALIDATION,
+    LifecycleStage.LAUNCH: BusinessStatus.SETUP,
+    LifecycleStage.GROWTH: BusinessStatus.OPERATION,
+    LifecycleStage.SCALE: BusinessStatus.OPTIMIZATION,
+    LifecycleStage.MATURITY: BusinessStatus.REPLICATION,
+    LifecycleStage.DECLINE: BusinessStatus.REPLICATION,  # Decline maps to REPLICATION (review phase)
+    LifecycleStage.EXIT: BusinessStatus.SUNSET,
+}
+
+
+def convert_status_to_stage(status: BusinessStatus) -> LifecycleStage:
+    """Convert a BusinessStatus (DB model) to LifecycleStage (enhanced lifecycle)."""
+    return STATUS_TO_STAGE.get(status, LifecycleStage.IDEATION)
+
+
+def convert_stage_to_status(stage: LifecycleStage) -> BusinessStatus:
+    """Convert a LifecycleStage (enhanced lifecycle) to BusinessStatus (DB model)."""
+    return STAGE_TO_STATUS.get(stage, BusinessStatus.DISCOVERY)
+
+
+def get_unified_status_info(status: BusinessStatus) -> dict:
+    """
+    Get unified status information including both DB status and enhanced stage details.
+    Useful for APIs and dashboards that need comprehensive status info.
+    """
+    stage = convert_status_to_stage(status)
+    stage_config = STAGE_CONFIG.get(stage, {})
+    
+    return {
+        "db_status": status.value,
+        "lifecycle_stage": stage.value,
+        "typical_duration_days": stage_config.get("typical_duration_days"),
+        "description": stage_config.get("description", ""),
+        "next_stages": [s.value for s in stage_config.get("next_stages", [])],
+        "requirements": stage_config.get("requirements", []),
+        "is_terminal": status in (BusinessStatus.SUNSET, BusinessStatus.REPLICATION),
+    }
+
+
 class BasicLifecycleEngine:
     """
     Basic deterministic state machine for business progression.

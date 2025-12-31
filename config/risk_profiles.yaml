@@ -5,10 +5,19 @@ conservative:
     - financial_transactions
     - external_api_calls
     - code_modifications
+    - infrastructure_updates
   autonomous_actions_allowed:
     - research
     - analysis
     - planning
+  # Enhanced risk controls
+  max_daily_transactions: 10
+  require_two_factor_for_amount: 500
+  escalation_contacts:
+    - admin@company.com
+  # Circuit breaker integration
+  circuit_breaker_sensitivity: high
+  auto_pause_on_circuit_open: true
 
 moderate:
   max_spend_without_approval: 500
@@ -21,6 +30,14 @@ moderate:
     - planning
     - content_creation
     - small_purchases
+  # Enhanced risk controls
+  max_daily_transactions: 50
+  require_two_factor_for_amount: 2000
+  escalation_contacts:
+    - admin@company.com
+  # Circuit breaker integration
+  circuit_breaker_sensitivity: medium
+  auto_pause_on_circuit_open: false
 
 aggressive:
   max_spend_without_approval: 5000
@@ -28,3 +45,11 @@ aggressive:
     - legal_actions
   autonomous_actions_allowed:
     - all
+  # Enhanced risk controls
+  max_daily_transactions: 200
+  require_two_factor_for_amount: 10000
+  escalation_contacts:
+    - admin@company.com
+  # Circuit breaker integration
+  circuit_breaker_sensitivity: low
+  auto_pause_on_circuit_open: false

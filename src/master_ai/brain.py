@@ -23,6 +23,9 @@ from src.master_ai.models import (
     ActionResult, TokenUsage, PlanStep
 )
 from src.agents.router import AgentRouter
+from src.business.playbook_executor import PlaybookExecutor
+from src.business.playbook_loader import PlaybookLoader
+from src.business.playbook_models import TriggerType
 from src.database.connection import get_db
 from src.database.models import ConversationMessage, Task, EvolutionProposal
 from src.utils.llm_router import LLMRouter, TaskContext
@@ -70,6 +73,14 @@ class MasterAI:
         risk_profile = getattr(settings, "risk_profile", "moderate")
         if not isinstance(risk_profile, str):
             risk_profile = "moderate"
+
+        # Playbook system for executing business strategies
+        self.playbook_loader = PlaybookLoader()
+        self.playbook_executor = PlaybookExecutor()
+        
+        # Register agents with playbook executor
+        for agent_name, agent in self.agent_router.agents.items():
+            self.playbook_executor.register_agent(agent_name, agent)
 
         logger.info(
             "Master AI initialized",
@@ -368,6 +379,179 @@ If the data is not available, say so clearly.
         
         return await self._call_llm(prompt, task_context=task_context)
 
+    # =========================================================================
+    # PLAYBOOK EXECUTION SYSTEM
+    # =========================================================================
+    
+    async def execute_playbook(
+        self,
+        playbook_id: str,
+        business_id: str,
+        context: dict = None,
+        trigger: TriggerType = TriggerType.SCHEDULED,
+    ) -> dict:
+        """
+        Execute a playbook for a business unit.
+        
+        This is the primary entry point for running business playbooks.
+        The MasterAI coordinates the execution, delegating tasks to agents.
+        
+        Args:
+            playbook_id: ID of the playbook to execute (e.g., 'dropshipping', 'saas')
+            business_id: ID of the business unit to execute for
+            context: Optional context data for the playbook
+            trigger: What triggered this execution
+            
+        Returns:
+            Execution result with status, completed tasks, and any errors
+        """
+        logger.info(
+            "Executing playbook",
+            playbook_id=playbook_id,
+            business_id=business_id,
+            trigger=trigger.value
+        )
+        
+        try:
+            # Load the playbook definition
+            playbook = self.playbook_loader.load_playbook(playbook_id)
+            if not playbook:
+                return {
+                    "success": False,
+                    "error": f"Playbook '{playbook_id}' not found",
+                    "playbook_id": playbook_id,
+                    "business_id": business_id
+                }
+            
+            # Build execution context
+            exec_context = context or {}
+            exec_context["business_id"] = business_id
+            exec_context["triggered_at"] = datetime.now().isoformat()
+            
+            # Execute the playbook
+            run = await self.playbook_executor.execute(
+                playbook=playbook,
+                business_id=business_id,
+                context=exec_context,
+                trigger=trigger
+            )
+            
+            # Log completion
+            logger.info(
+                "Playbook execution complete",
+                run_id=run.id,
+                status=run.status.value,
+                completed_tasks=len(run.completed_tasks),
+                failed_tasks=len(run.failed_tasks)
+            )
+            
+            return {
+                "success": run.status.value == "completed",
+                "run_id": run.id,
+                "playbook_id": playbook_id,
+                "business_id": business_id,
+                "status": run.status.value,
+                "completed_tasks": run.completed_tasks,
+                "failed_tasks": run.failed_tasks,
+                "error": run.error,
+                "started_at": run.started_at.isoformat() if run.started_at else None,
+                "completed_at": run.completed_at.isoformat() if run.completed_at else None,
+            }
+            
+        except Exception as e:
+            logger.error("Playbook execution failed", error=str(e), exc_info=True)
+            return {
+                "success": False,
+                "error": str(e),
+                "playbook_id": playbook_id,
+                "business_id": business_id
+            }
+    
+    async def execute_playbook_stage(
+        self,
+        playbook_id: str,
+        business_id: str,
+        stage: str,
+        context: dict = None
+    ) -> dict:
+        """
+        Execute only a specific stage of a playbook.
+        
+        Useful for resuming playbooks or running specific phases.
+        
+        Args:
+            playbook_id: ID of the playbook
+            business_id: ID of the business unit
+            stage: Stage name to execute (e.g., 'discovery', 'validation')
+            context: Optional context data
+            
+        Returns:
+            Execution result for the stage
+        """
+        logger.info(
+            "Executing playbook stage",
+            playbook_id=playbook_id,
+            business_id=business_id,
+            stage=stage
+        )
+        
+        try:
+            playbook = self.playbook_loader.load_playbook(playbook_id)
+            if not playbook:
+                return {
+                    "success": False,
+                    "error": f"Playbook '{playbook_id}' not found"
+                }
+            
+            # Filter tasks to only those in the requested stage
+            stage_tasks = [t for t in playbook.tasks if t.metadata.get("stage") == stage]
+            
+            if not stage_tasks:
+                return {
+                    "success": False,
+                    "error": f"No tasks found for stage '{stage}' in playbook '{playbook_id}'"
+                }
+            
+            # Create a modified playbook with only stage tasks
+            from src.business.playbook_models import PlaybookDefinition
+            stage_playbook = PlaybookDefinition(
+                id=f"{playbook.id}_{stage}",
+                name=f"{playbook.name} - {stage.title()}",
+                description=f"Stage execution: {stage}",
+                version=playbook.version,
+                tasks=stage_tasks,
+                metadata={**playbook.metadata, "original_playbook": playbook.id, "stage": stage}
+            )
+            
+            # Execute the stage playbook
+            run = await self.playbook_executor.execute(
+                playbook=stage_playbook,
+                business_id=business_id,
+                context=context or {},
+                trigger=TriggerType.SCHEDULED
+            )
+            
+            return {
+                "success": run.status.value == "completed",
+                "run_id": run.id,
+                "stage": stage,
+                "completed_tasks": run.completed_tasks,
+                "failed_tasks": run.failed_tasks,
+                "error": run.error
+            }
+            
+        except Exception as e:
+            logger.error("Stage execution failed", error=str(e), exc_info=True)
+            return {
+                "success": False,
+                "error": str(e),
+                "stage": stage
+            }
+    
+    def list_available_playbooks(self) -> list[dict]:
+        """List all available playbooks with their metadata."""
+        return self.playbook_loader.list_playbooks()
+
     @trace_llm
     async def _call_llm(
         self,
@@ -460,8 +644,9 @@ If the data is not available, say so clearly.
             except Exception as e:
                 logger.error("Autonomous loop error", exc_info=True)
             
-            # Wait for the next optimization cycle (6 hours)
-            await asyncio.sleep(6 * 60 * 60)
+            # Wait for the next optimization cycle (use configurable interval)
+            interval_hours = getattr(settings, 'kpi_review_interval_hours', 6)
+            await asyncio.sleep(interval_hours * 60 * 60)
     
     async def _check_business_health(self, context: str):
         """

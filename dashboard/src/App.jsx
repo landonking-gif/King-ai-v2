@@ -1,6 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import './App.css';
+import { PLDashboard } from './components/Charts/PLDashboard';
+import { CircuitBreakerDashboard } from './components/Monitoring/CircuitBreakerDashboard';
 
 const API_BASE = `http://${window.location.hostname}:8000/api`;
 
@@ -18,17 +20,20 @@ function App() {
   const [evolutions, setEvolutions] = useState([]);
   const [approvals, setApprovals] = useState([]);
   const [schedulerStatus, setSchedulerStatus] = useState(null);
+  const [plData, setPlData] = useState(null);
+  const [plPeriod, setPlPeriod] = useState('30d');
 
   // Fetch Empire Stats and Businesses
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [bizRes, healthRes, evoRes, approvalRes, schedRes] = await Promise.all([
+        const [bizRes, healthRes, evoRes, approvalRes, schedRes, plRes] = await Promise.all([
           fetch(`${API_BASE}/businesses/`),
           fetch(`${API_BASE}/health`),
           fetch(`${API_BASE}/evolution/proposals`).catch(() => ({ ok: false })),
           fetch(`${API_BASE}/approvals/pending`).catch(() => ({ ok: false })),
-          fetch(`${API_BASE}/scheduler/status`).catch(() => ({ ok: false }))
+          fetch(`${API_BASE}/scheduler/status`).catch(() => ({ ok: false })),
+          fetch(`${API_BASE}/analytics/pl?period=${plPeriod}`).catch(() => ({ ok: false }))
         ]);
 
         if (bizRes.ok) {
@@ -66,6 +71,11 @@ function App() {
           const schedData = await schedRes.json();
           setSchedulerStatus(schedData);
         }
+
+        if (plRes.ok) {
+          const plData = await plRes.json();
+          setPlData(plData);
+        }
       } catch (err) {
         console.error("Failed to fetch dashboard data:", err);
       }
@@ -74,7 +84,7 @@ function App() {
     fetchData();
     const interval = setInterval(fetchData, 10000); // Polling every 10s
     return () => clearInterval(interval);
-  }, []);
+  }, [plPeriod]);
 
   const handleSendMessage = async () => {
     if (!chatInput.trim()) return;
@@ -172,6 +182,12 @@ function App() {
             🏰 My Empire
           </button>
           <button
+            className={`btn-nav ${activeTab === 'pl' ? 'active' : ''}`}
+            onClick={() => setActiveTab('pl')}
+          >
+            📊 P&L Dashboard
+          </button>
+          <button
             className={`btn-nav ${activeTab === 'ceo' ? 'active' : ''}`}
             onClick={() => setActiveTab('ceo')}
           >
@@ -189,6 +205,12 @@ function App() {
           >
             🧬 Evolution {evolutions.filter(e => e.status === 'pending').length > 0 && 
               <span className="badge">{evolutions.filter(e => e.status === 'pending').length}</span>}
+          </button>
+          <button
+            className={`btn-nav ${activeTab === 'system' ? 'active' : ''}`}
+            onClick={() => setActiveTab('system')}
+          >
+            🔧 System Health
           </button>
           <button
             className={`btn-nav ${activeTab === 'scheduler' ? 'active' : ''}`}
@@ -210,9 +232,11 @@ function App() {
         <header style={{ marginBottom: '40px' }}>
           <h2 style={{ fontSize: '2rem' }}>
             {activeTab === 'empire' && 'Empire Overview'}
+            {activeTab === 'pl' && 'Profit & Loss Dashboard'}
             {activeTab === 'ceo' && 'CEO Briefing'}
             {activeTab === 'approvals' && 'Approval Queue'}
             {activeTab === 'evolution' && 'Evolution Proposals'}
+            {activeTab === 'system' && 'System Health & Circuit Breakers'}
             {activeTab === 'scheduler' && 'Autonomous Scheduler'}
           </h2>
           <p style={{ color: 'var(--text-dim)' }}>Welcome back, Your Majesty.</p>
@@ -258,6 +282,26 @@ function App() {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {activeTab === 'pl' && (
+          <div className="content-fade-in">
+            <PLDashboard 
+              data={plData}
+              period={plPeriod}
+              onPeriodChange={setPlPeriod}
+              showComparison={true}
+            />
+          </div>
+        )}
+
+        {activeTab === 'system' && (
+          <div className="content-fade-in">
+            <CircuitBreakerDashboard 
+              apiBaseUrl={`${API_BASE}/v1/system`}
+              refreshInterval={5000}
+            />
           </div>
         )}
 

@@ -1,14 +1,129 @@
 name: Micro-SaaS Bootstrap
 type: saas
+description: Complete playbook for building and launching a micro-SaaS product
+
+# Budget allocation per stage
+budget:
+  discovery: 200
+  validation: 500
+  implementation: 2000
+  launch: 1000
+  operation: 500
+  total: 4200
+
+# Success criteria for stage transitions
+criteria:
+  discovery_to_validation:
+    - metric: pain_points_identified
+      operator: ">="
+      value: 5
+    - metric: target_audience_defined
+      operator: "=="
+      value: true
+  validation_to_implementation:
+    - metric: landing_page_signups
+      operator: ">="
+      value: 50
+    - metric: problem_validated
+      operator: "=="
+      value: true
+  implementation_to_launch:
+    - metric: mvp_complete
+      operator: "=="
+      value: true
+    - metric: tests_passing
+      operator: "=="
+      value: true
+  launch_to_operation:
+    - metric: paying_users
+      operator: ">="
+      value: 3
+    - metric: mrr
+      operator: ">="
+      value: 100
+
 stages:
   - name: Discovery
+    timeout_hours: 72
+    budget: 200
     steps:
-      - research: "Identify developer pain points"
+      - id: research_pain_points
+        agent: research
+        action: "Identify developer pain points and underserved niches"
+        parameters:
+          research_type: market
+          depth: 3
+          max_sources: 20
+      - id: analyze_competitors
+        agent: research
+        action: "Analyze existing solutions and their gaps"
+        depends_on: [research_pain_points]
+        parameters:
+          research_type: competitor
+          
+  - name: Validation
+    timeout_hours: 120
+    budget: 500
+    steps:
+      - id: create_landing_page
+        agent: content
+        action: "Create landing page to test interest"
+        parameters:
+          content_type: landing_page
+      - id: collect_feedback
+        agent: research
+        action: "Collect feedback from potential users"
+        depends_on: [create_landing_page]
+        
   - name: Implementation
+    timeout_hours: 336  # 2 weeks
+    budget: 2000
     steps:
-      - code_generator: "Build MVP backend"
-      - code_generator: "Build React frontend"
+      - id: build_backend
+        agent: code_generator
+        action: "Build MVP backend with core features"
+        parameters:
+          language: python
+          mode: create
+      - id: build_frontend
+        agent: code_generator
+        action: "Build React frontend with user dashboard"
+        depends_on: [build_backend]
+        parameters:
+          language: typescript
+          mode: create
+      - id: setup_infrastructure
+        agent: code_generator
+        action: "Setup deployment infrastructure"
+        depends_on: [build_backend, build_frontend]
+        parameters:
+          language: yaml
+          
+  - name: Launch
+    timeout_hours: 72
+    budget: 1000
+    steps:
+      - id: setup_billing
+        agent: finance
+        action: "Setup Stripe billing and subscription tiers"
+        parameters:
+          action: create_subscription
+      - id: create_docs
+        agent: content
+        action: "Create documentation and onboarding guides"
+        parameters:
+          content_type: blog_post
+          
   - name: Operation
+    timeout_hours: null  # Ongoing
+    budget: 500
     steps:
-      - analytics: "Track user retention"
-      - finance: "Setup Stripe billing"
+      - id: track_retention
+        agent: analytics
+        action: "Track user retention and engagement metrics"
+        parameters:
+          kpis: [retention_rate, churn_rate, mrr, arpu]
+      - id: iterate_features
+        agent: research
+        action: "Gather user feedback for feature prioritization"
+        depends_on: [track_retention]

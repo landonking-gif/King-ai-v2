@@ -125,7 +125,8 @@ def get_all_function_schemas() -> list[dict]:
     from src.agents.router import agent_router
     
     schemas = []
-    for name, agent in agent_router.list_agents().items():
+    # list_agents() returns list[dict], so iterate over registered agents directly
+    for name, agent in agent_router.agents.items():
         if hasattr(agent, 'FUNCTION_SCHEMA') and agent.FUNCTION_SCHEMA:
             schemas.append(agent.FUNCTION_SCHEMA)
     

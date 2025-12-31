@@ -94,6 +94,35 @@ class CodeReviewerAgent(SubAgent):
     name = "code_reviewer"
     description = "Automated code review and quality analysis"
     
+    FUNCTION_SCHEMA = {
+        "name": "code_reviewer",
+        "description": "Review code for quality, security, and best practices. Provides detailed analysis with issue severity and actionable recommendations.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "description": "The code to review"
+                },
+                "language": {
+                    "type": "string",
+                    "enum": ["python", "javascript", "typescript", "sql", "yaml", "json"],
+                    "description": "Programming language of the code"
+                },
+                "file_path": {
+                    "type": "string",
+                    "description": "Optional file path for context"
+                },
+                "focus_areas": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Specific areas to focus on: security, performance, maintainability, correctness, style, documentation"
+                }
+            },
+            "required": ["code", "language"]
+        }
+    }
+    
     REVIEW_PROMPT = """Review the following {language} code for issues and improvements.
 
 Code:
