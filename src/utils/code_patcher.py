@@ -94,9 +94,17 @@ class PatchSet:
     applied_at: Optional[datetime] = None
     backup_dir: Optional[str] = None
     
-    def add_patch(self, file_path: str, old_content: str, new_content: str):
-        """Add a patch to the set."""
-        self.patches.append(CodePatch(file_path, old_content, new_content))
+    def add_patch(self, patch_or_path, old_content: str = None, new_content: str = None):
+        """Add a patch to the set.
+        
+        Can accept either:
+            - A CodePatch object directly
+            - file_path, old_content, new_content as separate args
+        """
+        if isinstance(patch_or_path, CodePatch):
+            self.patches.append(patch_or_path)
+        else:
+            self.patches.append(CodePatch(patch_or_path, old_content, new_content))
     
     @property
     def total_stats(self) -> Dict[str, int]:

@@ -130,7 +130,12 @@ class TestContextManager:
         """Test that build_context returns a string."""
         with patch('src.master_ai.context.get_db') as mock_db:
             mock_session = AsyncMock()
-            mock_session.execute.return_value.scalars.return_value.all.return_value = []
+            # Create proper mock chain for SQLAlchemy result
+            mock_result = MagicMock()
+            mock_scalars = MagicMock()
+            mock_scalars.all.return_value = []
+            mock_result.scalars.return_value = mock_scalars
+            mock_session.execute.return_value = mock_result
             mock_db.return_value.__aenter__.return_value = mock_session
             
             context = await context_manager.build_context()

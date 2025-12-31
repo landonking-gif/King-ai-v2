@@ -37,6 +37,8 @@ class Settings(BaseSettings):
     risk_profile: Literal["conservative", "moderate", "aggressive"] = "moderate"
     # Max number of self-modification proposals allowed per hour
     max_evolutions_per_hour: int = Field(default=5)
+    # Enable autonomous operation mode (self-driven without user prompts)
+    enable_autonomous_mode: bool = Field(default=False)
     
     # --- API Server Settings ---
     # Host for the FastAPI server

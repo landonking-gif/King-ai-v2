@@ -34,10 +34,22 @@ variable "gpu_min_instances" {
   default     = 2
 }
 
-variable "gpu_max_instances" {
-  description = "Maximum number of GPU instances"
+variable "gpu_instance_count" {
+  description = "Number of GPU instances to deploy"
   type        = number
-  default     = 8
+  default     = 2
+}
+
+variable "ollama_model" {
+  description = "Ollama model to deploy"
+  type        = string
+  default     = "llama2:13b"
+}
+
+variable "vllm_model" {
+  description = "vLLM model to deploy"
+  type        = string
+  default     = "meta-llama/Llama-2-13b-hf"
 }
 
 variable "db_instance_class" {

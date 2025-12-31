@@ -35,12 +35,41 @@ class PaginatedResponse:
     has_next_page: bool = False
     next_page_info: Optional[str] = None
     total_count: Optional[int] = None
+    
+    # Alias for backwards compatibility
+    @property
+    def has_next(self) -> bool:
+        return self.has_next_page
+    
+    def __init__(
+        self, 
+        items: List[Dict[str, Any]], 
+        has_next_page: bool = False,
+        has_next: bool = None,  # Alias
+        next_page_info: Optional[str] = None,
+        total_count: Optional[int] = None
+    ):
+        self.items = items
+        self.has_next_page = has_next if has_next is not None else has_next_page
+        self.next_page_info = next_page_info
+        self.total_count = total_count
+
+
+@dataclass
+class RateLimit:
+    """Rate limit information from Shopify API."""
+    used: int
+    maximum: int
+    
+    @property
+    def available(self) -> int:
+        return self.maximum - self.used
 
 
 @dataclass
 class ShopifyConfig:
     """Configuration for Shopify store connection."""
-    shop_url: str  # e.g., "mystore.myshopify.com"
+    shop_url: str = ""  # e.g., "mystore.myshopify.com"
     shop_name: str = ""  # Alias for compatibility
     access_token: str = ""
     api_version: str = "2024-10"
@@ -49,6 +78,12 @@ class ShopifyConfig:
         # Allow shop_name as alias for shop_url
         if not self.shop_url and self.shop_name:
             self.shop_url = f"{self.shop_name}.myshopify.com"
+    
+    @property
+    def base_url(self) -> str:
+        """Get the base API URL."""
+        url = self.shop_url.replace("https://", "").replace("http://", "")
+        return f"https://{url}/admin/api/{self.api_version}"
 
 
 class ShopifyClient:
@@ -57,21 +92,56 @@ class ShopifyClient:
     Handles products, inventory, and orders.
     """
 
-    def __init__(self, shop_url: str, access_token: str, api_version: str = "2024-10"):
+    def __init__(
+        self, 
+        shop_url_or_config: str | ShopifyConfig = None, 
+        access_token: str = None, 
+        api_version: str = "2024-10"
+    ):
         """
         Initialize Shopify client.
         
         Args:
-            shop_url: Store URL (e.g., "mystore.myshopify.com")
-            access_token: Admin API access token
+            shop_url_or_config: Store URL or ShopifyConfig object
+            access_token: Admin API access token (optional if config provided)
             api_version: API version (default: 2024-10)
         """
-        self.shop_url = shop_url.replace("https://", "").replace("http://", "")
-        self.access_token = access_token
-        self.api_version = api_version
-        self.base_url = f"https://{self.shop_url}/admin/api/{api_version}"
+        # Handle both config object and individual params
+        if isinstance(shop_url_or_config, ShopifyConfig):
+            self.config = shop_url_or_config
+            self.shop_url = self.config.shop_url.replace("https://", "").replace("http://", "")
+            self.access_token = self.config.access_token
+            self.api_version = self.config.api_version
+        else:
+            shop_url = shop_url_or_config or ""
+            self.shop_url = shop_url.replace("https://", "").replace("http://", "")
+            self.access_token = access_token or ""
+            self.api_version = api_version
+            self.config = ShopifyConfig(
+                shop_url=self.shop_url,
+                access_token=self.access_token,
+                api_version=self.api_version
+            )
+        
+        self.base_url = f"https://{self.shop_url}/admin/api/{self.api_version}"
         self.client = httpx.AsyncClient(timeout=30.0)
         self._rate_limit_delay = 0.5
+
+    def _parse_rate_limit(self, headers: Dict[str, str]) -> RateLimit:
+        """
+        Parse rate limit information from Shopify response headers.
+        
+        Args:
+            headers: Response headers dictionary
+            
+        Returns:
+            RateLimit object with used/maximum/available info
+        """
+        rate_limit_header = headers.get("X-Shopify-Shop-Api-Call-Limit", "0/40")
+        parts = rate_limit_header.split("/")
+        used = int(parts[0])
+        maximum = int(parts[1]) if len(parts) > 1 else 40
+        return RateLimit(used=used, maximum=maximum)
 
     async def close(self):
         """Close the HTTP client."""

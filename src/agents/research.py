@@ -9,15 +9,81 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 import hashlib
+import os
+import httpx
 
 from src.agents.base import BaseAgent, AgentCapability, AgentResult
 from src.utils.web_scraper import WebScraper, ScrapedPage, ContentExtractor
-from src.utils.search_client import UnifiedSearchClient, SearchResponse, SearchResult
+from src.utils.search_client import UnifiedSearchClient, SearchResponse, SearchResult, SearchEngine
 from src.utils.ollama_client import OllamaClient
 from src.database.vector_store import VectorStore
 from src.utils.structured_logging import get_logger
 
 logger = get_logger("research_agent")
+
+
+class SerpAPIClient:
+    """SerpAPI client for web search."""
+    
+    def __init__(self):
+        self.api_key = os.getenv("SERPAPI_KEY")
+        self.base_url = "https://serpapi.com/search"
+    
+    async def search(
+        self,
+        query: str,
+        num_results: int = 10,
+        search_type: str = "google"
+    ) -> List[Dict[str, Any]]:
+        """
+        Search the web using SerpAPI.
+        
+        Args:
+            query: Search query
+            num_results: Number of results
+            search_type: Engine type
+            
+        Returns:
+            List of search results
+        """
+        if not self.api_key:
+            logger.warning("SerpAPI key not configured, using mock data")
+            return self._mock_results(query)
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                self.base_url,
+                params={
+                    "q": query,
+                    "api_key": self.api_key,
+                    "engine": search_type,
+                    "num": num_results
+                }
+            )
+            response.raise_for_status()
+            data = response.json()
+            
+            results = []
+            for item in data.get("organic_results", []):
+                results.append({
+                    "title": item.get("title"),
+                    "url": item.get("link"),
+                    "snippet": item.get("snippet"),
+                    "position": item.get("position")
+                })
+            
+            return results
+    
+    def _mock_results(self, query: str) -> List[Dict[str, Any]]:
+        """Return mock results for development."""
+        return [
+            {
+                "title": f"Result for: {query}",
+                "url": "https://example.com",
+                "snippet": "Mock search result",
+                "position": 1
+            }
+        ]
 
 
 class ResearchType(str, Enum):
@@ -87,23 +153,29 @@ class ResearchAgent(BaseAgent):
     
     def __init__(
         self,
-        llm_client: OllamaClient,
-        vector_store: VectorStore
+        llm_client: Optional[OllamaClient] = None,
+        vector_store: Optional[VectorStore] = None
     ):
         """
         Initialize research agent.
         
         Args:
-            llm_client: LLM client for analysis
-            vector_store: Vector store for caching
+            llm_client: LLM client for analysis (optional, creates default if None)
+            vector_store: Vector store for caching (optional, uses singleton if None)
         """
         super().__init__("research", llm_client)
-        self.vector_store = vector_store
+        # Use provided vector_store or import singleton
+        if vector_store is None:
+            from src.database.vector_store import vector_store as default_vector_store
+            self.vector_store = default_vector_store
+        else:
+            self.vector_store = vector_store
         self.scraper = WebScraper(rate_limit=0.5)
         self.search_client = UnifiedSearchClient()
+        self.serp_client = SerpAPIClient()
         self.extractor = ContentExtractor()
     
-    async def execute(self, task: Dict[str, Any]) -> AgentResult:
+    async def execute(self, task: Dict[str, Any]) -> dict:
         """Execute a research task."""
         query = ResearchQuery(
             query=task.get("query", ""),
@@ -115,18 +187,20 @@ class ResearchAgent(BaseAgent):
         try:
             report = await self.research(query)
             
-            return AgentResult(
-                success=True,
-                data=report.to_dict(),
-                message=f"Research complete: {len(report.sources)} sources analyzed"
-            )
+            return {
+                "success": True,
+                "output": report.to_dict(),
+                "error": None,
+                "metadata": {"sources_count": len(report.sources)}
+            }
         except Exception as e:
             logger.error(f"Research failed: {e}")
-            return AgentResult(
-                success=False,
-                error=str(e),
-                message="Research failed"
-            )
+            return {
+                "success": False,
+                "output": None,
+                "error": str(e),
+                "metadata": {}
+            }
     
     async def research(self, query: ResearchQuery) -> ResearchReport:
         """
@@ -175,27 +249,25 @@ class ResearchAgent(BaseAgent):
         self,
         query: ResearchQuery
     ) -> List[SearchResult]:
-        """Search for relevant sources."""
-        # Construct search queries based on research type
-        search_queries = self._build_search_queries(query)
+        """Search for sources using SerpAPI."""
+        serp_results = await self.serp_client.search(
+            query.query,
+            num_results=query.max_sources
+        )
         
-        all_results = []
-        for sq in search_queries:
-            response = await self.search_client.search(
-                sq,
-                num_results=query.max_sources
+        # Convert to SearchResult objects
+        results = []
+        for item in serp_results:
+            result = SearchResult(
+                title=item.get("title", ""),
+                url=item.get("url", ""),
+                snippet=item.get("snippet", ""),
+                position=item.get("position", 0),
+                engine=SearchEngine.GOOGLE  # Default to Google
             )
-            all_results.extend(response.results)
+            results.append(result)
         
-        # Deduplicate by URL
-        seen_urls = set()
-        unique_results = []
-        for result in all_results:
-            if result.url not in seen_urls:
-                seen_urls.add(result.url)
-                unique_results.append(result)
-        
-        return unique_results[:query.max_sources * 2]
+        return results
     
     def _build_search_queries(self, query: ResearchQuery) -> List[str]:
         """Build search queries based on research type."""
