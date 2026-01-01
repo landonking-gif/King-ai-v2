@@ -8,10 +8,10 @@ Provides endpoints for:
 - Rate limit monitoring
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional, List
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, HTTPException, Query, Response
 from pydantic import BaseModel
 
 from src.utils.circuit_breaker import CircuitBreaker, get_circuit_breakers_health
@@ -354,9 +354,9 @@ async def get_runtime_config():
         "environment": getattr(settings, 'environment', 'development'),
         "debug": getattr(settings, 'debug', False),
         "log_level": getattr(settings, 'log_level', 'INFO'),
-        "enable_self_modification": getattr(settings, 'enable_self_modification', True),
-        "max_evolutions_per_hour": getattr(settings, 'max_evolutions_per_hour', 5),
-        "risk_profile": getattr(settings, 'risk_profile', 'moderate'),
+        "enable_self_modification": settings.enable_self_modification,
+        "max_evolutions_per_hour": settings.max_evolutions_per_hour,
+        "risk_profile": settings.risk_profile,
     }
     
     return config

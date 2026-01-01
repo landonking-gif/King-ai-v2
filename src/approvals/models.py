@@ -35,6 +35,7 @@ class ApprovalType(Enum):
     STRATEGIC = "strategic"
     TECHNICAL = "technical"
     EXTERNAL = "external"
+    SYSTEM = "system"
 
 
 @dataclass

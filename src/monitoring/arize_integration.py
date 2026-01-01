@@ -4,12 +4,12 @@ Arize AI Integration - ML observability and model monitoring.
 Tracks model performance, drift, and quality.
 """
 
-import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass
 import uuid
 
+from config.settings import settings
 from src.utils.logging import get_logger
 
 logger = get_logger("arize")
@@ -51,14 +51,14 @@ class ArizeMonitor:
     """
     
     def __init__(self):
-        self.enabled = ARIZE_AVAILABLE and os.getenv("ARIZE_API_KEY")
+        self.enabled = ARIZE_AVAILABLE and settings.arize_api_key
         
         if not self.enabled:
             logger.info("Arize monitoring disabled")
             return
         
-        self.api_key = os.getenv("ARIZE_API_KEY")
-        self.space_key = os.getenv("ARIZE_SPACE_KEY")
+        self.api_key = settings.arize_api_key
+        self.space_key = settings.arize_space_key
         self.model_id = "king-ai-master"
         self.model_version = "2.0.0"
         

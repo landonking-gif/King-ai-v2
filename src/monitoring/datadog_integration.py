@@ -51,16 +51,16 @@ class DatadogMonitor:
     """
     
     def __init__(self, config: DatadogConfig = None):
-        self.enabled = DATADOG_AVAILABLE and os.getenv("DATADOG_API_KEY")
+        self.enabled = DATADOG_AVAILABLE and settings.datadog_api_key
         
         if not self.enabled:
             logger.info("Datadog monitoring disabled (no API key)")
             return
         
         self.config = config or DatadogConfig(
-            api_key=os.getenv("DATADOG_API_KEY", ""),
-            app_key=os.getenv("DATADOG_APP_KEY", ""),
-            env=os.getenv("ENVIRONMENT", "development")
+            api_key=settings.datadog_api_key or "",
+            app_key=settings.datadog_app_key or "",
+            env=settings.environment or "development"
         )
         
         self._initialize()

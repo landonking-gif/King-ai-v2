@@ -11,6 +11,8 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 import asyncio
 
+from config.settings import settings
+
 # Conditional import for Datadog
 try:
     from ddtrace import tracer, patch_all
@@ -40,14 +42,14 @@ class DatadogMonitor:
         """Initialize Datadog if API key is available."""
         self.enabled = False
         self.tags = MetricTags(
-            environment=os.getenv("ENVIRONMENT", "development")
+            environment=settings.environment or "development"
         )
         
-        dd_api_key = os.getenv("DD_API_KEY")
+        dd_api_key = settings.dd_api_key
         if DATADOG_AVAILABLE and dd_api_key:
             initialize(
                 api_key=dd_api_key,
-                app_key=os.getenv("DD_APP_KEY"),
+                app_key=settings.dd_app_key,
             )
             patch_all()  # Auto-instrument common libraries
             self.enabled = True

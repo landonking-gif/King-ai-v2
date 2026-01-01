@@ -10,7 +10,6 @@ import json
 import asyncio
 import time
 from datetime import datetime
-from typing import Optional, Any
 from uuid import uuid4
 
 # Internal project imports
@@ -20,14 +19,14 @@ from src.master_ai.evolution import EvolutionEngine
 from src.master_ai.prompts import SYSTEM_PROMPT, INTENT_CLASSIFICATION_PROMPT
 from src.master_ai.models import (
     ClassifiedIntent, IntentType, ActionType, MasterAIResponse,
-    ActionResult, TokenUsage, PlanStep
+    ActionResult, PlanStep
 )
 from src.agents.router import AgentRouter
 from src.business.playbook_executor import PlaybookExecutor
 from src.business.playbook_loader import PlaybookLoader
 from src.business.playbook_models import TriggerType
 from src.database.connection import get_db
-from src.database.models import ConversationMessage, Task, EvolutionProposal
+from src.database.models import Task, EvolutionProposal
 from src.utils.llm_router import LLMRouter, TaskContext
 from src.utils.structured_logging import get_logger, set_request_context
 from src.utils.retry import with_retry, LLM_RETRY_CONFIG, TransientError
@@ -744,7 +743,7 @@ If the data is not available, say so clearly.
         Calls the EvolutionEngine to see if any system improvements are needed.
         Rate limited to prevent runaway self-modifications.
         """
-        if not getattr(settings, 'enable_self_modification', True):
+        if not settings.enable_self_modification:
             return
         
         # Periodic reset of the hourly evolution counter

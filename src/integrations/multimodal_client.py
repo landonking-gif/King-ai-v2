@@ -14,7 +14,6 @@ Enables advanced business use cases like:
 """
 
 import base64
-import os
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
@@ -22,6 +21,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import httpx
 import tempfile
 
+from config.settings import settings
 from src.utils.structured_logging import get_logger
 from src.utils.circuit_breaker import CircuitBreaker
 
@@ -95,7 +95,7 @@ class WhisperClient:
     API_URL = "https://api.openai.com/v1/audio"
     
     def __init__(self, api_key: str = None):
-        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
+        self.api_key = api_key or settings.openai_api_key
         self._configured = bool(self.api_key)
         
         if not self._configured:
@@ -381,7 +381,7 @@ class VisionClient:
     API_URL = "https://api.openai.com/v1/chat/completions"
     
     def __init__(self, api_key: str = None, model: str = "gpt-4o"):
-        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
+        self.api_key = api_key or settings.openai_api_key
         self.model = model
         self._configured = bool(self.api_key)
     

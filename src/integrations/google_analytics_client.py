@@ -5,7 +5,6 @@ Integrates with GA4 Data API for retrieving website analytics,
 user behavior, and e-commerce metrics for business units.
 """
 
-import os
 from datetime import date, timedelta
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass, field
@@ -23,6 +22,7 @@ except ImportError:
     GA_AVAILABLE = False
     BetaAnalyticsDataClient = None
 
+from config.settings import settings
 from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -135,10 +135,10 @@ class GoogleAnalyticsClient:
             credentials_path: Path to service account JSON file
             credentials_json: Service account JSON as string (alternative to path)
         """
-        self.property_id = property_id or os.getenv("GA4_PROPERTY_ID")
+        self.property_id = property_id or settings.ga4_property_id
         self._client: Optional[BetaAnalyticsDataClient] = None
-        self._credentials_path = credentials_path or os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-        self._credentials_json = credentials_json or os.getenv("GA4_CREDENTIALS_JSON")
+        self._credentials_path = credentials_path or settings.google_application_credentials
+        self._credentials_json = credentials_json or settings.ga4_credentials_json
         
         if not GA_AVAILABLE:
             logger.warning("Google Analytics SDK not installed. Install with: pip install google-analytics-data")

@@ -146,23 +146,31 @@ class SandboxEnvironment:
             if self.config.install_dependencies:
                 await self._create_requirements()
             
-            # Create Dockerfile
-            await self._create_dockerfile()
-            
-            # Build container (if Docker unavailable, fall back to local execution)
-            success = await self._build_container()
+            # Try Docker if enabled, otherwise use local execution
+            if settings.docker_sandbox_enabled:
+                # Create Dockerfile
+                await self._create_dockerfile()
+                
+                # Build container (if Docker unavailable, fall back to local execution)
+                success = await self._build_container()
 
-            if success:
-                self._use_docker = True
+                if success:
+                    self._use_docker = True
+                    self.status = SandboxStatus.READY
+                    logger.info(f"Sandbox ready with Docker: {self.sandbox_id}")
+                    return True
+
+                # Docker build failed: run locally inside the sandbox directory.
+                self._use_docker = False
                 self.status = SandboxStatus.READY
-                logger.info(f"Sandbox ready: {self.sandbox_id}")
+                logger.warning(f"Docker unavailable; using local sandbox execution: {self.sandbox_id}")
                 return True
-
-            # Docker build failed: run locally inside the sandbox directory.
-            self._use_docker = False
-            self.status = SandboxStatus.READY
-            logger.warning(f"Docker unavailable; using local sandbox execution: {self.sandbox_id}")
-            return True
+            else:
+                # Docker disabled: use local execution directly
+                self._use_docker = False
+                self.status = SandboxStatus.READY
+                logger.info(f"Sandbox ready with local execution (Docker disabled): {self.sandbox_id}")
+                return True
             
         except Exception as e:
             logger.error(f"Sandbox setup failed: {e}")

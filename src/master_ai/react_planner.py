@@ -4,15 +4,14 @@ Implements iterative planning with observation feedback.
 """
 
 import json
-import asyncio
-from typing import Optional, List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple
 from datetime import datetime
 
 from src.master_ai.planning_models import (
     ExecutionPlan, PlanTask, PlanningContext, ReActStep,
     TaskStatus, RiskLevel, ReplanRequest
 )
-from src.master_ai.prompts import REACT_PLANNING_PROMPT, TASK_DECOMPOSITION_PROMPT
+from src.master_ai.prompts import TASK_DECOMPOSITION_PROMPT
 from src.utils.llm_router import LLMRouter, TaskContext
 from src.utils.structured_logging import get_logger
 from src.utils.retry import with_retry, LLM_RETRY_CONFIG

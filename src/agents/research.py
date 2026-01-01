@@ -13,6 +13,7 @@ import os
 import httpx
 import inspect
 
+from config.settings import settings
 from src.agents.base import BaseAgent, AgentCapability, AgentResult
 from src.utils.web_scraper import WebScraper, ScrapedPage, ContentExtractor
 from src.utils.search_client import UnifiedSearchClient, SearchResponse, SearchResult, SearchEngine
@@ -27,7 +28,7 @@ class SerpAPIClient:
     """SerpAPI client for web search."""
     
     def __init__(self):
-        self.api_key = os.getenv("SERPAPI_KEY")
+        self.api_key = settings.serpapi_key
         self.base_url = "https://serpapi.com/search"
     
     async def search(

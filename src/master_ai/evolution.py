@@ -3,17 +3,15 @@ Evolution Engine - Manages self-modification proposals and execution.
 Enhanced with confidence scoring, validation, and approval workflows.
 """
 
-import asyncio
 import json
 import re
 import ast
-from typing import Optional, List, Dict, Any, Tuple
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 from pathlib import Path
 
 from src.master_ai.evolution_models import (
-    EvolutionProposal, ProposalStatus, ProposalType, RiskLevel,
-    ValidationResult, EvolutionHistory, EvolutionMetrics, CodeChange, ConfidenceScore
+    EvolutionProposal, ProposalStatus, ProposalType, ValidationResult, EvolutionMetrics, CodeChange
 )
 from src.master_ai.confidence_scorer import ConfidenceScorer
 from src.master_ai.prompts import EVOLUTION_PROPOSAL_PROMPT, VALIDATION_PROMPT, EVOLUTION_PROMPT

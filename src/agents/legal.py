@@ -2,9 +2,7 @@
 Legal Agent - Document generation, compliance, contracts.
 """
 import uuid
-from dataclasses import asdict
 from datetime import datetime, date, timedelta
-from typing import Any, Optional
 
 from src.agents.base import SubAgent
 from src.legal.templates import (

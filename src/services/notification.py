@@ -102,13 +102,13 @@ class EmailProvider(NotificationProvider):
         use_ses: bool = False,
         aws_region: str = "us-east-1",
     ):
-        self.smtp_host = smtp_host or getattr(settings, 'smtp_host', None)
-        self.smtp_port = smtp_port
-        self.smtp_user = smtp_user or getattr(settings, 'smtp_user', None)
-        self.smtp_password = smtp_password or getattr(settings, 'smtp_password', None)
-        self.from_email = from_email
-        self.use_ses = use_ses
-        self.aws_region = aws_region
+        self.smtp_host = smtp_host or settings.smtp_host
+        self.smtp_port = smtp_port or settings.smtp_port
+        self.smtp_user = smtp_user or settings.smtp_user
+        self.smtp_password = smtp_password or settings.smtp_password
+        self.from_email = from_email or settings.smtp_from_email
+        self.use_ses = use_ses or settings.use_ses
+        self.aws_region = aws_region or settings.aws_region
     
     async def send(self, notification: Notification, recipient: NotificationRecipient) -> bool:
         """Send email notification."""
@@ -260,9 +260,9 @@ class SMSProvider(NotificationProvider):
         use_sns: bool = False,
         aws_region: str = "us-east-1",
     ):
-        self.twilio_sid = twilio_sid or getattr(settings, 'twilio_sid', None)
-        self.twilio_token = twilio_token or getattr(settings, 'twilio_token', None)
-        self.twilio_from = twilio_from or getattr(settings, 'twilio_from', None)
+        self.twilio_sid = twilio_sid or settings.twilio_sid
+        self.twilio_token = twilio_token or settings.twilio_token
+        self.twilio_from = twilio_from or settings.twilio_from
         self.use_sns = use_sns
         self.aws_region = aws_region
     
