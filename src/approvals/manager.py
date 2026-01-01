@@ -9,6 +9,7 @@ from src.approvals.models import (
     RiskFactor, ApprovalDecision, ApprovalPolicy
 )
 from src.utils.logging import get_logger
+from src.utils.security_scanner import scan_for_approval
 
 logger = get_logger(__name__)
 
@@ -74,9 +75,32 @@ class ApprovalManager:
         source_plan_id: str = None,
         source_task_id: str = None,
     ) -> ApprovalRequest:
-        """Create a new approval request."""
+        """Create a new approval request with security scanning."""
         # Find applicable policy
         policy = self._find_policy(action_type, risk_level)
+        
+        # Security scanning for code-related approvals
+        security_scan_result = None
+        if action_type == ApprovalType.SYSTEM and payload.get("code"):
+            passed, scan_details = scan_for_approval(
+                code=payload.get("code"),
+                file_path=payload.get("file_path"),
+            )
+            security_scan_result = scan_details
+            
+            # Add security findings to payload
+            payload["security_scan"] = scan_details
+            
+            # If security scan fails, escalate risk level
+            if not passed:
+                logger.warning(f"Security scan failed for {title}: {scan_details}")
+                risk_level = RiskLevel.CRITICAL
+                risk_factors = risk_factors or []
+                risk_factors.append(RiskFactor(
+                    name="security_vulnerability",
+                    description=f"Security scan found issues: {scan_details.get('summary', 'Unknown issues')}",
+                    severity=1.0,
+                ))
         
         # Check auto-approve
         if policy and policy.auto_approve_below:

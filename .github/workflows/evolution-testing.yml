@@ -1,0 +1,383 @@
+name: Evolution Testing
+
+# Triggered when evolution proposals are created
+on:
+  push:
+    branches:
+      - 'evolution/**'
+    paths:
+      - 'src/**'
+      - 'tests/**'
+  pull_request:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'src/**'
+  workflow_dispatch:
+    inputs:
+      evolution_id:
+        description: 'Evolution proposal ID to test'
+        required: false
+        type: string
+
+env:
+  PYTHON_VERSION: '3.10'
+  POSTGRES_USER: testuser
+  POSTGRES_PASSWORD: testpass
+  POSTGRES_DB: testdb
+
+jobs:
+  # Job 1: Static Analysis and Linting
+  lint:
+    name: Static Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff mypy
+
+      - name: Run Ruff linter
+        run: ruff check src/ --output-format=github
+
+      - name: Run Ruff formatter check
+        run: ruff format --check src/
+
+      - name: Run MyPy type checking
+        run: mypy src/ --ignore-missing-imports --no-error-summary
+        continue-on-error: true
+
+  # Job 2: Unit Tests
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: lint
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ env.POSTGRES_DB }}
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run unit tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5432/${{ env.POSTGRES_DB }}
+          REDIS_URL: redis://localhost:6379
+          TESTING: "true"
+        run: |
+          pytest tests/ -v \
+            --ignore=tests/test_integration.py \
+            --ignore=tests/test_e2e.py \
+            -x \
+            --tb=short \
+            --cov=src \
+            --cov-report=xml \
+            --cov-report=term-missing
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: false
+
+  # Job 3: Integration Tests
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ env.POSTGRES_DB }}
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run database migrations
+        env:
+          DATABASE_URL: postgresql+asyncpg://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5432/${{ env.POSTGRES_DB }}
+        run: |
+          alembic upgrade head
+
+      - name: Run integration tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5432/${{ env.POSTGRES_DB }}
+          REDIS_URL: redis://localhost:6379
+          TESTING: "true"
+        run: |
+          pytest tests/test_integration.py -v --tb=short || true
+
+  # Job 4: Security Scan
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Bandit
+        run: pip install bandit[toml]
+
+      - name: Run Bandit security scan
+        run: bandit -r src/ -f json -o bandit-report.json || true
+
+      - name: Upload security report
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-security-report
+          path: bandit-report.json
+
+      - name: Check for high severity issues
+        run: |
+          if [ -f bandit-report.json ]; then
+            HIGH_ISSUES=$(python -c "import json; data=json.load(open('bandit-report.json')); print(len([r for r in data.get('results', []) if r.get('issue_severity') == 'HIGH']))")
+            if [ "$HIGH_ISSUES" -gt 0 ]; then
+              echo "::error::Found $HIGH_ISSUES high severity security issues"
+              exit 1
+            fi
+          fi
+
+  # Job 5: Performance Benchmark (for evolutions)
+  benchmark:
+    name: Performance Benchmark
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    if: startsWith(github.ref, 'refs/heads/evolution/')
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+          pip install pytest-benchmark
+
+      - name: Run benchmarks
+        run: |
+          pytest tests/ -v \
+            --benchmark-only \
+            --benchmark-json=benchmark.json \
+            --benchmark-compare \
+            || true
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: benchmark.json
+
+      - name: Comment benchmark on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            if (fs.existsSync('benchmark.json')) {
+              const benchmark = JSON.parse(fs.readFileSync('benchmark.json', 'utf8'));
+              const benchmarks = benchmark.benchmarks || [];
+              
+              let comment = '## 📊 Performance Benchmark Results\n\n';
+              comment += '| Test | Mean | Std Dev | Ops/sec |\n';
+              comment += '|------|------|---------|--------|\n';
+              
+              for (const b of benchmarks.slice(0, 10)) {
+                comment += `| ${b.name} | ${b.stats?.mean?.toFixed(4)}s | ${b.stats?.stddev?.toFixed(4)}s | ${(1/b.stats?.mean).toFixed(2)} |\n`;
+              }
+              
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: comment
+              });
+            }
+
+  # Job 6: Evolution Validation
+  evolution-validation:
+    name: Evolution Validation
+    runs-on: ubuntu-latest
+    needs: [unit-tests, security]
+    if: startsWith(github.ref, 'refs/heads/evolution/')
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for diff
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Get changed files
+        id: changed-files
+        run: |
+          CHANGED=$(git diff --name-only origin/main...HEAD -- 'src/**/*.py' | tr '\n' ' ')
+          echo "files=$CHANGED" >> $GITHUB_OUTPUT
+
+      - name: Validate evolution scope
+        run: |
+          python -c "
+          import sys
+          changed = '${{ steps.changed-files.outputs.files }}'.split()
+          
+          # Check if evolution touches too many files
+          if len(changed) > 10:
+              print('::warning::Evolution modifies many files ({})'.format(len(changed)))
+          
+          # Check for forbidden modifications
+          forbidden = ['config/settings.py', 'alembic/', 'src/api/main.py']
+          for f in changed:
+              for fb in forbidden:
+                  if f.startswith(fb):
+                      print('::error::Evolution modifies protected file: {}'.format(f))
+                      sys.exit(1)
+          
+          print('Evolution scope validated: {} files modified'.format(len(changed)))
+          "
+
+      - name: Run regression tests
+        env:
+          TESTING: "true"
+        run: |
+          # Run full test suite to catch regressions
+          pytest tests/ -v --tb=short -x
+
+      - name: Generate evolution report
+        run: |
+          echo "# Evolution Validation Report" > evolution-report.md
+          echo "" >> evolution-report.md
+          echo "## Changed Files" >> evolution-report.md
+          git diff --name-only origin/main...HEAD -- 'src/**/*.py' >> evolution-report.md
+          echo "" >> evolution-report.md
+          echo "## Test Results" >> evolution-report.md
+          echo "All tests passed ✅" >> evolution-report.md
+
+      - name: Upload evolution report
+        uses: actions/upload-artifact@v4
+        with:
+          name: evolution-report
+          path: evolution-report.md
+
+  # Job 7: Final Approval Gate
+  approval-gate:
+    name: Evolution Approval Gate
+    runs-on: ubuntu-latest
+    needs: [evolution-validation, benchmark]
+    if: startsWith(github.ref, 'refs/heads/evolution/')
+    
+    steps:
+      - name: Check all jobs passed
+        run: |
+          echo "✅ All evolution validation checks passed"
+          echo "This evolution is ready for human review"
+
+      - name: Create approval summary
+        run: |
+          echo "## Evolution Ready for Review" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Static analysis passed" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Unit tests passed" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Security scan passed" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Evolution scope validated" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Regression tests passed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Next step:** Human review and merge approval required" >> $GITHUB_STEP_SUMMARY

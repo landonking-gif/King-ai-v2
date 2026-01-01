@@ -7,6 +7,19 @@
   --glass-border: rgba(255, 255, 255, 0.1);
   --text-main: #f1f5f9;
   --text-dim: #94a3b8;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  
+  /* Responsive breakpoints */
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+}
+
+* {
+  box-sizing: border-box;
 }
 
 body {
@@ -40,6 +53,8 @@ body {
   flex-direction: column;
   gap: 32px;
   border-right: 1px solid var(--glass-border);
+  transition: transform 0.3s ease, width 0.3s ease;
+  z-index: 100;
 }
 
 .main-content {
@@ -71,4 +86,266 @@ body {
 
 .btn-primary:hover {
   background: var(--primary-hover);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MOBILE NAVIGATION
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.mobile-header {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: var(--bg-dark);
+  border-bottom: 1px solid var(--glass-border);
+  padding: 0 16px;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 101;
+}
+
+.mobile-menu-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-main);
+  font-size: 24px;
+  cursor: pointer;
+  padding: 8px;
+}
+
+.mobile-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 99;
+}
+
+.mobile-overlay.active {
+  display: block;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RESPONSIVE BREAKPOINTS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Tablet and below (< 1024px) */
+@media (max-width: 1023px) {
+  .sidebar {
+    width: 220px;
+    padding: 20px;
+  }
+  
+  .main-content {
+    padding: 24px;
+  }
+  
+  .stat-grid {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+  }
+}
+
+/* Mobile (< 768px) */
+@media (max-width: 767px) {
+  .mobile-header {
+    display: flex;
+  }
+  
+  .dashboard-container {
+    flex-direction: column;
+    padding-top: 60px;
+  }
+  
+  .sidebar {
+    position: fixed;
+    top: 60px;
+    left: 0;
+    bottom: 0;
+    width: 280px;
+    transform: translateX(-100%);
+    background: var(--bg-dark);
+    border-right: 1px solid var(--glass-border);
+  }
+  
+  .sidebar.open {
+    transform: translateX(0);
+  }
+  
+  .main-content {
+    padding: 16px;
+    width: 100%;
+  }
+  
+  .stat-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  
+  .card {
+    padding: 16px;
+    margin-bottom: 16px;
+    border-radius: 12px;
+  }
+  
+  .stat-value {
+    font-size: 1.75rem;
+  }
+  
+  /* Chat input improvements for mobile */
+  .chat-input-container {
+    position: sticky;
+    bottom: 0;
+    background: var(--bg-dark);
+    padding: 12px;
+    margin: -16px;
+    margin-top: 16px;
+    border-top: 1px solid var(--glass-border);
+  }
+  
+  input.glass {
+    width: 100%;
+    font-size: 16px; /* Prevents zoom on iOS */
+  }
+  
+  /* Business cards stack on mobile */
+  .business-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Small mobile (< 480px) */
+@media (max-width: 479px) {
+  .stat-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .main-content {
+    padding: 12px;
+  }
+  
+  .card {
+    padding: 12px;
+  }
+  
+  .stat-value {
+    font-size: 1.5rem;
+  }
+  
+  .btn-primary {
+    width: 100%;
+    padding: 12px;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TOUCH OPTIMIZATIONS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (hover: none) and (pointer: coarse) {
+  /* Larger touch targets */
+  .btn-nav {
+    padding: 14px 16px;
+    min-height: 48px;
+  }
+  
+  .btn-primary {
+    min-height: 48px;
+  }
+  
+  /* Remove hover effects that look weird on touch */
+  .btn-nav:hover {
+    background: transparent;
+  }
+  
+  .btn-nav.active:hover {
+    background: var(--primary);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ACCESSIBILITY IMPROVEMENTS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Focus visible for keyboard navigation */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Reduced motion for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  :root {
+    --glass-bg: rgba(255, 255, 255, 0.15);
+    --glass-border: rgba(255, 255, 255, 0.3);
+  }
+  
+  .card {
+    border-width: 2px;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DARK/LIGHT MODE SUPPORT (future)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (prefers-color-scheme: light) {
+  /* Light mode variables - uncomment to enable
+  :root {
+    --bg-dark: #f8fafc;
+    --glass-bg: rgba(0, 0, 0, 0.05);
+    --glass-border: rgba(0, 0, 0, 0.1);
+    --text-main: #1e293b;
+    --text-dim: #64748b;
+  }
+  */
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PRINT STYLES
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@media print {
+  .sidebar,
+  .mobile-header,
+  .chat-input-container {
+    display: none !important;
+  }
+  
+  .main-content {
+    padding: 0;
+  }
+  
+  .card {
+    break-inside: avoid;
+    border: 1px solid #ccc;
+  }
+  
+  body {
+    background: white;
+    color: black;
+  }
 }
