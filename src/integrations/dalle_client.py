@@ -3,12 +3,12 @@
 DALL-E Client - Image generation for content creation.
 """
 
-import os
 import httpx
 from typing import Optional, List
 from dataclasses import dataclass
 from enum import Enum
 
+from config.settings import settings
 from src.utils.logging import get_logger
 
 logger = get_logger("dalle")
@@ -53,9 +53,9 @@ class DALLEClient:
         Initialize DALL-E client.
         
         Args:
-            api_key: OpenAI API key (defaults to env var)
+            api_key: OpenAI API key (defaults to settings)
         """
-        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
+        self.api_key = api_key or settings.openai_api_key
         self.base_url = "https://api.openai.com/v1"
         self.model = "dall-e-3"
         

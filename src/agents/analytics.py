@@ -5,13 +5,11 @@ Integrates with Google Analytics 4 for web analytics data.
 """
 
 import uuid
-from dataclasses import asdict
 from datetime import datetime, timedelta, date, timezone
-from typing import Any, Optional
 from src.agents.base import SubAgent
 from src.utils.metrics import TASKS_EXECUTED
 from src.analytics.models import (
-    KPI, Alert, Report, TimeSeries, TimeGranularity, MetricCategory
+    KPI, Alert, Report, TimeGranularity
 )
 from src.analytics.collector import MetricsCollector, STANDARD_METRICS
 from src.integrations.google_analytics_client import GoogleAnalyticsClient, get_ga_client

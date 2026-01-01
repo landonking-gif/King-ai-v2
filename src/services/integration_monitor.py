@@ -179,9 +179,7 @@ class IntegrationHealthMonitor:
     
     async def _check_paypal(self):
         """Check PayPal API health."""
-        import os
-        client_id = os.getenv("PAYPAL_CLIENT_ID")
-        if not client_id:
+        if not settings.paypal_client_id:
             self._health["paypal"].status = IntegrationStatus.UNKNOWN
             return
         
@@ -202,8 +200,7 @@ class IntegrationHealthMonitor:
     
     async def _check_plaid(self):
         """Check Plaid API health."""
-        import os
-        if not os.getenv("PLAID_CLIENT_ID"):
+        if not settings.plaid_client_id:
             self._health["plaid"].status = IntegrationStatus.UNKNOWN
             return
         
@@ -220,9 +217,8 @@ class IntegrationHealthMonitor:
     
     async def _check_shopify(self):
         """Check Shopify API health."""
-        import os
-        shop_url = os.getenv("SHOPIFY_SHOP_URL")
-        access_token = os.getenv("SHOPIFY_ACCESS_TOKEN")
+        shop_url = settings.shopify_shop_url
+        access_token = settings.shopify_access_token
         
         if not shop_url or not access_token:
             self._health["shopify"].status = IntegrationStatus.UNKNOWN
@@ -230,7 +226,7 @@ class IntegrationHealthMonitor:
         
         try:
             start = datetime.utcnow()
-            api_version = os.getenv("SHOPIFY_API_VERSION", "2024-10")
+            api_version = settings.shopify_api_version or "2024-10"
             url = f"https://{shop_url}/admin/api/{api_version}/shop.json"
             
             async with httpx.AsyncClient(timeout=self._check_timeout) as client:

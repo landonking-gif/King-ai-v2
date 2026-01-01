@@ -430,26 +430,21 @@ async def get_payment_client():
     """
     from src.utils.circuit_breaker import stripe_circuit
     from config.settings import settings
-    import os
 
     # Check if Stripe is healthy
     if stripe_circuit.is_closed and settings.stripe_api_key:
         from src.integrations.stripe_client import StripeClient
         return StripeClient(
             api_key=settings.stripe_api_key,
-            webhook_secret=os.getenv("STRIPE_WEBHOOK_SECRET", "")
+            webhook_secret=settings.stripe_webhook_secret or ""
         ), "stripe"
 
     # Fall back to PayPal
-    paypal_client_id = os.getenv("PAYPAL_CLIENT_ID")
-    paypal_secret = os.getenv("PAYPAL_CLIENT_SECRET")
-    paypal_sandbox = os.getenv("PAYPAL_SANDBOX", "true").lower() == "true"
-
-    if paypal_client_id and paypal_secret:
+    if settings.paypal_client_id and settings.paypal_client_secret:
         return PayPalClient(
-            client_id=paypal_client_id,
-            client_secret=paypal_secret,
-            sandbox=paypal_sandbox
+            client_id=settings.paypal_client_id,
+            client_secret=settings.paypal_client_secret,
+            sandbox=settings.paypal_sandbox
         ), "paypal"
 
     # No payment provider available

@@ -4,7 +4,11 @@ from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
-from src.api.routes import chat, businesses, approvals, evolution, health, playbook, portfolio, system
+from src.api.routes import (
+    chat, businesses, approvals, evolution, health, playbook, portfolio, system,
+    analytics, banking, codegen, commerce, content, finance, legal, lifecycle,
+    monitoring, research, sandbox, supplier, webhooks, dev_dashboard
+)
 from src.api.routes import scheduler as scheduler_routes
 from src.api.middleware import RateLimitMiddleware, RateLimitConfig
 from src.master_ai.brain import MasterAI
@@ -46,13 +50,13 @@ async def lifespan(app: FastAPI):
     app.state.risk_manager = risk_manager
     
     # Register and start scheduled tasks
-    if getattr(settings, 'enable_scheduler', True):
+    if settings.enable_scheduler:
         # KPI Review - configurable interval (default 6 hours)
-        kpi_interval = getattr(settings, 'kpi_review_interval_hours', 6)
+        kpi_interval = settings.kpi_review_interval_hours
         frequency_map = {
             1: TaskFrequency.HOURLY,
             6: TaskFrequency.EVERY_6_HOURS,
-            12: TaskFrequency.EVERY_12_HOURS,
+            12: TaskFrequency.DAILY,  # 12 hours = daily
             24: TaskFrequency.DAILY,
         }
         kpi_frequency = frequency_map.get(kpi_interval, TaskFrequency.EVERY_6_HOURS)
@@ -70,7 +74,7 @@ async def lifespan(app: FastAPI):
             name="kpi_review",
             callback=kpi_review_task,
             frequency=kpi_frequency,
-            enabled=getattr(settings, 'enable_autonomous_mode', False),
+            enabled=settings.enable_autonomous_mode,
             run_immediately=False,
             metadata={"description": "Periodic KPI analysis and optimization"}
         )
@@ -89,7 +93,7 @@ async def lifespan(app: FastAPI):
             name="business_health_check",
             callback=health_check_task,
             frequency=TaskFrequency.HOURLY,
-            enabled=getattr(settings, 'enable_autonomous_mode', False),
+            enabled=settings.enable_autonomous_mode,
             run_immediately=False,
             metadata={"description": "Monitor business unit health"}
         )
@@ -98,7 +102,7 @@ async def lifespan(app: FastAPI):
         async def evolution_check_task():
             """Daily check for system evolution opportunities."""
             try:
-                if master_ai and getattr(settings, 'enable_self_modification', True):
+                if master_ai and settings.enable_self_modification:
                     await master_ai._consider_evolution("Daily evolution check")
                     logger.info("Completed daily evolution check")
             except Exception as e:
@@ -108,7 +112,7 @@ async def lifespan(app: FastAPI):
             name="evolution_check",
             callback=evolution_check_task,
             frequency=TaskFrequency.DAILY,
-            enabled=getattr(settings, 'enable_self_modification', True),
+            enabled=settings.enable_self_modification,
             run_immediately=False,
             metadata={"description": "Check for system evolution opportunities"}
         )
@@ -163,12 +167,12 @@ app.add_middleware(
 )
 
 # Rate Limiting
-if getattr(settings, 'enable_rate_limiting', True):
+if settings.enable_rate_limiting:
     app.add_middleware(
         RateLimitMiddleware,
         default_limit=RateLimitConfig(
-            requests=getattr(settings, 'rate_limit_requests', 100),
-            window_seconds=getattr(settings, 'rate_limit_window', 60)
+            requests=settings.rate_limit_requests,
+            window_seconds=settings.rate_limit_window
         ),
     )
 
@@ -182,6 +186,22 @@ app.include_router(playbook.router, prefix="/api", tags=["playbooks"])
 app.include_router(portfolio.router, prefix="/api", tags=["portfolios"])
 app.include_router(scheduler_routes.router, prefix="/api/scheduler", tags=["scheduler"])
 app.include_router(system.router, tags=["system"])
+
+# Additional feature routes
+app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"])
+app.include_router(banking.router, prefix="/api/banking", tags=["banking"])
+app.include_router(codegen.router, prefix="/api/codegen", tags=["codegen"])
+app.include_router(commerce.router, prefix="/api/commerce", tags=["commerce"])
+app.include_router(content.router, prefix="/api/content", tags=["content"])
+app.include_router(finance.router, prefix="/api/finance", tags=["finance"])
+app.include_router(legal.router, prefix="/api/legal", tags=["legal"])
+app.include_router(lifecycle.router, prefix="/api/lifecycle", tags=["lifecycle"])
+app.include_router(monitoring.router, prefix="/api/monitoring", tags=["monitoring"])
+app.include_router(research.router, prefix="/api/research", tags=["research"])
+app.include_router(sandbox.router, prefix="/api/sandbox", tags=["sandbox"])
+app.include_router(supplier.router, prefix="/api/supplier", tags=["supplier"])
+app.include_router(webhooks.router, prefix="/api/webhooks", tags=["webhooks"])
+app.include_router(dev_dashboard.router, prefix="/dev", tags=["dev-dashboard"])
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):

@@ -6,36 +6,57 @@ King AI v2 is a sophisticated autonomous AI system that acts as an "AI CEO" to p
 
 ## 🚀 Quick Start
 
-### 1. Clone & Configure
+### Prerequisites
+- Python 3.10+
+- PostgreSQL 14+
+- Redis 6+
+- Node.js 18+
+- Docker (optional)
+
+### Automated Setup (Recommended)
 ```bash
 git clone <your-repo-url>
 cd king-ai-v2
 
-# Copy the configuration template and add your credentials
-cp .env.example .env
-# Edit .env with your API keys (see SETUP.md for details)
+# Run the automated setup
+python scripts/control.py
+# Select [3] 🤖 Automated Empire Setup (AWS Infra + GitHub + Full Setup)
 ```
 
-### 2. Start Services
+This will automatically:
+- Install prerequisites
+- Configure AWS infrastructure (if needed)
+- Set up databases and services
+- Deploy the application
+
+### Manual Setup
 ```bash
-# Using Docker (recommended)
-docker-compose up -d
+git clone <your-repo-url>
+cd king-ai-v2
 
-# Or manually (see SETUP.md for full instructions)
+# Copy configuration
+cp .env.example .env
+# Edit .env with your API keys
+
+# Install dependencies
+pip install -r requirements.txt
+npm install
+
+# Start services
+docker-compose up -d
+python -m uvicorn src.api.main:app --reload
 ```
 
-### 3. Access Dashboard
+### Access Dashboard
 Open http://localhost:5173 in your browser.
 
 ## 📚 Documentation
 
 | Document | Description |
 |----------|-------------|
-| **[SETUP.md](SETUP.md)** | Complete setup guide - API keys, integrations, deployment |
+| **[USER_GUIDE.md](USER_GUIDE.md)** | Complete user guide - setup, operation, and usage |
+| **[DEVELOPER_DOCS.md](DEVELOPER_DOCS.md)** | Technical documentation - architecture, API, deployment |
 | **[.env.example](.env.example)** | Configuration template with all variables explained |
-| **[USER_GUIDE.md](USER_GUIDE.md)** | How to use the dashboard and chat with the AI CEO |
-| **[DEVELOPER_DOCS.md](DEVELOPER_DOCS.md)** | Architecture, codebase structure, contributing |
-| **[docs/APPROVAL_SYSTEM.md](docs/APPROVAL_SYSTEM.md)** | Human oversight and approval workflows |
 
 ## 🧠 Core Features
 

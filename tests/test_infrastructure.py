@@ -76,6 +76,11 @@ class TestLLMRouter:
             mock_settings.ollama_url = "http://localhost:11434"
             mock_settings.ollama_model = "llama3.1:8b"
             mock_settings.vllm_url = None
+            mock_settings.vllm_model = "meta-llama/Llama-3.1-70B-Instruct"
+            mock_settings.anthropic_api_key = None
+            mock_settings.claude_model = "claude-3-5-sonnet-20241022"
+            mock_settings.gemini_api_key = None
+            mock_settings.gemini_api_keys = ""
             return LLMRouter()
     
     @pytest.mark.asyncio

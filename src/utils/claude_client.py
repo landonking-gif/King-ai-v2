@@ -7,11 +7,12 @@ This module is safe to import even when Claude is not configured.
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from typing import Optional
 
 import httpx
+
+from config.settings import settings
 
 
 @dataclass(frozen=True)
@@ -33,7 +34,7 @@ class ClaudeClient:
         timeout_seconds: float = 120.0,
         base_url: str = "https://api.anthropic.com/v1",
     ):
-        self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
+        self.api_key = api_key or settings.anthropic_api_key
         self.model = model
         self.base_url = base_url
         self._client = httpx.AsyncClient(

@@ -5,7 +5,6 @@ Provides image understanding and similarity search using OpenAI's CLIP model.
 Enables multi-modal processing for product matching, visual search, and content analysis.
 """
 
-import os
 import base64
 from dataclasses import dataclass
 from datetime import datetime
@@ -14,6 +13,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import httpx
 import numpy as np
 
+from config.settings import settings
 from src.utils.structured_logging import get_logger
 from src.utils.circuit_breaker import CircuitBreaker
 
@@ -95,7 +95,7 @@ class CLIPClient:
     SUPPORTED_FORMATS = [".jpg", ".jpeg", ".png", ".gif", ".webp"]
     
     def __init__(self, api_key: str = None):
-        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
+        self.api_key = api_key or settings.openai_api_key
         self._configured = bool(self.api_key)
         self._embedding_cache: Dict[str, List[float]] = {}
         

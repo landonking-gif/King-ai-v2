@@ -11,7 +11,6 @@ Features:
 - Evaluation dataset management
 """
 
-import os
 import uuid
 from typing import Optional, Dict, Any, Callable
 from datetime import datetime
@@ -19,6 +18,7 @@ from contextlib import asynccontextmanager
 from functools import wraps
 from dataclasses import dataclass, field
 
+from config.settings import settings
 from src.utils.logging import get_logger
 
 logger = get_logger("langsmith")
@@ -71,11 +71,11 @@ class LangSmithTracer:
         
         Args:
             project_name: LangSmith project name
-            api_key: LangSmith API key (or from LANGCHAIN_API_KEY env)
+            api_key: LangSmith API key (or from settings)
         """
-        self.project_name = project_name
-        self.api_key = api_key or os.getenv("LANGCHAIN_API_KEY")
-        self.enabled = LANGSMITH_AVAILABLE and bool(self.api_key)
+        self.project_name = project_name or settings.langchain_project
+        self.api_key = api_key or settings.langchain_api_key
+        self.enabled = LANGSMITH_AVAILABLE and bool(self.api_key) and settings.langchain_tracing_v2
         self._client: Optional[Any] = None
         
         # Local trace storage for when LangSmith is disabled

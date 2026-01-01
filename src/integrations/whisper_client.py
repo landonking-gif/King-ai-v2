@@ -5,15 +5,14 @@ Provides audio transcription and analysis capabilities using OpenAI's Whisper AP
 Enables multi-modal processing for podcasts, voice notes, customer calls, etc.
 """
 
-import os
-import tempfile
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, BinaryIO
+from typing import Any, Dict, List, Optional
 import httpx
 
+from config.settings import settings
 from src.utils.structured_logging import get_logger
 from src.utils.circuit_breaker import CircuitBreaker
 
@@ -116,7 +115,7 @@ class WhisperClient:
     SUPPORTED_FORMATS = [".mp3", ".mp4", ".mpeg", ".mpga", ".m4a", ".wav", ".webm"]
     
     def __init__(self, api_key: str = None):
-        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
+        self.api_key = api_key or settings.openai_api_key
         self._configured = bool(self.api_key)
         
         if not self._configured:

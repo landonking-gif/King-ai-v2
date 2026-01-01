@@ -10,6 +10,7 @@ from src.approvals.models import (
 )
 from src.utils.logging import get_logger
 from src.utils.security_scanner import scan_for_approval
+from config.settings import settings
 
 logger = get_logger(__name__)
 
@@ -21,16 +22,16 @@ DEFAULT_POLICIES = [
         name="High-Value Financial",
         action_types=[ApprovalType.FINANCIAL],
         min_risk_level=RiskLevel.MEDIUM,
-        auto_approve_below=100.0,
-        expiry_hours=24,
+        auto_approve_below=settings.max_auto_approve_amount,
+        expiry_hours=settings.approval_expiry_hours,
     ),
     ApprovalPolicy(
         id="legal_all",
         name="Legal Actions",
         action_types=[ApprovalType.LEGAL],
         min_risk_level=RiskLevel.LOW,
-        require_two_approvers=True,
-        expiry_hours=48,
+        require_two_approvers=settings.require_approval_legal,
+        expiry_hours=settings.approval_expiry_hours,
     ),
     ApprovalPolicy(
         id="external_comms",

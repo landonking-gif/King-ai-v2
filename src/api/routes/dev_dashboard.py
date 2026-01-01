@@ -6,7 +6,6 @@ Endpoints for monitoring and debugging during development.
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
-from enum import Enum
 import sys
 import os
 import platform
@@ -411,3 +410,7 @@ def create_dashboard_router():
     except ImportError:
         logger.warning("FastAPI not available, dashboard routes not created")
         return None
+
+
+# Create module-level router for FastAPI include_router
+router = create_dashboard_router()

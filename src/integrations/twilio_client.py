@@ -5,13 +5,13 @@ Provides SMS and voice notifications for critical approvals and alerts.
 Complements email notifications for urgent, on-the-go oversight.
 """
 
-import os
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
 import httpx
 
+from config.settings import settings
 from src.utils.structured_logging import get_logger
 from src.utils.circuit_breaker import CircuitBreaker
 
@@ -77,9 +77,9 @@ class TwilioClient:
         auth_token: str = None,
         from_number: str = None
     ):
-        self.account_sid = account_sid or os.getenv("TWILIO_ACCOUNT_SID")
-        self.auth_token = auth_token or os.getenv("TWILIO_AUTH_TOKEN")
-        self.from_number = from_number or os.getenv("TWILIO_FROM_NUMBER")
+        self.account_sid = account_sid or settings.twilio_account_sid
+        self.auth_token = auth_token or settings.twilio_auth_token
+        self.from_number = from_number or settings.twilio_from_number
         
         self._configured = all([
             self.account_sid,

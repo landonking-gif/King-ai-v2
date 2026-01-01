@@ -31,7 +31,7 @@ class TestApprovalManager:
             action_type=ApprovalType.FINANCIAL,
             title="Small Purchase",
             description="Minor expense",
-            payload={"amount": 50},  # Below auto-approve threshold
+            payload={"amount": 3},  # Below auto-approve threshold (default is $5 in .env)
             risk_level=RiskLevel.LOW,
         )
         

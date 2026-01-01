@@ -70,20 +70,15 @@ class LLMRouter:
         
         # Tertiary: Gemini for cloud fallback
         self.gemini: Optional[GeminiClient] = None
-        import os
-        if os.getenv("GEMINI_API_KEY"):
-            self.gemini = GeminiClient(api_key=os.getenv("GEMINI_API_KEY"))
+        if settings.gemini_api_key:
+            self.gemini = GeminiClient(api_key=settings.gemini_api_key)
 
         # High-stakes fallback: Claude
         self.claude: Optional[ClaudeClient] = None
-        if os.getenv("ANTHROPIC_API_KEY"):
+        if settings.anthropic_api_key:
             self.claude = ClaudeClient(
-                api_key=os.getenv("ANTHROPIC_API_KEY"),
-                model=(
-                    settings.claude_model
-                    if hasattr(settings, "claude_model") and settings.claude_model
-                    else "claude-3-5-sonnet-20241022"
-                ),
+                api_key=settings.anthropic_api_key,
+                model=settings.claude_model or "claude-3-5-sonnet-20241022",
             )
         
         # Health tracking
