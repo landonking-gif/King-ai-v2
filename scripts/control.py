@@ -1,3 +1,37 @@
+# --- Remote Terraform Installer ---
+def ensure_terraform_on_server(ip, key_path):
+    """Ensure Terraform is installed on the remote server."""
+    log("Checking for Terraform on server...", "ACTION")
+    ssh_opts = f"-o StrictHostKeyChecking=no -i \"{key_path}\""
+    check_cmd = f'ssh {ssh_opts} ubuntu@{ip} "command -v terraform"'
+    result = run(check_cmd, capture=True)
+    if result:
+        log("Terraform already installed on server.", "SUCCESS")
+        return
+    log("Terraform not found on server. Installing...", "WARN")
+    install_script = '''
+#!/bin/bash
+set -e
+sudo apt-get update
+sudo apt-get install -y wget unzip
+wget https://releases.hashicorp.com/terraform/1.8.5/terraform_1.8.5_linux_amd64.zip
+unzip terraform_1.8.5_linux_amd64.zip
+sudo mv terraform /usr/local/bin/
+rm terraform_1.8.5_linux_amd64.zip
+terraform --version
+'''
+    script_path = ROOT_DIR / "install_terraform.sh"
+    with open(script_path, "w", newline='\n', encoding='utf-8') as f:
+        f.write(install_script)
+    try:
+        run(f'scp {ssh_opts} "{script_path}" ubuntu@{ip}:~/install_terraform.sh')
+        run(f'ssh {ssh_opts} ubuntu@{ip} "chmod +x install_terraform.sh && ./install_terraform.sh"')
+        log("Terraform installed on server!", "SUCCESS")
+    except Exception as e:
+        log(f"Failed to install Terraform: {e}", "ERROR")
+    finally:
+        if script_path.exists():
+            os.remove(script_path)
 
 # --- Pythonic system setup ---
 import subprocess
@@ -2482,6 +2516,7 @@ def main():
                 log("Could not retrieve current EC2 IP. Using configured IP.", "WARN")
         # Continue with regular automated setup
         upload_env_file(target_ip, key_file)
+        ensure_terraform_on_server(target_ip, key_file)
         sync_to_github()
         check_server_dependencies(target_ip, key_file)
         pull_from_github(target_ip, key_file)
