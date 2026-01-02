@@ -20,6 +20,7 @@ ROOT_DIR = Path(__file__).parent.parent.absolute()
 CONFIG_FILE = ROOT_DIR / "scripts" / "control_config.json"
 PEM_GLOB = "*.pem"
 DEFAULT_IP = "ec2-13-222-9-32.compute-1.amazonaws.com"
+TERRAFORM_PATH = r"C:\Users\dmilner.AGV-040318-PC\AppData\Local\Microsoft\WinGet\Packages\Hashicorp.Terraform_Microsoft.Winget.Source_8wekyb3d8bbwe\terraform.exe"
 
 # --- Visuals ---
 def clear_screen():
@@ -64,6 +65,8 @@ def find_key_file():
 
 def run(cmd, cwd=None, capture=False):
     """Run a shell command."""
+    if cmd.startswith("terraform "):
+        cmd = TERRAFORM_PATH + cmd[9:]
     try:
         result = subprocess.run(
             cmd,
