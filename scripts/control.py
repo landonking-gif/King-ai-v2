@@ -241,7 +241,12 @@ set -e
 echo "🚀 Starting King AI v2 Automated Setup..."
 
 # Navigate to project directory
-cd king-ai-v2
+if [ ! -d "king-ai-v2" ]; then
+    git clone https://github.com/landonking-gif/King-ai-v2.git king-ai-v2
+    cd king-ai-v2
+else
+    cd king-ai-v2
+fi
 
 # 1. Create Python virtual environment
 echo "🐍 Setting up Python virtual environment..."
@@ -1163,6 +1168,18 @@ echo "🌐 Setting up Nginx reverse proxy..."
 sudo apt install -y nginx certbot python3-certbot-nginx
 
 # Get server domain/IP for SSL
+
+# --- System Cleanup: Fix apt sources and Docker dependencies ---
+echo "\n🧹 Cleaning up apt sources and Docker dependencies..."
+sudo rm -f /etc/apt/sources.list.d/archive_uri-https_developer_download_nvidia_com_compute_cuda_repos_ubuntu2204_x86_64_-jammy.list
+sudo rm -f /etc/apt/sources.list.d/cuda-ubuntu2204-x86_64.list
+sudo apt-mark unhold docker-ce docker-ce-cli containerd.io
+sudo apt-get remove -y containerd containerd.io docker-ce docker-ce-cli docker-compose-plugin
+sudo apt-get update
+sudo apt-get install -y docker.io
+sudo apt-get autoremove -y
+echo "Apt sources cleaned and Docker reinstalled."
+
 read -p "Enter your domain name (or press Enter to skip SSL): " domain
 
 # === Dependency Checks and Auto-Install (AWS/Ubuntu) ===
