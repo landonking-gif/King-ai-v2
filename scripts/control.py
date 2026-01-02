@@ -2000,22 +2000,14 @@ def configure_aws_credentials():
         result = run("aws sts get-caller-identity", capture=True)
         log("✅ AWS credentials already configured!", "SUCCESS")
         
-        # Get the credentials and set environment variables for Terraform
+        # Export credentials to environment variables for Terraform
         try:
-            access_key = run("aws configure get aws_access_key_id", capture=True).strip()
-            secret_key = run("aws configure get aws_secret_access_key", capture=True).strip()
-            session_token = run("aws configure get aws_session_token", capture=True).strip()
-            
-            if access_key:
-                os.environ['AWS_ACCESS_KEY_ID'] = access_key
-            if secret_key:
-                os.environ['AWS_SECRET_ACCESS_KEY'] = secret_key
-            if session_token:
-                os.environ['AWS_SESSION_TOKEN'] = session_token
-            
-            region = run("aws configure get region", capture=True).strip() or "us-east-1"
-            os.environ['AWS_DEFAULT_REGION'] = region
-            
+            export_output = run("aws configure export-credentials --format env", capture=True)
+            for line in export_output.split('\n'):
+                if line.startswith('export '):
+                    key_value = line[7:].split('=', 1)
+                    if len(key_value) == 2:
+                        os.environ[key_value[0]] = key_value[1].strip('"')
         except:
             pass
         
@@ -2097,13 +2089,19 @@ def configure_terraform_vars():
     if tfvars_path.exists():
         log("Overwriting existing terraform.tfvars", "INFO")
     
-    # Get user preferences
+    # Get user preferences (use defaults for automation)
     print("\nTerraform Configuration:")
-    region = input("AWS Region (us-east-1): ").strip() or "us-east-1"
-    environment = input("Environment (prod): ").strip() or "prod"
-    gpu_count = input("GPU instances (0): ").strip() or "0"
-    db_class = input("Database instance class (db.r6g.xlarge): ").strip() or "db.r6g.xlarge"
-    redis_type = input("Redis node type (cache.r6g.large): ").strip() or "cache.r6g.large"
+    region = "us-east-1"
+    environment = "prod"
+    gpu_count = "0"
+    db_class = "db.r6g.xlarge"
+    redis_type = "cache.r6g.large"
+    
+    print(f"AWS Region ({region}): {region}")
+    print(f"Environment ({environment}): {environment}")
+    print(f"GPU instances ({gpu_count}): {gpu_count}")
+    print(f"Database instance class ({db_class}): {db_class}")
+    print(f"Redis node type ({redis_type}): {redis_type}")
     
     # Create terraform.tfvars
     tfvars_content = f'''# Terraform variables for King AI v2
@@ -2152,8 +2150,9 @@ def deploy_infrastructure():
         log("Planning infrastructure deployment...", "INFO")
         run("terraform plan", cwd=infra_dir)
         
-        # Confirm deployment
-        if input("Review the plan above. Proceed with deployment? (Y/n): ").strip().lower() == 'n':
+        # Confirm deployment (default to yes for automation)
+        proceed = input("Review the plan above. Proceed with deployment? (Y/n): ").strip().lower()
+        if proceed == 'n' or proceed == 'no':
             log("Deployment cancelled by user.", "WARN")
             return False
         
