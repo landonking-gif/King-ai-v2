@@ -325,13 +325,7 @@ def automated_setup(ip, key_path):
 set -e
 echo "🚀 Starting King AI v2 Automated Setup..."
 
-# Navigate to project directory
-if [ ! -d "king-ai-v2" ]; then
-    git clone https://github.com/landonking-gif/King-ai-v2.git king-ai-v2
-    cd king-ai-v2
-else
-    cd king-ai-v2
-fi
+# We are already in the king-ai-v2 directory
 
 # 1. Create Python virtual environment
 echo "🐍 Setting up Python virtual environment..."
