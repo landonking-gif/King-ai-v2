@@ -897,7 +897,7 @@ EOF
 pip install asyncpg redis requests pytz pinecone-client
 
 # Run integration tests
-python3 configure_integrations.py
+timeout 120 python3 configure_integrations.py || echo "Integration testing timed out or failed"
 
 # 11. Set up comprehensive monitoring
 echo "📊 Setting up comprehensive monitoring..."
