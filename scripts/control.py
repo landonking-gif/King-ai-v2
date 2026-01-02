@@ -98,7 +98,7 @@ def sync_to_github():
         run(f'git commit -m "{commit_msg}"')
 
         # Push to remote
-        run("git push origin master:main")
+        run("git push king-ai-v2 master:main")
 
         log("Code synced to GitHub successfully!", "SUCCESS")
 
@@ -174,12 +174,12 @@ cd king-ai-v2
 if [ ! -d ".git" ]; then
     echo "Initializing git repository..."
     git init
-    git remote add origin https://github.com/your-org/king-ai-v2.git
+    git remote add king-ai-v2 https://github.com/landonking-gif/King-ai-v2.git
 fi
 
 # Pull latest changes
 echo "Pulling latest changes..."
-git pull origin main || git pull origin master
+git pull king-ai-v2 main || git pull king-ai-v2 master
 
 echo "Git pull complete!"
 '''
