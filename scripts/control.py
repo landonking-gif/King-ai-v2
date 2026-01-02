@@ -1,3 +1,45 @@
+
+# --- Pythonic system setup ---
+import subprocess
+import os
+
+def run_shell(cmd):
+    print(f"Running: {cmd}")
+    subprocess.run(cmd, shell=True, check=False)
+
+# Upgrade Node.js to v20+ if needed
+try:
+    node_version = subprocess.check_output("node -v", shell=True).decode().strip().lstrip('v')
+    major = int(node_version.split('.')[0])
+except Exception:
+    major = 0
+if major < 20:
+    run_shell("curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -")
+    run_shell("sudo apt-get install -y nodejs")
+else:
+    print(f"Node.js version is {major} (sufficient)")
+
+# Install Terraform if missing
+if subprocess.run("terraform --version", shell=True, stdout=subprocess.DEVNULL).returncode != 0:
+    run_shell("sudo apt-get update")
+    run_shell("sudo apt-get install -y wget unzip")
+    run_shell("wget https://releases.hashicorp.com/terraform/1.8.5/terraform_1.8.5_linux_amd64.zip")
+    run_shell("unzip terraform_1.8.5_linux_amd64.zip")
+    run_shell("sudo mv terraform /usr/local/bin/")
+    run_shell("rm terraform_1.8.5_linux_amd64.zip")
+else:
+    print("Terraform already installed.")
+
+# Ensure .env file exists before sed commands
+if not os.path.exists(".env"):
+    if os.path.exists(".env.example"):
+        run_shell("cp .env.example .env")
+        print(".env file created from .env.example.")
+    else:
+        open(".env", "w").close()
+        print(".env file created (empty).")
+else:
+    print(".env file already exists.")
 #!/usr/bin/env python3
 """
 👑 King AI v2 - Imperial Control Center
