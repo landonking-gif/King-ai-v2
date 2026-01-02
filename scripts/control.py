@@ -1999,6 +1999,26 @@ def configure_aws_credentials():
     try:
         result = run("aws sts get-caller-identity", capture=True)
         log("✅ AWS credentials already configured!", "SUCCESS")
+        
+        # Get the credentials and set environment variables for Terraform
+        try:
+            access_key = run("aws configure get aws_access_key_id", capture=True).strip()
+            secret_key = run("aws configure get aws_secret_access_key", capture=True).strip()
+            session_token = run("aws configure get aws_session_token", capture=True).strip()
+            
+            if access_key:
+                os.environ['AWS_ACCESS_KEY_ID'] = access_key
+            if secret_key:
+                os.environ['AWS_SECRET_ACCESS_KEY'] = secret_key
+            if session_token:
+                os.environ['AWS_SESSION_TOKEN'] = session_token
+            
+            region = run("aws configure get region", capture=True).strip() or "us-east-1"
+            os.environ['AWS_DEFAULT_REGION'] = region
+            
+        except:
+            pass
+        
         return True
     except:
         pass
