@@ -492,6 +492,25 @@ fi
 
 echo "✅ Optional services configuration complete"
 
+# 5.5. Setup database user and database
+echo "🗃️  Setting up database user and database..."
+# Check if PostgreSQL is running as system service
+if systemctl is-active --quiet postgresql; then
+    echo "📡 Using system PostgreSQL service..."
+    # Create user and database if they don't exist
+    sudo -u postgres psql -c "DO \$\$ BEGIN CREATE USER king WITH PASSWORD 'LeiaPup21'; EXCEPTION WHEN duplicate_object THEN RAISE NOTICE 'User king already exists'; END \$\$;" 2>/dev/null || echo "User setup attempted"
+    sudo -u postgres psql -c "SELECT 1 FROM pg_database WHERE datname = 'kingai'" | grep -q 1 || sudo -u postgres psql -c "CREATE DATABASE kingai OWNER king;" 2>/dev/null || echo "Database creation attempted"
+    sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE kingai TO king;" 2>/dev/null || echo "Privileges granted"
+    
+    # Update .env with correct database password
+    if [ -f ".env" ]; then
+        sed -i 's|king:password|king:LeiaPup21|g' .env
+        echo "✅ Database configuration updated in .env"
+    fi
+else
+    echo "🐳 Using Docker PostgreSQL..."
+fi
+
 # 6. Start databases (Docker)
 echo "🗄️  Starting databases..."
 docker run -d --name kingai-postgres -e POSTGRES_USER=king -e POSTGRES_PASSWORD=LeiaPup21 -e POSTGRES_DB=kingai -p 5432:5432 postgres:15 || echo "PostgreSQL already running"
@@ -1770,7 +1789,22 @@ echo "🎯 Ready to build your AI empire!"
         # Then run the setup script
         run(f'scp {ssh_opts} "{setup_script_path}" ubuntu@{ip}:~/automated_setup.sh')
         run(f'ssh {ssh_opts} ubuntu@{ip} "chmod +x automated_setup.sh && cp automated_setup.sh king-ai-v2/ && cd king-ai-v2 && ./automated_setup.sh"')
+        
+        # Start the services
+        log("Starting King AI v2 services...", "ACTION")
+        
+        # Start the API server in background
+        log("Starting FastAPI backend server...", "INFO")
+        run(f'ssh {ssh_opts} ubuntu@{ip} "cd king-ai-v2 && source venv/bin/activate && nohup python -m uvicorn src.api.main:app --host 0.0.0.0 --port 8000 > api.log 2>&1 &"')
+        
+        # Start the dashboard in background  
+        log("Starting React dashboard...", "INFO")
+        run(f'ssh {ssh_opts} ubuntu@{ip} "cd king-ai-v2/dashboard && nohup npm run dev -- --host 0.0.0.0 --port 5173 > dashboard.log 2>&1 &"')
+        
         log("Automated setup completed successfully!", "SUCCESS")
+        log(f"Empire is live at: http://{ip}:5173", "SUCCESS")
+        log(f"API available at: http://{ip}:8000", "SUCCESS")
+        log(f"API docs at: http://{ip}:8000/docs", "SUCCESS")
     except Exception as e:
         log(f"Automated setup failed: {e}", "ERROR")
     finally:
@@ -2375,8 +2409,32 @@ def main():
         check_server_dependencies(target_ip, key_file)
         pull_from_github(target_ip, key_file)
         automated_setup(target_ip, key_file)
-        log("Empire setup complete! Check the server for running services.", "SUCCESS")
+        
+        # Start local dashboard
+        log("Starting local dashboard development server...", "INFO")
+        try:
+            import subprocess
+            import os
+            dashboard_dir = ROOT_DIR / "dashboard"
+            if dashboard_dir.exists():
+                log("Dashboard will start in background. Access at http://localhost:5173", "INFO")
+                # Start dashboard in background
+                subprocess.Popen(
+                    ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"],
+                    cwd=str(dashboard_dir),
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+                )
+        except Exception as e:
+            log(f"Could not start local dashboard: {e}", "WARN")
+        
+        log("Empire setup complete! Services are starting up.", "SUCCESS")
         print("All steps completed.")
+        print(f"🌐 Dashboard: http://localhost:5173 (local)")
+        print(f"🌐 Dashboard: http://{target_ip}:5173 (remote)")
+        print(f"🔌 API: http://{target_ip}:8000")
+        print(f"📚 API Docs: http://{target_ip}:8000/docs")
     elif choice == '4':
         header()
         log("Streaming backend logs (Ctrl+C to stop)...", "INFO")
