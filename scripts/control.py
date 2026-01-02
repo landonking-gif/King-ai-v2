@@ -394,40 +394,29 @@ if command -v terraform &> /dev/null && [ -d "infrastructure/terraform" ]; then
                 fi
                 echo "✅ .env updated with AWS endpoints!"
             else
-                echo "⚠️  .env file not found, creating from example..."
-                cp .env.example .env
-                sed -i "s|DATABASE_URL=.*|DATABASE_URL=postgresql+asyncpg://kingadmin:${DB_PASSWORD}@${RDS_ENDPOINT}/kingai|" .env
-                sed -i "s|REDIS_URL=.*|REDIS_URL=redis://${REDIS_ENDPOINT}:6379|" .env
-                if [ ! -z "$ALB_DNS" ]; then
-                    sed -i "s|VLLM_URL=.*|VLLM_URL=http://${ALB_DNS}:8080|" .env
-                fi
+                echo "⚠️  .env file not found. Please ensure .env is uploaded to the server."
+                exit 1
             fi
         else
             echo "⚠️  AWS infrastructure found but could not retrieve endpoints. Using existing configuration."
             if [ ! -f ".env" ]; then
-                cp .env.example .env
-                # Update database URL for local PostgreSQL
-                sed -i "s|DATABASE_URL=.*|DATABASE_URL=postgresql+asyncpg://king:LeiaPup21@localhost:5432/kingai|" .env
-                sed -i "s|OLLAMA_URL=.*|OLLAMA_URL=http://localhost:11434|" .env
+                echo "⚠️  .env file not found. Please ensure .env is uploaded to the server."
+                exit 1
             fi
         fi
     else
         echo "⚠️  Terraform state not found or not initialized. Using existing configuration."
         if [ ! -f ".env" ]; then
-            cp .env.example .env
-            # Update database URL for local PostgreSQL
-            sed -i "s|DATABASE_URL=.*|DATABASE_URL=postgresql+asyncpg://king:LeiaPup21@localhost:5432/kingai|" .env
-            sed -i "s|OLLAMA_URL=.*|OLLAMA_URL=http://localhost:11434|" .env
+            echo "⚠️  .env file not found. Please ensure .env is uploaded to the server."
+            exit 1
         fi
     fi
 else
-    echo "⚠️  Terraform not found or infrastructure directory missing. Using existing configuration."
-    if [ ! -f ".env" ]; then
-        cp .env.example .env
-        # Update database URL for local PostgreSQL
-        sed -i "s|DATABASE_URL=.*|DATABASE_URL=postgresql+asyncpg://king:LeiaPup21@localhost:5432/kingai|" .env
-        sed -i "s|OLLAMA_URL=.*|OLLAMA_URL=http://localhost:11434|" .env
-    fi
+        echo "⚠️  Terraform not found or infrastructure directory missing. Using existing configuration."
+        if [ ! -f ".env" ]; then
+            echo "⚠️  .env file not found. Please ensure .env is uploaded to the server."
+            exit 1
+        fi
 fi
 
 # 4.5. Configure optional services automatically from .env
