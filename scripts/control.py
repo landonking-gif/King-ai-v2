@@ -2271,9 +2271,10 @@ def main():
     saved_ip = config.get("aws_ip", DEFAULT_IP)
 
     print(f"\033[93mTarget Server:\033[0m {saved_ip}")
-    new_ip = input(f"Press Enter to use current, or type new IP: ").strip()
-    if new_ip.lower() in ["", "enter"]:
-        new_ip = ""
+    # new_ip = input(f"Press Enter to use current, or type new IP: ").strip()
+    # if new_ip.lower() in ["", "enter"]:
+    #     new_ip = ""
+    new_ip = ""
 
     target_ip = new_ip if new_ip else saved_ip
     save_config(target_ip)
