@@ -67,6 +67,23 @@ def run(cmd, cwd=None, capture=False):
     """Run a shell command."""
     if cmd.startswith("terraform "):
         cmd = TERRAFORM_PATH + cmd[9:]
+    
+    env = os.environ.copy()
+    # Ensure AWS credentials are available for Terraform
+    if 'AWS_ACCESS_KEY_ID' not in env and 'AWS_PROFILE' not in env:
+        # Try to get from AWS CLI config
+        try:
+            import configparser
+            config = configparser.ConfigParser()
+            config.read(os.path.expanduser('~/.aws/credentials'))
+            if 'default' in config:
+                env['AWS_ACCESS_KEY_ID'] = config['default']['aws_access_key_id']
+                env['AWS_SECRET_ACCESS_KEY'] = config['default']['aws_secret_access_key']
+                if 'aws_session_token' in config['default']:
+                    env['AWS_SESSION_TOKEN'] = config['default']['aws_session_token']
+        except:
+            pass
+    
     try:
         result = subprocess.run(
             cmd,
@@ -75,7 +92,8 @@ def run(cmd, cwd=None, capture=False):
             cwd=cwd or ROOT_DIR,
             stdout=subprocess.PIPE if capture else None,
             stderr=subprocess.PIPE if capture else None,
-            text=True
+            text=True,
+            env=env
         )
         return result.stdout.strip() if capture else True
     except subprocess.CalledProcessError as e:

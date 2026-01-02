@@ -108,5 +108,3 @@ resource "aws_security_group" "ollama" {
     Name = "king-ai-ollama-sg"
   }
 }
-  alarm_actions       = [aws_autoscaling_policy.ollama_scale_up.arn]
-}
