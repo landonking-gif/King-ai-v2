@@ -98,7 +98,7 @@ def sync_to_github():
         run(f'git commit -m "{commit_msg}"')
 
         # Push to remote
-        run("git push origin main")
+        run("git push origin master:main")
 
         log("Code synced to GitHub successfully!", "SUCCESS")
 
