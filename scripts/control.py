@@ -1165,6 +1165,79 @@ sudo apt install -y nginx certbot python3-certbot-nginx
 # Get server domain/IP for SSL
 read -p "Enter your domain name (or press Enter to skip SSL): " domain
 
+# === Dependency Checks and Auto-Install (AWS/Ubuntu) ===
+echo "\n🔍 Checking for required dependencies..."
+
+# Function to check and install a package if missing
+install_if_missing() {
+    PKG_NAME=$1
+    CMD_CHECK=$2
+    INSTALL_CMD=$3
+    if ! command -v $CMD_CHECK &> /dev/null; then
+        echo "Installing $PKG_NAME..."
+        eval $INSTALL_CMD
+    else
+        echo "$PKG_NAME already installed."
+    fi
+}
+
+# Update package list
+sudo apt update
+
+# Python 3
+install_if_missing "Python 3" "python3" "sudo apt install -y python3"
+# pip3
+install_if_missing "pip3" "pip3" "sudo apt install -y python3-pip"
+# venv
+install_if_missing "python3-venv" "python3 -m venv --help" "sudo apt install -y python3-venv"
+# Docker
+install_if_missing "Docker" "docker" "sudo apt install -y docker.io"
+# Docker Compose
+install_if_missing "docker-compose" "docker-compose" "sudo apt install -y docker-compose"
+# Nginx
+install_if_missing "Nginx" "nginx" "sudo apt install -y nginx"
+# Certbot
+install_if_missing "Certbot" "certbot" "sudo apt install -y certbot python3-certbot-nginx"
+# Node.js
+install_if_missing "Node.js" "node" "sudo apt install -y nodejs"
+# npm
+install_if_missing "npm" "npm" "sudo apt install -y npm"
+# jq
+install_if_missing "jq" "jq" "sudo apt install -y jq"
+# curl
+install_if_missing "curl" "curl" "sudo apt install -y curl"
+# git
+install_if_missing "git" "git" "sudo apt install -y git"
+# fail2ban
+install_if_missing "fail2ban" "fail2ban-client" "sudo apt install -y fail2ban"
+# haproxy
+install_if_missing "HAProxy" "haproxy" "sudo apt install -y haproxy"
+# grafana
+if ! command -v grafana-server &> /dev/null; then
+    echo "Installing Grafana..."
+    sudo apt install -y apt-transport-https software-properties-common wget
+    sudo wget -q -O /usr/share/keyrings/grafana.key https://apt.grafana.com/gpg.key
+    echo "deb [signed-by=/usr/share/keyrings/grafana.key] https://apt.grafana.com stable main" | sudo tee /etc/apt/sources.list.d/grafana.list
+    sudo apt update
+    sudo apt install -y grafana
+else
+    echo "Grafana already installed."
+fi
+
+# AlertManager (manual download/install)
+if ! command -v alertmanager &> /dev/null; then
+    echo "Installing AlertManager..."
+    wget https://github.com/prometheus/alertmanager/releases/download/v0.27.0/alertmanager-0.27.0.linux-amd64.tar.gz
+    tar xvf alertmanager-0.27.0.linux-amd64.tar.gz
+    sudo mv alertmanager-0.27.0.linux-amd64/alertmanager /usr/local/bin/
+    sudo mkdir -p /etc/alertmanager
+    rm -rf alertmanager-0.27.0.linux-amd64*
+else
+    echo "AlertManager already installed."
+fi
+
+echo "✅ Dependency check and installation complete."
+
 if [ ! -z "$domain" ]; then
     # Configure Nginx with SSL
     cat > /etc/nginx/sites-available/king-ai << EOF
