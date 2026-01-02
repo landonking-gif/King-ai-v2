@@ -17,12 +17,12 @@ terraform {
   }
 
   # Configure backend for state storage
-  backend "s3" {
-    bucket = "king-ai-terraform-state"
-    key    = "infrastructure/terraform.tfstate"
-    region = "us-east-1"
-    encrypt = true
-  }
+  # backend "s3" {
+  #   bucket = "king-ai-terraform-state"
+  #   key    = "infrastructure/terraform.tfstate"
+  #   region = "us-east-1"
+  #   encrypt = true
+  # }
 }
 
 provider "aws" {
