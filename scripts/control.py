@@ -2294,16 +2294,18 @@ def main():
             full_aws_deployment()
             # After AWS deployment, get the new target IP
             try:
-                target_ip = run("terraform output -raw ec2_public_ip", cwd=ROOT_DIR / "infrastructure" / "terraform", capture=True).strip()
-                save_config(target_ip)
-                log(f"Updated target IP to: {target_ip}", "INFO")
+                new_ip = run("terraform output -raw ec2_public_ip", cwd=ROOT_DIR / "infrastructure" / "terraform", capture=True).strip()
+                if new_ip and not new_ip.startswith("Warning"):
+                    target_ip = new_ip
+                    save_config(target_ip)
+                    log(f"Updated target IP to: {target_ip}", "INFO")
             except:
                 log("Could not retrieve new EC2 IP. Please check Terraform outputs.", "WARN")
         else:
             # Infrastructure exists, get the current IP
             try:
                 current_ip = run("terraform output -raw ec2_public_ip", cwd=ROOT_DIR / "infrastructure" / "terraform", capture=True).strip()
-                if current_ip and current_ip != target_ip:
+                if current_ip and not current_ip.startswith("Warning") and current_ip != target_ip:
                     target_ip = current_ip
                     save_config(target_ip)
                     log(f"Updated target IP to: {target_ip}", "INFO")
