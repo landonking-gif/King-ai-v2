@@ -748,7 +748,29 @@ echo "Monitoring setup complete - metrics available at :9090"
 echo "🚀 Starting API server..."
 nohup uvicorn src.api.main:app --host 0.0.0.0 --port 8000 > api.log 2>&1 &
 
-# 13. Set up production services (systemd)
+# 13. Start the React dashboard
+echo "💻 Starting React dashboard..."
+cd dashboard
+nohup npm run dev -- --host 0.0.0.0 --port 5173 > dashboard.log 2>&1 &
+cd ..
+echo "✅ API and Dashboard servers started"
+
+# 14. Verify services are running
+echo "🔍 Verifying services are running..."
+sleep 5
+if curl -s http://localhost:8000/health > /dev/null 2>&1; then
+    echo "✅ API server is responding"
+else
+    echo "⚠️ API server may not be ready yet"
+fi
+
+if curl -s http://localhost:5173 > /dev/null 2>&1; then
+    echo "✅ Dashboard is responding"
+else
+    echo "⚠️ Dashboard may not be ready yet"
+fi
+
+# 15. Set up production services (systemd)
 echo "🔧 Setting up production services..."
 
 # Create systemd service for API
@@ -802,7 +824,7 @@ sudo systemctl enable king-ai-dashboard
 sudo systemctl start king-ai-api
 echo "✅ Production services configured"
 
-# 14. Set up Nginx reverse proxy with SSL
+# 16. Set up Nginx reverse proxy with SSL
 echo "🌐 Setting up Nginx reverse proxy..."
 
 # Install Nginx and Certbot
