@@ -2054,9 +2054,7 @@ def configure_terraform_vars():
     tfvars_path = ROOT_DIR / "infrastructure" / "terraform" / "terraform.tfvars"
     
     if tfvars_path.exists():
-        if input("terraform.tfvars already exists. Overwrite? (y/N): ").strip().lower() != 'y':
-            log("✅ Using existing terraform.tfvars", "SUCCESS")
-            return True
+        log("Overwriting existing terraform.tfvars", "INFO")
     
     # Get user preferences
     print("\nTerraform Configuration:")
