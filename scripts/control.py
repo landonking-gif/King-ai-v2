@@ -53,7 +53,12 @@ def save_config(ip):
 def load_config():
     if CONFIG_FILE.exists():
         with open(CONFIG_FILE, 'r') as f:
-            return json.load(f)
+            config = json.load(f)
+            ip = config.get("aws_ip", DEFAULT_IP)
+            # Validate IP
+            if not ip or ip.startswith("Warning") or not ip.replace(".", "").replace("-", "").isalnum():
+                return {}
+            return config
     return {}
 
 def find_key_file():
