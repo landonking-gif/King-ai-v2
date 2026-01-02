@@ -184,6 +184,8 @@ echo "Dependencies check complete!"
         run(f'scp {ssh_opts} "{dep_script_path}" ubuntu@{ip}:~/check_deps.sh')
         run(f'ssh {ssh_opts} ubuntu@{ip} "chmod +x check_deps.sh && ./check_deps.sh"')
         log("Server dependencies verified!", "SUCCESS")
+    except Exception as e:
+        log(f"Server dependencies check failed: {e}", "ERROR")
     finally:
         if dep_script_path.exists():
             os.remove(dep_script_path)
@@ -221,6 +223,8 @@ echo "Git pull complete!"
         run(f'scp {ssh_opts} "{git_script_path}" ubuntu@{ip}:~/git_pull.sh')
         run(f'ssh {ssh_opts} ubuntu@{ip} "chmod +x git_pull.sh && ./git_pull.sh"')
         log("Code pulled from GitHub!", "SUCCESS")
+    except Exception as e:
+        log(f"GitHub pull failed: {e}", "ERROR")
     finally:
         if git_script_path.exists():
             os.remove(git_script_path)
@@ -1727,6 +1731,8 @@ echo "🎯 Ready to build your AI empire!"
         run(f'scp {ssh_opts} "{setup_script_path}" ubuntu@{ip}:~/automated_setup.sh')
         run(f'ssh {ssh_opts} ubuntu@{ip} "chmod +x automated_setup.sh && ./automated_setup.sh"')
         log("Automated setup completed successfully!", "SUCCESS")
+    except Exception as e:
+        log(f"Automated setup failed: {e}", "ERROR")
     finally:
         if setup_script_path.exists():
             os.remove(setup_script_path)
@@ -2319,18 +2325,9 @@ def main():
         
         # Continue with regular automated setup
         sync_to_github()
-        try:
-            check_server_dependencies(target_ip, key_file)
-        except Exception as e:
-            log(f"Server dependencies check failed: {e}", "ERROR")
-        try:
-            pull_from_github(target_ip, key_file)
-        except Exception as e:
-            log(f"GitHub pull failed: {e}", "ERROR")
-        try:
-            automated_setup(target_ip, key_file)
-        except Exception as e:
-            log(f"Automated setup failed: {e}", "ERROR")
+        check_server_dependencies(target_ip, key_file)
+        pull_from_github(target_ip, key_file)
+        automated_setup(target_ip, key_file)
         log("Empire setup complete! Check the server for running services.", "SUCCESS")
     elif choice == '4':
         header()
