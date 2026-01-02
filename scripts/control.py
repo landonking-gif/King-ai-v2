@@ -151,6 +151,20 @@ def run(cmd, cwd=None, capture=False):
         log(f"Command failed: {cmd}", "ERROR")
         return None
 
+def upload_env_file(ip, key_path):
+    """Upload the local .env file to the remote server project directory."""
+    log("Uploading .env file to server...", "ACTION")
+    ssh_opts = f"-o StrictHostKeyChecking=no -i \"{key_path}\""
+    env_path = ROOT_DIR / ".env"
+    if not env_path.exists():
+        log(".env file not found locally!", "WARN")
+        return
+    try:
+        run(f'scp {ssh_opts} "{env_path}" ubuntu@{ip}:~/king-ai-v2/.env')
+        log(".env file uploaded to server!", "SUCCESS")
+    except Exception as e:
+        log(f"Failed to upload .env: {e}", "ERROR")
+
 # --- GitHub Sync ---
 def sync_to_github():
     """Sync local code to GitHub repository."""
@@ -2434,14 +2448,15 @@ def main():
     choice = input("\nCommand > ").strip().lower()
 
     if choice == '1':
+        upload_env_file(target_ip, key_file)
         sync_secrets(target_ip, key_file)
         deploy_code(target_ip, key_file)
     elif choice == '2':
+        upload_env_file(target_ip, key_file)
         deploy_code(target_ip, key_file)
     elif choice == '3':
         # Automated Empire Setup with AWS Infrastructure
         log("Starting Automated Empire Setup...", "ACTION")
-        
         # Check if AWS infrastructure exists
         if not check_aws_infrastructure_exists():
             log("AWS infrastructure not detected. Starting full AWS deployment...", "INFO")
@@ -2465,8 +2480,8 @@ def main():
                     log(f"Updated target IP to: {target_ip}", "INFO")
             except:
                 log("Could not retrieve current EC2 IP. Using configured IP.", "WARN")
-        
         # Continue with regular automated setup
+        upload_env_file(target_ip, key_file)
         sync_to_github()
         check_server_dependencies(target_ip, key_file)
         pull_from_github(target_ip, key_file)
