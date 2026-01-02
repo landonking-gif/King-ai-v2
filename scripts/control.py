@@ -1841,11 +1841,6 @@ def check_aws_infrastructure_exists():
     except:
         pass
     
-    # Check if terraform.tfvars exists (indicating previous setup)
-    if (infra_dir / "terraform.tfvars").exists():
-        log("✅ Terraform configuration found (terraform.tfvars exists)", "SUCCESS")
-        return True
-    
     # Try to get outputs (in case state exists but list failed)
     try:
         ec2_ip = run("terraform output -raw ec2_public_ip", cwd=infra_dir, capture=True)
