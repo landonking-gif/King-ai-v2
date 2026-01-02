@@ -1,20 +1,37 @@
-# --- Ensure Terraform is installed on remote server before setup ---
-import subprocess
-def ensure_terraform():
+# --- Remote Terraform Installer ---
+def ensure_terraform_on_server(ip, key_path):
+    """Ensure Terraform is installed on the remote server."""
+    log("Checking for Terraform on server...", "ACTION")
+    ssh_opts = f"-o StrictHostKeyChecking=no -i \"{key_path}\""
+    check_cmd = f'ssh {ssh_opts} ubuntu@{ip} "command -v terraform"'
+    result = run(check_cmd, capture=True)
+    if result:
+        log("Terraform already installed on server.", "SUCCESS")
+        return
+    log("Terraform not found on server. Installing...", "WARN")
+    install_script = '''
+#!/bin/bash
+set -e
+sudo apt-get update
+sudo apt-get install -y wget unzip
+wget https://releases.hashicorp.com/terraform/1.8.5/terraform_1.8.5_linux_amd64.zip
+unzip terraform_1.8.5_linux_amd64.zip
+sudo mv terraform /usr/local/bin/
+rm terraform_1.8.5_linux_amd64.zip
+terraform --version
+'''
+    script_path = ROOT_DIR / "install_terraform.sh"
+    with open(script_path, "w", newline='\n', encoding='utf-8') as f:
+        f.write(install_script)
     try:
-        subprocess.run(["terraform", "--version"], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        print("Terraform is already installed.")
-    except Exception:
-        print("Terraform not found. Installing...")
-        subprocess.run("sudo apt-get update", shell=True)
-        subprocess.run("sudo apt-get install -y wget unzip", shell=True)
-        subprocess.run("wget https://releases.hashicorp.com/terraform/1.8.5/terraform_1.8.5_linux_amd64.zip", shell=True)
-        subprocess.run("unzip terraform_1.8.5_linux_amd64.zip", shell=True)
-        subprocess.run("sudo mv terraform /usr/local/bin/", shell=True)
-        subprocess.run("rm terraform_1.8.5_linux_amd64.zip", shell=True)
-        print("Terraform installed.")
-
-ensure_terraform()
+        run(f'scp {ssh_opts} "{script_path}" ubuntu@{ip}:~/install_terraform.sh')
+        run(f'ssh {ssh_opts} ubuntu@{ip} "chmod +x install_terraform.sh && ./install_terraform.sh"')
+        log("Terraform installed on server!", "SUCCESS")
+    except Exception as e:
+        log(f"Failed to install Terraform: {e}", "ERROR")
+    finally:
+        if script_path.exists():
+            os.remove(script_path)
 
 # --- Pythonic system setup ---
 import subprocess
@@ -28,8 +45,217 @@ def run_shell(cmd):
 try:
     node_version = subprocess.check_output("node -v", shell=True).decode().strip().lstrip('v')
 
+<<<<<<< HEAD
     # Skipping interactive configuration. All configuration will be read from .env only.
     echo "✅ Skipping interactive configuration. Using .env for all settings."
+=======
+# Install Terraform if missing
+if subprocess.run("terraform --version", shell=True, stdout=subprocess.DEVNULL).returncode != 0:
+    run_shell("sudo apt-get update")
+    run_shell("sudo apt-get install -y wget unzip")
+    run_shell("wget https://releases.hashicorp.com/terraform/1.8.5/terraform_1.8.5_linux_amd64.zip")
+    run_shell("unzip terraform_1.8.5_linux_amd64.zip")
+    run_shell("sudo mv terraform /usr/local/bin/")
+    run_shell("rm terraform_1.8.5_linux_amd64.zip")
+else:
+    print("Terraform already installed.")
+
+# Ensure .env file exists before sed commands
+if not os.path.exists(".env"):
+    if os.path.exists(".env.example"):
+        run_shell("cp .env.example .env")
+        print(".env file created from .env.example.")
+    else:
+        open(".env", "w").close()
+        print(".env file created (empty).")
+else:
+    print(".env file already exists.")
+#!/usr/bin/env python3
+"""
+👑 King AI v2 - Imperial Control Center
+The unified command interface for deploying and managing the autonomous empire.
+"""
+
+import os
+import sys
+import time
+import json
+import shutil
+import subprocess
+import webbrowser
+import platform
+from datetime import datetime
+from pathlib import Path
+
+# --- Configuration ---
+ROOT_DIR = Path(__file__).parent.parent.absolute()
+CONFIG_FILE = ROOT_DIR / "scripts" / "control_config.json"
+PEM_GLOB = "*.pem"
+DEFAULT_IP = "ec2-13-222-9-32.compute-1.amazonaws.com"
+TERRAFORM_PATH = r"C:\Users\dmilner.AGV-040318-PC\AppData\Local\Microsoft\WinGet\Packages\Hashicorp.Terraform_Microsoft.Winget.Source_8wekyb3d8bbwe\terraform.exe"
+
+# --- Visuals ---
+def clear_screen():
+    os.system('cls' if os.name == 'nt' else 'clear')
+
+def header():
+    clear_screen()
+    print("""
+\033[96m╔══════════════════════════════════════════════════════════════════╗
+║               👑 KING AI v2 - IMPERIAL CONTROL                   ║
+║             "The Empire Builds Itself While You Sleep"           ║
+╚══════════════════════════════════════════════════════════════════╝\033[0m
+""")
+
+def log(msg, type="INFO"):
+    colors = {
+        "INFO": "\033[94m[ℹ️ INFO]\033[0m",
+        "SUCCESS": "\033[92m[✅ SUCCESS]\033[0m",
+        "WARN": "\033[93m[⚠️ WARN]\033[0m",
+        "ERROR": "\033[91m[❌ ERROR]\033[0m",
+        "ACTION": "\033[95m[🚀 ACTION]\033[0m"
+    }
+    print(f"{colors.get(type, type)} {msg}")
+
+# --- Utilities ---
+def save_config(ip):
+    with open(CONFIG_FILE, 'w') as f:
+        json.dump({"aws_ip": ip, "last_used": str(datetime.now())}, f)
+
+def load_config():
+    if CONFIG_FILE.exists():
+        with open(CONFIG_FILE, 'r') as f:
+            config = json.load(f)
+            ip = config.get("aws_ip", DEFAULT_IP)
+            # Validate IP
+            if not ip or ip.startswith("Warning") or not ip.replace(".", "").replace("-", "").isalnum():
+                return {}
+            return config
+    return {}
+
+def find_key_file():
+    keys = list(ROOT_DIR.glob(PEM_GLOB))
+    if not keys:
+        log("No .pem file found in project root!", "ERROR")
+        return None
+    return keys[0]
+
+def run(cmd, cwd=None, capture=False):
+    """Run a shell command."""
+    if cmd.startswith("terraform "):
+        cmd = TERRAFORM_PATH + cmd[9:]
+    if cmd.startswith("aws "):
+        cmd = r'"C:\Program Files\Amazon\AWSCLIV2\aws.exe"' + cmd[3:]
+    
+    env = os.environ.copy()
+    # Ensure AWS credentials are available for Terraform
+    if 'AWS_ACCESS_KEY_ID' not in env and 'AWS_PROFILE' not in env:
+        # Try to get from AWS CLI config
+        try:
+            import configparser
+            config = configparser.ConfigParser()
+            config.read(os.path.expanduser('~/.aws/credentials'))
+            if 'default' in config:
+                env['AWS_ACCESS_KEY_ID'] = config['default']['aws_access_key_id']
+                env['AWS_SECRET_ACCESS_KEY'] = config['default']['aws_secret_access_key']
+                if 'aws_session_token' in config['default']:
+                    env['AWS_SESSION_TOKEN'] = config['default']['aws_session_token']
+        except:
+            pass
+    
+    try:
+        result = subprocess.run(
+            cmd,
+            shell=True,
+            check=True,
+            cwd=cwd or ROOT_DIR,
+            stdout=subprocess.PIPE if capture else None,
+            stderr=subprocess.PIPE if capture else None,
+            text=True,
+            env=env
+        )
+        return result.stdout.strip() if capture else True
+    except subprocess.CalledProcessError as e:
+        if capture:
+            return None
+        log(f"Command failed: {cmd}", "ERROR")
+        return None
+
+def upload_env_file(ip, key_path):
+    """Upload the local .env file to the remote server project directory."""
+    log("Uploading .env file to server...", "ACTION")
+    ssh_opts = f"-o StrictHostKeyChecking=no -i \"{key_path}\""
+    env_path = ROOT_DIR / ".env"
+    if not env_path.exists():
+        log(".env file not found locally!", "WARN")
+        return
+    try:
+        run(f'scp {ssh_opts} "{env_path}" ubuntu@{ip}:~/king-ai-v2/.env')
+        log(".env file uploaded to server!", "SUCCESS")
+    except Exception as e:
+        log(f"Failed to upload .env: {e}", "ERROR")
+
+# --- GitHub Sync ---
+def sync_to_github():
+    """Sync local code to GitHub repository."""
+    log("Syncing code to GitHub...", "ACTION")
+
+    try:
+        # Check if we're in a git repository
+        run("git status", capture=True)
+
+        # Add all changes
+        run("git add .")
+
+        # Commit changes
+        commit_msg = f"Auto-deploy: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        run(f'git commit -m "{commit_msg}"')
+
+        # Push to remote
+        run("git push king-ai-v2 master:main")
+
+        log("Code synced to GitHub successfully!", "SUCCESS")
+
+    except subprocess.CalledProcessError:
+        log("Git operations failed. Please check your repository status.", "WARN")
+
+# --- Automated Setup ---
+def check_server_dependencies(ip, key_path):
+    """Check and install server dependencies."""
+    log("Checking server dependencies...", "ACTION")
+
+    ssh_opts = f"-o StrictHostKeyChecking=no -i \"{key_path}\""
+
+    # Check if required packages are installed
+    dependencies_script = '''
+#!/bin/bash
+echo "Checking system dependencies..."
+
+# Update package list
+sudo apt update
+
+# Install required packages if not present
+PACKAGES="python3 python3-pip python3-venv postgresql postgresql-contrib redis-server curl docker.io"
+for pkg in $PACKAGES; do
+    if ! dpkg -l | grep -q "^ii  $pkg"; then
+        echo "Installing $pkg..."
+        sudo apt install -y $pkg
+    else
+        echo "$pkg already installed"
+    fi
+done
+
+# Install Node.js 18+ if not present
+if ! command -v node &> /dev/null || [[ $(node -v | sed 's/v//') < "18.0.0" ]]; then
+    echo "Installing Node.js 18..."
+    curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+    sudo apt-get install -y nodejs
+fi
+
+# Install Ollama if not present
+if ! command -v ollama &> /dev/null; then
+    echo "Installing Ollama..."
+>>>>>>> 22ef7f1c0a60202843811d89d409895ccb2d97ff
     curl -fsSL https://ollama.ai/install.sh | sh
 fi
 
@@ -2253,14 +2479,15 @@ def main():
     choice = input("\nCommand > ").strip().lower()
 
     if choice == '1':
+        upload_env_file(target_ip, key_file)
         sync_secrets(target_ip, key_file)
         deploy_code(target_ip, key_file)
     elif choice == '2':
+        upload_env_file(target_ip, key_file)
         deploy_code(target_ip, key_file)
     elif choice == '3':
         # Automated Empire Setup with AWS Infrastructure
         log("Starting Automated Empire Setup...", "ACTION")
-        
         # Check if AWS infrastructure exists
         if not check_aws_infrastructure_exists():
             log("AWS infrastructure not detected. Starting full AWS deployment...", "INFO")
@@ -2284,8 +2511,9 @@ def main():
                     log(f"Updated target IP to: {target_ip}", "INFO")
             except:
                 log("Could not retrieve current EC2 IP. Using configured IP.", "WARN")
-        
         # Continue with regular automated setup
+        upload_env_file(target_ip, key_file)
+        ensure_terraform_on_server(target_ip, key_file)
         sync_to_github()
         check_server_dependencies(target_ip, key_file)
         pull_from_github(target_ip, key_file)
