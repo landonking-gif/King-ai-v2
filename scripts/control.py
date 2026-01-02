@@ -2360,3 +2360,5 @@ if __name__ == "__main__":
         main()
     except KeyboardInterrupt:
         print("\n\033[91mAborted by user.\033[0m")
+    except Exception as e:
+        print(f"\n\033[91mError: {e}\033[0m")
