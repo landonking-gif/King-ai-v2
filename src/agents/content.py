@@ -515,10 +515,12 @@ Tagline: [Tagline]
         for issue in seo_score.issues[:3]:
             improvements.append(issue)
         
+        issues_list = '\n'.join(f'- {issue}' for issue in improvements)
+        
         prompt = f"""Improve the following content to address these SEO issues:
 
 Issues:
-{'\n'.join(f'- {issue}' for issue in improvements)}
+{issues_list}
 
 Current Title: {content.title}
 Current Meta: {content.meta_description}
