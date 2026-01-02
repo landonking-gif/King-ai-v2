@@ -354,9 +354,15 @@ echo "⚙️  Configuring environment..."
 
 # Check for AWS infrastructure and update URLs automatically
 echo "🔍 Checking for AWS infrastructure..."
-if command -v terraform &> /dev/null && [ -d "../../infrastructure/terraform" ]; then
-    cd ../../infrastructure/terraform
-    if terraform state list &> /dev/null; then
+if command -v terraform &> /dev/null && [ -d "infrastructure/terraform" ]; then
+    cd infrastructure/terraform
+    # Try to initialize terraform if not already done
+    if [ ! -d ".terraform" ]; then
+        echo "Initializing Terraform..."
+        terraform init -input=false || echo "Terraform init failed, continuing with local config"
+    fi
+    
+    if terraform state list &> /dev/null 2>&1; then
         echo "🌐 AWS infrastructure detected! Updating .env with AWS endpoints..."
         
         # Get AWS endpoints from Terraform
@@ -364,7 +370,7 @@ if command -v terraform &> /dev/null && [ -d "../../infrastructure/terraform" ];
         REDIS_ENDPOINT=$(terraform output -raw redis_endpoint 2>/dev/null || echo "")
         ALB_DNS=$(terraform output -raw alb_dns_name 2>/dev/null || echo "")
         
-        cd ../../scripts
+        cd ../..
         
         if [ ! -z "$RDS_ENDPOINT" ] && [ ! -z "$REDIS_ENDPOINT" ]; then
             echo "✅ Found AWS RDS: $RDS_ENDPOINT"
@@ -380,256 +386,126 @@ if command -v terraform &> /dev/null && [ -d "../../infrastructure/terraform" ];
             fi
             
             # Update .env with AWS endpoints
-            if [ -f "../.env" ]; then
-                sed -i "s|DATABASE_URL=.*|DATABASE_URL=postgresql+asyncpg://kingadmin:${DB_PASSWORD}@${RDS_ENDPOINT}/kingai|" ../.env
-                sed -i "s|REDIS_URL=.*|REDIS_URL=redis://${REDIS_ENDPOINT}:6379|" ../.env
+            if [ -f ".env" ]; then
+                sed -i "s|DATABASE_URL=.*|DATABASE_URL=postgresql+asyncpg://kingadmin:${DB_PASSWORD}@${RDS_ENDPOINT}/kingai|" .env
+                sed -i "s|REDIS_URL=.*|REDIS_URL=redis://${REDIS_ENDPOINT}:6379|" .env
                 if [ ! -z "$ALB_DNS" ]; then
-                    sed -i "s|VLLM_URL=.*|VLLM_URL=http://${ALB_DNS}:8080|" ../.env
+                    sed -i "s|VLLM_URL=.*|VLLM_URL=http://${ALB_DNS}:8080|" .env
                 fi
                 echo "✅ .env updated with AWS endpoints!"
             else
                 echo "⚠️  .env file not found, creating from example..."
-                cp ../.env.example ../.env
-                sed -i "s|DATABASE_URL=.*|DATABASE_URL=postgresql+asyncpg://kingadmin:${DB_PASSWORD}@${RDS_ENDPOINT}/kingai|" ../.env
-                sed -i "s|REDIS_URL=.*|REDIS_URL=redis://${REDIS_ENDPOINT}:6379|" ../.env
+                cp .env.example .env
+                sed -i "s|DATABASE_URL=.*|DATABASE_URL=postgresql+asyncpg://kingadmin:${DB_PASSWORD}@${RDS_ENDPOINT}/kingai|" .env
+                sed -i "s|REDIS_URL=.*|REDIS_URL=redis://${REDIS_ENDPOINT}:6379|" .env
                 if [ ! -z "$ALB_DNS" ]; then
-                    sed -i "s|VLLM_URL=.*|VLLM_URL=http://${ALB_DNS}:8080|" ../.env
+                    sed -i "s|VLLM_URL=.*|VLLM_URL=http://${ALB_DNS}:8080|" .env
                 fi
             fi
         else
-            echo "⚠️  AWS infrastructure found but could not retrieve endpoints. Using local configuration."
-            if [ ! -f "../.env" ]; then
-                cp ../.env.example ../.env
+            echo "⚠️  AWS infrastructure found but could not retrieve endpoints. Using existing configuration."
+            if [ ! -f ".env" ]; then
+                cp .env.example .env
                 # Update database URL for local PostgreSQL
-                sed -i "s|DATABASE_URL=.*|DATABASE_URL=postgresql+asyncpg://king:LeiaPup21@localhost:5432/kingai|" ../.env
-                sed -i "s|OLLAMA_URL=.*|OLLAMA_URL=http://localhost:11434|" ../.env
+                sed -i "s|DATABASE_URL=.*|DATABASE_URL=postgresql+asyncpg://king:LeiaPup21@localhost:5432/kingai|" .env
+                sed -i "s|OLLAMA_URL=.*|OLLAMA_URL=http://localhost:11434|" .env
             fi
         fi
     else
-        cd ../../scripts
-        echo "⚠️  No AWS infrastructure detected. Using local configuration."
-        if [ ! -f "../.env" ]; then
-            cp ../.env.example ../.env
+        echo "⚠️  Terraform state not found or not initialized. Using existing configuration."
+        if [ ! -f ".env" ]; then
+            cp .env.example .env
             # Update database URL for local PostgreSQL
-            sed -i "s|DATABASE_URL=.*|DATABASE_URL=postgresql+asyncpg://king:LeiaPup21@localhost:5432/kingai|" ../.env
-            sed -i "s|OLLAMA_URL=.*|OLLAMA_URL=http://localhost:11434|" ../.env
+            sed -i "s|DATABASE_URL=.*|DATABASE_URL=postgresql+asyncpg://king:LeiaPup21@localhost:5432/kingai|" .env
+            sed -i "s|OLLAMA_URL=.*|OLLAMA_URL=http://localhost:11434|" .env
         fi
     fi
 else
-    echo "⚠️  Terraform not found or infrastructure directory missing. Using local configuration."
-    if [ ! -f "../.env" ]; then
-        cp ../.env.example ../.env
+    echo "⚠️  Terraform not found or infrastructure directory missing. Using existing configuration."
+    if [ ! -f ".env" ]; then
+        cp .env.example .env
         # Update database URL for local PostgreSQL
-        sed -i "s|DATABASE_URL=.*|DATABASE_URL=postgresql+asyncpg://king:LeiaPup21@localhost:5432/kingai|" ../.env
-        sed -i "s|OLLAMA_URL=.*|OLLAMA_URL=http://localhost:11434|" ../.env
+        sed -i "s|DATABASE_URL=.*|DATABASE_URL=postgresql+asyncpg://king:LeiaPup21@localhost:5432/kingai|" .env
+        sed -i "s|OLLAMA_URL=.*|OLLAMA_URL=http://localhost:11434|" .env
     fi
 fi
 
-# 4.5. Configure optional services
-echo "🔧 Configuring optional services..."
-echo "Leave blank to skip any service you don't want to configure."
-echo ""
+# 4.5. Configure optional services automatically from .env
+echo "🔧 Configuring optional services from .env file..."
 
-# LLM Providers
-echo "🤖 LLM PROVIDERS:"
-read -p "Anthropic Claude API Key (for high-stakes decisions): " anthropic_key
-if [ ! -z "$anthropic_key" ]; then
-    sed -i "s|# ANTHROPIC_API_KEY=.*|ANTHROPIC_API_KEY=$anthropic_key|" .env
-    sed -i "s|# CLAUDE_MODEL=.*|CLAUDE_MODEL=claude-3-5-sonnet-20241022|" .env
-    echo "✅ Anthropic Claude configured"
+# Check if services are already configured in .env and enable them
+if grep -q "^ANTHROPIC_API_KEY=" .env && ! grep -q "^# ANTHROPIC_API_KEY=" .env; then
+    echo "✅ Anthropic Claude already configured"
 fi
 
-read -p "Google Gemini API Key (fallback LLM): " gemini_key
-if [ ! -z "$gemini_key" ]; then
-    sed -i "s|# GEMINI_API_KEY=.*|GEMINI_API_KEY=$gemini_key|" .env
-    echo "✅ Google Gemini configured"
+if grep -q "^GEMINI_API_KEY=" .env && ! grep -q "^# GEMINI_API_KEY=" .env; then
+    echo "✅ Google Gemini already configured"
 fi
 
-# Vector Database
-echo ""
-echo "🗄️  VECTOR DATABASE:"
-read -p "Pinecone API Key (for long-term memory): " pinecone_key
-if [ ! -z "$pinecone_key" ]; then
-    read -p "Pinecone Index Name: " pinecone_index
-    read -p "Pinecone Environment (us-east-1-aws): " pinecone_env
-    pinecone_env=${pinecone_env:-us-east-1-aws}
-    sed -i "s|# PINECONE_API_KEY=.*|PINECONE_API_KEY=$pinecone_key|" .env
-    sed -i "s|# PINECONE_INDEX=.*|PINECONE_INDEX=${pinecone_index:-king-ai}|" .env
-    sed -i "s|# PINECONE_ENVIRONMENT=.*|PINECONE_ENVIRONMENT=$pinecone_env|" .env
-    echo "✅ Pinecone configured"
+if grep -q "^PINECONE_API_KEY=" .env && ! grep -q "^# PINECONE_API_KEY=" .env; then
+    echo "✅ Pinecone already configured"
 fi
 
-# E-commerce
-echo ""
-echo "🛒 E-COMMERCE:"
-read -p "Shopify Shop URL (your-store.myshopify.com): " shopify_url
-if [ ! -z "$shopify_url" ]; then
-    read -p "Shopify Access Token: " shopify_token
-    if [ ! -z "$shopify_token" ]; then
-        sed -i "s|# SHOPIFY_SHOP_URL=.*|SHOPIFY_SHOP_URL=$shopify_url|" .env
-        sed -i "s|# SHOPIFY_ACCESS_TOKEN=.*|SHOPIFY_ACCESS_TOKEN=$shopify_token|" .env
-        sed -i "s|# SHOPIFY_API_VERSION=.*|SHOPIFY_API_VERSION=2024-10|" .env
-        echo "✅ Shopify configured"
-    fi
+if grep -q "^SHOPIFY_ACCESS_TOKEN=" .env && ! grep -q "^# SHOPIFY_ACCESS_TOKEN=" .env; then
+    echo "✅ Shopify already configured"
 fi
 
-# Payments
-echo ""
-echo "💳 PAYMENTS:"
-read -p "Stripe API Key (sk_test_...): " stripe_key
-if [ ! -z "$stripe_key" ]; then
-    read -p "Stripe Publishable Key (pk_test_...): " stripe_pub
-    read -p "Stripe Webhook Secret (whsec_...): " stripe_webhook
-    sed -i "s|# STRIPE_API_KEY=.*|STRIPE_API_KEY=$stripe_key|" .env
-    if [ ! -z "$stripe_pub" ]; then
-        sed -i "s|# STRIPE_PUBLISHABLE_KEY=.*|STRIPE_PUBLISHABLE_KEY=$stripe_pub|" .env
-    fi
-    if [ ! -z "$stripe_webhook" ]; then
-        sed -i "s|# STRIPE_WEBHOOK_SECRET=.*|STRIPE_WEBHOOK_SECRET=$stripe_webhook|" .env
-    fi
-    echo "✅ Stripe configured"
+if grep -q "^STRIPE_API_KEY=" .env && ! grep -q "^# STRIPE_API_KEY=" .env; then
+    echo "✅ Stripe already configured"
 fi
 
-read -p "PayPal Client ID: " paypal_client
-if [ ! -z "$paypal_client" ]; then
-    read -p "PayPal Client Secret: " paypal_secret
-    read -p "PayPal Webhook ID: " paypal_webhook
-    sed -i "s|# PAYPAL_CLIENT_ID=.*|PAYPAL_CLIENT_ID=$paypal_client|" .env
-    sed -i "s|# PAYPAL_CLIENT_SECRET=.*|PAYPAL_CLIENT_SECRET=$paypal_secret|" .env
-    sed -i "s|# PAYPAL_SANDBOX=.*|PAYPAL_SANDBOX=true|" .env
-    if [ ! -z "$paypal_webhook" ]; then
-        sed -i "s|# PAYPAL_WEBHOOK_ID=.*|PAYPAL_WEBHOOK_ID=$paypal_webhook|" .env
-    fi
-    echo "✅ PayPal configured"
+if grep -q "^PAYPAL_CLIENT_ID=" .env && ! grep -q "^# PAYPAL_CLIENT_ID=" .env; then
+    echo "✅ PayPal already configured"
 fi
 
-# Banking
-echo ""
-echo "🏦 BANKING:"
-read -p "Plaid Client ID: " plaid_client
-if [ ! -z "$plaid_client" ]; then
-    read -p "Plaid Secret: " plaid_secret
-    read -p "Plaid Environment (sandbox): " plaid_env
-    plaid_env=${plaid_env:-sandbox}
-    sed -i "s|# PLAID_CLIENT_ID=.*|PLAID_CLIENT_ID=$plaid_client|" .env
-    sed -i "s|# PLAID_SECRET=.*|PLAID_SECRET=$plaid_secret|" .env
-    sed -i "s|# PLAID_ENV=.*|PLAID_ENV=$plaid_env|" .env
-    echo "✅ Plaid configured"
+if grep -q "^PLAID_CLIENT_ID=" .env && ! grep -q "^# PLAID_CLIENT_ID=" .env; then
+    echo "✅ Plaid already configured"
 fi
 
-# Analytics
-echo ""
-echo "📊 ANALYTICS:"
-read -p "Google Analytics 4 Property ID: " ga4_property
-if [ ! -z "$ga4_property" ]; then
-    read -p "GA4 Credentials JSON (paste full JSON): " ga4_json
-    if [ ! -z "$ga4_json" ]; then
-        sed -i "s|# GA4_PROPERTY_ID=.*|GA4_PROPERTY_ID=$ga4_property|" .env
-        # Escape single quotes in JSON for sed
-        ga4_json_escaped=$(echo "$ga4_json" | sed 's/"/\\"/g')
-        sed -i "s|# GA4_CREDENTIALS_JSON=.*|GA4_CREDENTIALS_JSON='$ga4_json_escaped'|" .env
-        echo "✅ Google Analytics 4 configured"
-    fi
+if grep -q "^GA4_PROPERTY_ID=" .env && ! grep -q "^# GA4_PROPERTY_ID=" .env; then
+    echo "✅ Google Analytics 4 already configured"
 fi
 
-# Image Generation
-echo ""
-echo "🎨 IMAGE GENERATION:"
-read -p "OpenAI API Key (for DALL-E): " openai_key
-if [ ! -z "$openai_key" ]; then
-    sed -i "s|# OPENAI_API_KEY=.*|OPENAI_API_KEY=$openai_key|" .env
-    echo "✅ OpenAI configured"
+if grep -q "^OPENAI_API_KEY=" .env && ! grep -q "^# OPENAI_API_KEY=" .env; then
+    echo "✅ OpenAI already configured"
 fi
 
-# Web Search
-echo ""
-echo "🔍 WEB SEARCH:"
-read -p "SerpAPI Key: " serpapi_key
-if [ ! -z "$serpapi_key" ]; then
-    sed -i "s|# SERPAPI_KEY=.*|SERPAPI_KEY=$serpapi_key|" .env
-    echo "✅ SerpAPI configured"
+if grep -q "^SERPAPI_KEY=" .env && ! grep -q "^# SERPAPI_KEY=" .env; then
+    echo "✅ SerpAPI already configured"
 fi
 
-# Notifications
-echo ""
-echo "📧 NOTIFICATIONS:"
-read -p "Gmail User (for SMTP notifications): " gmail_user
-if [ ! -z "$gmail_user" ]; then
-    read -p "Gmail App Password: " gmail_password
-    if [ ! -z "$gmail_password" ]; then
-        sed -i "s|# SMTP_HOST=.*|SMTP_HOST=smtp.gmail.com|" .env
-        sed -i "s|# SMTP_PORT=.*|SMTP_PORT=587|" .env
-        sed -i "s|# SMTP_USER=.*|SMTP_USER=$gmail_user|" .env
-        sed -i "s|# SMTP_PASSWORD=.*|SMTP_PASSWORD=$gmail_password|" .env
-        sed -i "s|# SMTP_FROM_EMAIL=.*|SMTP_FROM_EMAIL=$gmail_user|" .env
-        echo "✅ Email notifications configured"
-    fi
+if grep -q "^SMTP_USER=" .env && ! grep -q "^# SMTP_USER=" .env; then
+    echo "✅ Email notifications already configured"
 fi
 
-read -p "Twilio Account SID: " twilio_sid
-if [ ! -z "$twilio_sid" ]; then
-    read -p "Twilio Auth Token: " twilio_token
-    read -p "Twilio From Number (+1234567890): " twilio_from
-    read -p "Admin Phone Number (+1234567890): " admin_phone
-    sed -i "s|# TWILIO_ACCOUNT_SID=.*|TWILIO_ACCOUNT_SID=$twilio_sid|" .env
-    sed -i "s|# TWILIO_AUTH_TOKEN=.*|TWILIO_AUTH_TOKEN=$twilio_token|" .env
-    if [ ! -z "$twilio_from" ]; then
-        sed -i "s|# TWILIO_FROM_NUMBER=.*|TWILIO_FROM_NUMBER=$twilio_from|" .env
-    fi
-    if [ ! -z "$admin_phone" ]; then
-        sed -i "s|# ADMIN_PHONE_NUMBER=.*|ADMIN_PHONE_NUMBER=$admin_phone|" .env
-    fi
-    echo "✅ Twilio SMS configured"
+if grep -q "^TWILIO_ACCOUNT_SID=" .env && ! grep -q "^# TWILIO_ACCOUNT_SID=" .env; then
+    echo "✅ Twilio SMS already configured"
 fi
 
-# Monitoring
-echo ""
-echo "📈 MONITORING:"
-read -p "Datadog API Key: " dd_api_key
-if [ ! -z "$dd_api_key" ]; then
-    read -p "Datadog App Key: " dd_app_key
-    sed -i "s|# DD_API_KEY=.*|DD_API_KEY=$dd_api_key|" .env
-    sed -i "s|# DD_APP_KEY=.*|DD_APP_KEY=$dd_app_key|" .env
-    echo "✅ Datadog configured"
+if grep -q "^DD_API_KEY=" .env && ! grep -q "^# DD_API_KEY=" .env; then
+    echo "✅ Datadog already configured"
 fi
 
-read -p "Arize API Key: " arize_key
-if [ ! -z "$arize_key" ]; then
-    read -p "Arize Space Key: " arize_space
-    sed -i "s|# ARIZE_API_KEY=.*|ARIZE_API_KEY=$arize_key|" .env
-    sed -i "s|# ARIZE_SPACE_KEY=.*|ARIZE_SPACE_KEY=$arize_space|" .env
-    echo "✅ Arize configured"
+if grep -q "^ARIZE_API_KEY=" .env && ! grep -q "^# ARIZE_API_KEY=" .env; then
+    echo "✅ Arize already configured"
 fi
 
-read -p "LangSmith API Key: " langchain_key
-if [ ! -z "$langchain_key" ]; then
-    sed -i "s|# LANGCHAIN_API_KEY=.*|LANGCHAIN_API_KEY=$langchain_key|" .env
-    sed -i "s|# LANGCHAIN_TRACING_V2=.*|LANGCHAIN_TRACING_V2=true|" .env
-    sed -i "s|# LANGCHAIN_PROJECT=.*|LANGCHAIN_PROJECT=king-ai-v2|" .env
-    echo "✅ LangSmith configured"
+if grep -q "^LANGCHAIN_API_KEY=" .env && ! grep -q "^# LANGCHAIN_API_KEY=" .env; then
+    echo "✅ LangSmith already configured"
 fi
 
-# System Configuration
-echo ""
-echo "⚙️  SYSTEM CONFIGURATION:"
-echo "Risk Profile Options: conservative, moderate, aggressive"
-read -p "Risk Profile (moderate): " risk_profile
-risk_profile=${risk_profile:-moderate}
-sed -i "s|RISK_PROFILE=.*|RISK_PROFILE=$risk_profile|" .env
+# Set default values for system configuration if not set
+if ! grep -q "^RISK_PROFILE=" .env; then
+    echo "RISK_PROFILE=moderate" >> .env
+fi
 
-read -p "Enable Autonomous Mode (false): " autonomous_mode
-autonomous_mode=${autonomous_mode:-false}
-sed -i "s|ENABLE_AUTONOMOUS_MODE=.*|ENABLE_AUTONOMOUS_MODE=$autonomous_mode|" .env
+if ! grep -q "^ENABLE_AUTONOMOUS_MODE=" .env; then
+    echo "ENABLE_AUTONOMOUS_MODE=false" >> .env
+fi
 
-max_approve = input("Max Auto-approve Amount (100.0): ") or "100.0"
-with open(".env", "r") as file:
-    env_lines = file.readlines()
-with open(".env", "w") as file:
-    for line in env_lines:
-        if line.startswith("MAX_AUTO_APPROVE_AMOUNT="):
-            file.write(f"MAX_AUTO_APPROVE_AMOUNT={max_approve}\n")
-        else:
-            file.write(line)
+if ! grep -q "^MAX_AUTO_APPROVE_AMOUNT=" .env; then
+    echo "MAX_AUTO_APPROVE_AMOUNT=100.0" >> .env
+fi
 
 echo "✅ Optional services configuration complete"
 
