@@ -1775,7 +1775,7 @@ echo "🎯 Ready to build your AI empire!"
 
         # Then run the setup script
         run(f'scp {ssh_opts} "{setup_script_path}" ubuntu@{ip}:~/automated_setup.sh')
-        run(f'ssh {ssh_opts} ubuntu@{ip} "chmod +x automated_setup.sh && cd king-ai-v2 && ./automated_setup.sh"')
+        run(f'ssh {ssh_opts} ubuntu@{ip} "chmod +x automated_setup.sh && cp automated_setup.sh king-ai-v2/ && cd king-ai-v2 && ./automated_setup.sh"')
         log("Automated setup completed successfully!", "SUCCESS")
     except Exception as e:
         log(f"Automated setup failed: {e}", "ERROR")
