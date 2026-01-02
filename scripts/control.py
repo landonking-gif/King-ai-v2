@@ -2300,7 +2300,7 @@ def main():
             # After AWS deployment, get the new target IP
             try:
                 new_ip = run("terraform output -raw ec2_public_ip", cwd=ROOT_DIR / "infrastructure" / "terraform", capture=True).strip()
-                if new_ip and not new_ip.startswith("Warning"):
+                if new_ip and "Warning" not in new_ip:
                     target_ip = new_ip
                     save_config(target_ip)
                     log(f"Updated target IP to: {target_ip}", "INFO")
@@ -2310,7 +2310,7 @@ def main():
             # Infrastructure exists, get the current IP
             try:
                 current_ip = run("terraform output -raw ec2_public_ip", cwd=ROOT_DIR / "infrastructure" / "terraform", capture=True).strip()
-                if current_ip and not current_ip.startswith("Warning") and current_ip != target_ip:
+                if current_ip and "Warning" not in current_ip and current_ip != target_ip:
                     target_ip = current_ip
                     save_config(target_ip)
                     log(f"Updated target IP to: {target_ip}", "INFO")
