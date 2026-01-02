@@ -45,31 +45,29 @@ def run_shell(cmd):
 try:
     node_version = subprocess.check_output("node -v", shell=True).decode().strip().lstrip('v')
 
-<<<<<<< HEAD
-    # Skipping interactive configuration. All configuration will be read from .env only.
-    echo "✅ Skipping interactive configuration. Using .env for all settings."
-=======
-# Install Terraform if missing
-if subprocess.run("terraform --version", shell=True, stdout=subprocess.DEVNULL).returncode != 0:
-    run_shell("sudo apt-get update")
-    run_shell("sudo apt-get install -y wget unzip")
-    run_shell("wget https://releases.hashicorp.com/terraform/1.8.5/terraform_1.8.5_linux_amd64.zip")
-    run_shell("unzip terraform_1.8.5_linux_amd64.zip")
-    run_shell("sudo mv terraform /usr/local/bin/")
-    run_shell("rm terraform_1.8.5_linux_amd64.zip")
-else:
-    print("Terraform already installed.")
-
-# Ensure .env file exists before sed commands
-if not os.path.exists(".env"):
-    if os.path.exists(".env.example"):
-        run_shell("cp .env.example .env")
-        print(".env file created from .env.example.")
+    # Install Terraform if missing
+    if subprocess.run("terraform --version", shell=True, stdout=subprocess.DEVNULL).returncode != 0:
+        run_shell("sudo apt-get update")
+        run_shell("sudo apt-get install -y wget unzip")
+        run_shell("wget https://releases.hashicorp.com/terraform/1.8.5/terraform_1.8.5_linux_amd64.zip")
+        run_shell("unzip terraform_1.8.5_linux_amd64.zip")
+        run_shell("sudo mv terraform /usr/local/bin/")
+        run_shell("rm terraform_1.8.5_linux_amd64.zip")
     else:
-        open(".env", "w").close()
-        print(".env file created (empty).")
-else:
-    print(".env file already exists.")
+        print("Terraform already installed.")
+
+    # Ensure .env file exists before sed commands
+    if not os.path.exists(".env"):
+        if os.path.exists(".env.example"):
+            run_shell("cp .env.example .env")
+            print(".env file created from .env.example.")
+        else:
+            open(".env", "w").close()
+            print(".env file created (empty).")
+    else:
+        print(".env file already exists.")
+except Exception as e:
+    print(f"Error during setup: {e}")
 #!/usr/bin/env python3
 """
 👑 King AI v2 - Imperial Control Center
@@ -255,7 +253,7 @@ fi
 # Install Ollama if not present
 if ! command -v ollama &> /dev/null; then
     echo "Installing Ollama..."
->>>>>>> 22ef7f1c0a60202843811d89d409895ccb2d97ff
+
     curl -fsSL https://ollama.ai/install.sh | sh
 fi
 
