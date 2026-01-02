@@ -1073,24 +1073,51 @@ nohup uvicorn src.api.main:app --host 0.0.0.0 --port 8000 > api.log 2>&1 &
 # 13. Start the React dashboard
 echo "💻 Starting React dashboard..."
 cd dashboard
-nohup npm run dev -- --host 0.0.0.0 --port 5173 > dashboard.log 2>&1 &
+echo "Installing dashboard dependencies..."
+npm install --silent
+echo "Starting npm dev server..."
+timeout 30 npm run dev -- --host 0.0.0.0 --port 5173 > dashboard.log 2>&1 &
+DASHBOARD_PID=$!
+echo "Dashboard started with PID: $DASHBOARD_PID"
+sleep 5
+if ps -p $DASHBOARD_PID > /dev/null 2>&1; then
+    echo "✅ Dashboard process is running"
+    # Disown the process so it continues running after script exits
+    disown $DASHBOARD_PID
+else
+    echo "❌ Dashboard process failed to start"
+    echo "Dashboard log output:"
+    cat dashboard.log
+    echo "Trying alternative startup method..."
+    # Try starting without backgrounding to see error
+    timeout 10 npm run dev -- --host 0.0.0.0 --port 5173 || echo "Dashboard startup failed"
+fi
 cd ..
-echo "✅ API and Dashboard servers started"
 
 # 14. Verify services are running
 echo "🔍 Verifying services are running..."
 sleep 5
-if curl -s http://localhost:8000/health > /dev/null 2>&1; then
+if curl -s --max-time 5 http://localhost:8000/health > /dev/null 2>&1; then
     echo "✅ API server is responding"
 else
     echo "⚠️ API server may not be ready yet"
 fi
 
-if curl -s http://localhost:5173 > /dev/null 2>&1; then
+if curl -s --max-time 5 http://localhost:5173 > /dev/null 2>&1; then
     echo "✅ Dashboard is responding"
 else
-    echo "⚠️ Dashboard may not be ready yet"
+    echo "⚠️ Dashboard may not be ready yet - check dashboard.log for details"
 fi
+
+echo "🎉 Automated setup complete!"
+echo "📊 Services Status:"
+echo "  - API Server: http://localhost:8000 (check /health endpoint)"
+echo "  - Dashboard: http://localhost:5173"
+echo "  - API Docs: http://localhost:8000/docs"
+echo ""
+echo "To check logs:"
+echo "  - API logs: tail -f api.log"
+echo "  - Dashboard logs: tail -f dashboard/dashboard.log"
 
 # 15. Set up production services (systemd)
 echo "🔧 Setting up production services..."
