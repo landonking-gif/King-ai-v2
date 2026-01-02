@@ -2267,28 +2267,29 @@ def main():
     header()
 
     # 1. Config & Setup
+
     config = load_config()
     saved_ip = config.get("aws_ip", DEFAULT_IP)
 
-    print(f"\033[93mTarget Server:\033[0m {saved_ip}")
-    # new_ip = input(f"Press Enter to use current, or type new IP: ").strip()
-    # if new_ip.lower() in ["", "enter"]:
-    #     new_ip = ""
-    new_ip = ""
-
-    target_ip = new_ip if new_ip else saved_ip
+    print(f"\033[93mTarget Server (current):\033[0m {saved_ip}")
+    entered_ip = input(f"Enter server IP or DNS (or press Enter to use current): ").strip()
+    if entered_ip:
+        target_ip = entered_ip
+    else:
+        target_ip = saved_ip
     save_config(target_ip)
 
     key_file = find_key_file()
     log(f"Using Identity: {key_file.name}", "INFO")
 
     # 2. Main Menu
+
     print("\n\033[1mSelect Mission Profile:\033[0m")
     print(" [1] 🚀 Full Deployment (Code + Secrets + Restart)")
     print(" [2] 🔄 Quick Sync (Code Only)")
     print(" [3] 🤖 Automated Empire Setup (AWS Infra + GitHub + Full Setup)")
     print(" [4] 📺 View Remote Logs")
-    print(" [5] 📡 Connect (SSH Shell)")
+    print(f" [5] 📡 Connect (SSH Shell) to {target_ip}")
     print(" [q] Quit")
 
     choice = input("\nCommand > ").strip().lower()

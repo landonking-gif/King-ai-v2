@@ -63,7 +63,7 @@ resource "aws_lb_target_group" "inference" {
     unhealthy_threshold = 3
     timeout             = 5
     interval            = 30
-    path                = "/health"
+    path                = "/v1/models"
     matcher             = "200"
   }
 
