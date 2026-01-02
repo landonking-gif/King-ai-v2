@@ -3,7 +3,7 @@ Playbook Executor - Run playbooks and manage task execution.
 """
 import asyncio
 import uuid
-from datetime import datetime, UTC
+from datetime import datetime, timezone
 from typing import Any, Optional, Callable
 from src.business.playbook_models import (
     PlaybookDefinition, PlaybookRun, TaskDefinition, TaskExecution,
@@ -49,7 +49,7 @@ class PlaybookExecutor:
             playbook_id=playbook.id,
             business_id=business_id,
             status=TaskStatus.RUNNING,
-            started_at=datetime.now(UTC),
+            started_at=datetime.now(timezone.utc),
             context=context or {},
             triggered_by=trigger,
         )
@@ -78,7 +78,7 @@ class PlaybookExecutor:
             run.error = str(e)
             logger.error(f"Playbook execution error: {e}")
 
-        run.completed_at = datetime.now(UTC)
+        run.completed_at = datetime.now(timezone.utc)
 
         # Execute playbook completed hooks
         for hook in self._hooks["playbook_completed"]:
@@ -163,7 +163,7 @@ class PlaybookExecutor:
         """Execute a single task."""
         execution = run.task_executions[task.id]
         execution.status = TaskStatus.RUNNING
-        execution.started_at = datetime.now(UTC)
+        execution.started_at = datetime.now(timezone.utc)
         execution.attempts += 1
 
         # Execute task started hooks
@@ -177,7 +177,7 @@ class PlaybookExecutor:
         if not agent:
             execution.status = TaskStatus.FAILED
             execution.error = f"Agent not found: {task.agent}"
-            execution.completed_at = datetime.now(UTC)
+            execution.completed_at = datetime.now(timezone.utc)
             return None
 
         try:
@@ -197,7 +197,7 @@ class PlaybookExecutor:
 
             execution.result = result
             execution.status = TaskStatus.COMPLETED
-            execution.completed_at = datetime.now(UTC)
+            execution.completed_at = datetime.now(timezone.utc)
 
             # Store result in context for dependent tasks
             run.context[f"{task.id}_result"] = result
@@ -214,7 +214,7 @@ class PlaybookExecutor:
         except asyncio.TimeoutError:
             execution.status = TaskStatus.FAILED
             execution.error = "Task timed out"
-            execution.completed_at = datetime.now(UTC)
+            execution.completed_at = datetime.now(timezone.utc)
             
             # Retry if attempts remaining
             if execution.attempts < task.retry_count:
@@ -224,7 +224,7 @@ class PlaybookExecutor:
         except Exception as e:
             execution.status = TaskStatus.FAILED
             execution.error = str(e)
-            execution.completed_at = datetime.now(UTC)
+            execution.completed_at = datetime.now(timezone.utc)
 
             # Retry if attempts remaining
             if execution.attempts < task.retry_count:
@@ -282,5 +282,5 @@ class PlaybookExecutor:
 
         run.status = TaskStatus.FAILED
         run.error = "Cancelled by user"
-        run.completed_at = datetime.now(UTC)
+        run.completed_at = datetime.now(timezone.utc)
         return True
