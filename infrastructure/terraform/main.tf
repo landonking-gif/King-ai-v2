@@ -33,6 +33,16 @@ provider "aws" {
 provider "datadog" {
   api_key = var.datadog_api_key
   app_key = var.datadog_app_key
+  validate = false
+}
+
+# Common tags for all resources
+locals {
+  common_tags = {
+    Project     = "King AI v2"
+    Environment = var.environment
+    ManagedBy   = "Terraform"
+  }
 }
 
 # Pinecone secrets stored in AWS Secrets Manager
