@@ -2332,6 +2332,7 @@ def main():
         pull_from_github(target_ip, key_file)
         automated_setup(target_ip, key_file)
         log("Empire setup complete! Check the server for running services.", "SUCCESS")
+        print("All steps completed.")
     elif choice == '4':
         header()
         log("Streaming backend logs (Ctrl+C to stop)...", "INFO")
