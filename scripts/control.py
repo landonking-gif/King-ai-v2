@@ -2319,9 +2319,18 @@ def main():
         
         # Continue with regular automated setup
         sync_to_github()
-        check_server_dependencies(target_ip, key_file)
-        pull_from_github(target_ip, key_file)
-        automated_setup(target_ip, key_file)
+        try:
+            check_server_dependencies(target_ip, key_file)
+        except Exception as e:
+            log(f"Server dependencies check failed: {e}", "ERROR")
+        try:
+            pull_from_github(target_ip, key_file)
+        except Exception as e:
+            log(f"GitHub pull failed: {e}", "ERROR")
+        try:
+            automated_setup(target_ip, key_file)
+        except Exception as e:
+            log(f"Automated setup failed: {e}", "ERROR")
         log("Empire setup complete! Check the server for running services.", "SUCCESS")
     elif choice == '4':
         header()
