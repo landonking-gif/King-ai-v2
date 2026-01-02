@@ -531,9 +531,15 @@ read -p "Enable Autonomous Mode (false): " autonomous_mode
 autonomous_mode=${autonomous_mode:-false}
 sed -i "s|ENABLE_AUTONOMOUS_MODE=.*|ENABLE_AUTONOMOUS_MODE=$autonomous_mode|" .env
 
-read -p "Max Auto-approve Amount (100.0): " max_approve
-max_approve=${max_approve:-100.0}
-sed -i "s|MAX_AUTO_APPROVE_AMOUNT=.*|MAX_AUTO_APPROVE_AMOUNT=$max_approve|" .env
+max_approve = input("Max Auto-approve Amount (100.0): ") or "100.0"
+with open(".env", "r") as file:
+    env_lines = file.readlines()
+with open(".env", "w") as file:
+    for line in env_lines:
+        if line.startswith("MAX_AUTO_APPROVE_AMOUNT="):
+            file.write(f"MAX_AUTO_APPROVE_AMOUNT={max_approve}\n")
+        else:
+            file.write(line)
 
 echo "✅ Optional services configuration complete"
 
@@ -2290,6 +2296,7 @@ def main():
     print(" [3] 🤖 Automated Empire Setup (AWS Infra + GitHub + Full Setup)")
     print(" [4] 📺 View Remote Logs")
     print(f" [5] 📡 Connect (SSH Shell) to {target_ip}")
+    print(f" [6] 🚀 SSH & Start Web App (0.0.0.0:80) on {target_ip}")
     print(" [q] Quit")
 
     choice = input("\nCommand > ").strip().lower()
@@ -2342,9 +2349,19 @@ def main():
             run(f'ssh {ssh_opts} ubuntu@{target_ip} "tail -f king-ai-v2/api.log"')
         except KeyboardInterrupt:
             pass
+
     elif choice == '5':
         ssh_opts = f"-o StrictHostKeyChecking=no -i \"{key_file}\""
         os.system(f'ssh {ssh_opts} ubuntu@{target_ip}')
+        return
+
+    elif choice == '6':
+        ssh_opts = f"-o StrictHostKeyChecking=no -i \"{key_file}\""
+        # This will SSH in and prompt the user to start a web app on 0.0.0.0:80
+        print("\nLaunching SSH and starting web app on 0.0.0.0:80 (manual confirmation required)...")
+        # You can customize the command below for your stack (default: Flask)
+        start_cmd = 'flask run --host=0.0.0.0 --port=80 || uvicorn main:app --host 0.0.0.0 --port 80 || echo "Edit control.py to set your app start command!"; bash --login'
+        os.system(f'ssh {ssh_opts} ubuntu@{target_ip} "{start_cmd}"')
         return
 
     # Post-Action Checks
