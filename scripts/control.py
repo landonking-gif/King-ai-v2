@@ -65,7 +65,7 @@ def find_key_file():
     keys = list(ROOT_DIR.glob(PEM_GLOB))
     if not keys:
         log("No .pem file found in project root!", "ERROR")
-        sys.exit(1)
+        return None
     return keys[0]
 
 def run(cmd, cwd=None, capture=False):
@@ -107,7 +107,7 @@ def run(cmd, cwd=None, capture=False):
         if capture:
             return None
         log(f"Command failed: {cmd}", "ERROR")
-        sys.exit(1)
+        return None
 
 # --- GitHub Sync ---
 def sync_to_github():
