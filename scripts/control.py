@@ -528,7 +528,7 @@ alembic upgrade head
 echo "🤖 Starting Ollama service..."
 ollama serve &
 sleep 5
-ollama pull llama3.1:8b || echo "Model already downloaded"
+timeout 600 ollama pull llama3.1:8b || echo "Model download timed out or already downloaded"
 
 # 10. Configure and test all integrations using available API keys
 echo "🔗 Configuring and testing integrations..."
