@@ -1074,12 +1074,15 @@ nohup uvicorn src.api.main:app --host 0.0.0.0 --port 8000 > api.log 2>&1 &
 echo "💻 Starting React dashboard..."
 cd dashboard
 echo "Installing dashboard dependencies..."
-npm install --silent
+timeout 300 npm install --silent || { echo "❌ npm install timed out or failed"; exit 1; }
 echo "Starting npm dev server..."
-timeout 30 npm run dev -- --host 0.0.0.0 --port 5173 > dashboard.log 2>&1 &
+# Start dashboard in background with proper error handling
+nohup npm run dev -- --host 0.0.0.0 --port 5173 > dashboard.log 2>&1 &
 DASHBOARD_PID=$!
 echo "Dashboard started with PID: $DASHBOARD_PID"
-sleep 5
+
+# Wait a bit and check if it's still running
+sleep 10
 if ps -p $DASHBOARD_PID > /dev/null 2>&1; then
     echo "✅ Dashboard process is running"
     # Disown the process so it continues running after script exits
@@ -1088,9 +1091,9 @@ else
     echo "❌ Dashboard process failed to start"
     echo "Dashboard log output:"
     cat dashboard.log
-    echo "Trying alternative startup method..."
-    # Try starting without backgrounding to see error
-    timeout 10 npm run dev -- --host 0.0.0.0 --port 5173 || echo "Dashboard startup failed"
+    echo "Trying to start dashboard in foreground to see error..."
+    timeout 15 npm run dev -- --host 0.0.0.0 --port 5173 2>&1 || echo "Dashboard startup failed - check dashboard.log for details"
+    exit 1
 fi
 cd ..
 
