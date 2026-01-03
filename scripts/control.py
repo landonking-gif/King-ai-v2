@@ -489,21 +489,35 @@ if systemctl is-active --quiet postgresql; then
         sed -i 's|king:password|king:LeiaPup21|g' .env
         echo "✅ Database configuration updated in .env"
     fi
+    
+    # Check if Redis is also running
+    if systemctl is-active --quiet redis-server; then
+        echo "📡 Using system Redis service..."
+        USE_SYSTEM_SERVICES=true
+    else
+        echo "🐳 Using Docker Redis (PostgreSQL is system service)..."
+        USE_SYSTEM_SERVICES=false
+    fi
 else
     echo "🐳 Using Docker PostgreSQL..."
+    USE_SYSTEM_SERVICES=false
 fi
 
-# 6. Start databases (Docker)
-echo "🗄️  Starting databases..."
-# Remove existing containers if they exist
-docker rm -f kingai-postgres 2>/dev/null || true
-docker rm -f kingai-redis 2>/dev/null || true
-docker run -d --name kingai-postgres -e POSTGRES_USER=king -e POSTGRES_PASSWORD=LeiaPup21 -e POSTGRES_DB=kingai -p 5432:5432 postgres:15
-docker run -d --name kingai-redis -p 6379:6379 redis:7
-
-# 7. Wait for databases to be ready
-echo "⏳ Waiting for databases to start..."
-sleep 10
+# 6. Start databases (Docker) - only if not using system services
+if [ "$USE_SYSTEM_SERVICES" = false ]; then
+    echo "🗄️  Starting databases..."
+    # Remove existing containers if they exist
+    docker rm -f kingai-postgres 2>/dev/null || true
+    docker rm -f kingai-redis 2>/dev/null || true
+    docker run -d --name kingai-postgres -e POSTGRES_USER=king -e POSTGRES_PASSWORD=LeiaPup21 -e POSTGRES_DB=kingai -p 5432:5432 postgres:15
+    docker run -d --name kingai-redis -p 6379:6379 redis:7
+    
+    # 7. Wait for databases to be ready
+    echo "⏳ Waiting for databases to start..."
+    sleep 10
+else
+    echo "🗄️  Using system database services..."
+fi
 
 # 8. Run database migrations
 echo "🗃️  Running database migrations..."
