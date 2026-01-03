@@ -1318,7 +1318,7 @@ def check_disk_space(ip, key_path):
 def check_network_connectivity(ip, key_path):
     """Check network connectivity."""
     try:
-        result = run(f"ssh -o StrictHostKeyChecking=no -i \"{key_path}\" ubuntu@{ip} 'curl -s --max-time 10 google.com > /dev/null && echo OK'", capture=True)
+        result = run(f"ssh -o StrictHostKeyChecking=no -i \"{key_path}\" ubuntu@{ip} \"curl -s --max-time 10 google.com > /dev/null && echo OK\"", capture=True)
         return result and "OK" in result
     except:
         return False
