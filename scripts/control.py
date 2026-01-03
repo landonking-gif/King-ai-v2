@@ -776,6 +776,29 @@ class IntegrationTester:
             pass
         return False
     
+    async def test_redis(self) -> bool:
+        """Test Redis connection"""
+        try:
+            import redis
+            redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+            
+            # Parse Redis URL
+            if redis_url.startswith("redis://"):
+                # Extract host and port from URL
+                import urllib.parse
+                parsed = urllib.parse.urlparse(redis_url)
+                host = parsed.hostname or "localhost"
+                port = parsed.port or 6379
+                password = parsed.password
+                
+                r = redis.Redis(host=host, port=port, password=password, decode_responses=True)
+                r.ping()
+                print("✅ Redis: Connected successfully")
+                return True
+        except:
+            pass
+        return False
+    
     async def test_plaid(self) -> bool:
         """Test Plaid integration"""
         client_id = os.getenv("PLAID_CLIENT_ID")
@@ -1126,15 +1149,15 @@ EOF
 
 # Check if ports 9090-9095 are available
 MONITORING_PORT=9090
-for port in range(9090, 9096):
+for port in 9090 9091 9092 9093 9094 9095; do
     if ! lsof -i :$port >/dev/null 2>&1; then
         MONITORING_PORT=$port
         break
     fi
 done
 
-if [ "$MONITORING_PORT" = "9095" ]; then
-    echo "⚠️ All monitoring ports (9090-9094) are in use, using 9095 anyway"
+if [ "$MONITORING_PORT" = "9095" ] && lsof -i :9095 >/dev/null 2>&1; then
+    echo "⚠️ All monitoring ports (9090-9095) are in use, using 9095 anyway"
 fi
 
 echo "📊 Using monitoring port: $MONITORING_PORT"
