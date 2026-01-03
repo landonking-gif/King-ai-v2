@@ -1297,7 +1297,7 @@ def test_ssh_connection(ip, key_path):
 def check_system_requirements(ip, key_path):
     """Check basic system requirements."""
     try:
-        result = run(f"ssh -o StrictHostKeyChecking=no -i \"{key_path}\" ubuntu@{ip} 'lsb_release -d'", capture=True)
+        result = run(f"ssh -o StrictHostKeyChecking=no -i \"{key_path}\" ubuntu@{ip} 'cat /etc/os-release | grep -i ubuntu'", capture=True)
         return result and "Ubuntu" in result
     except:
         return False
