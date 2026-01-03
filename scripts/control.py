@@ -1305,8 +1305,7 @@ def check_system_requirements(ip, key_path):
 def check_disk_space(ip, key_path):
     """Check available disk space."""
     try:
-        awk_cmd = "awk '{print $4}'"
-        cmd = f"ssh -o StrictHostKeyChecking=no -i \"{key_path}\" ubuntu@{ip} 'df / | tail -1 | {awk_cmd}'"
+        cmd = f"ssh -o StrictHostKeyChecking=no -i \"{key_path}\" ubuntu@{ip} \"df / | tail -1 | awk '{{print \\$4}}'\""
         result = run(cmd, capture=True)
         if result:
             available_kb = int(result.strip())
