@@ -2003,7 +2003,6 @@ if [ -f "src/requirements.txt" ]; then
 else
     ./venv/bin/pip install .
 fi
-./venv/bin/pip install psycopg2-binary
 
 echo "💻 Installing Dashboard Dependencies..."
 cd dashboard
