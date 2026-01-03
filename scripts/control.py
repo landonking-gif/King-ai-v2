@@ -1413,7 +1413,7 @@ EOF
     echo "✅ Nginx with SSL configured for $domain"
 else
     # Configure Nginx without SSL
-    sudo tee /etc/nginx/sites-available/king-ai > /dev/null << 'EOF'
+    sudo tee /etc/nginx/sites-available/king-ai > /dev/null << EOF
 server {
     listen 80;
     server_name _;
@@ -1421,24 +1421,24 @@ server {
     # API proxy
     location /api/ {
         proxy_pass http://localhost:8000/;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
     }
     
     # Dashboard proxy
     location / {
         proxy_pass http://localhost:5173/;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
     }
     
     # Metrics proxy
     location /metrics/ {
-        proxy_pass http://localhost:9090/;
+        proxy_pass http://localhost:\$MONITORING_PORT/;
     }
 }
 EOF
@@ -1468,7 +1468,7 @@ sudo ufw allow 443
 # Allow application ports (for direct access if needed)
 sudo ufw allow 8000
 sudo ufw allow 5173
-sudo ufw allow 9090
+sudo ufw allow $MONITORING_PORT
 
 # Reload firewall
 sudo ufw reload
