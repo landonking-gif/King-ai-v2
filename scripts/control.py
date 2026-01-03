@@ -377,17 +377,21 @@ def sync_to_github(repo_url=None, branch="main", commit_msg=None):
     """Sync local code to GitHub repository with improved error handling."""
     log("Syncing code to GitHub...", "ACTION")
 
+    remote_name = "origin"  # Default fallback
+    
     if not repo_url:
         # Try to get repo URL from git config - check for any remote, not just origin
         try:
             # First try origin
             repo_url = run("git config --get remote.origin.url", capture=True)
-            if not repo_url:
+            if repo_url:
+                remote_name = "origin"
+            else:
                 # If no origin, try to get any remote
                 remotes = run("git remote", capture=True)
                 if remotes:
-                    first_remote = remotes.strip().split('\n')[0]
-                    repo_url = run(f"git config --get remote.{first_remote}.url", capture=True)
+                    remote_name = remotes.strip().split('\n')[0]
+                    repo_url = run(f"git config --get remote.{remote_name}.url", capture=True)
             
             if not repo_url:
                 log("No git remote configured. Skipping GitHub sync - deployment will continue.", "WARN")
@@ -429,13 +433,13 @@ def sync_to_github(repo_url=None, branch="main", commit_msg=None):
 
         # Check if remote branch exists, if not push with upstream
         try:
-            run(f"git ls-remote --heads origin {branch}", capture=True)
+            run(f"git ls-remote --heads {remote_name} {branch}", capture=True)
             # Branch exists, push normally
-            run(f"git push origin {branch}")
+            run(f"git push {remote_name} {branch}")
         except:
             # Branch might not exist, try to create it
             log(f"Creating and pushing {branch} branch", "INFO")
-            run(f"git push -u origin {branch}")
+            run(f"git push -u {remote_name} {branch}")
 
         log("Code synced to GitHub successfully!", "SUCCESS")
         return True
