@@ -1106,14 +1106,18 @@ EOF
 # Check if ports 9090-9095 are available
 MONITORING_PORT=9090
 for port in 9090 9091 9092 9093 9094 9095; do
-    if ! lsof -i :$port >/dev/null 2>&1; then
+    if ! lsof -i :$port >/dev/null 2>&1 && ! netstat -tln 2>/dev/null | grep -q ":$port "; then
         MONITORING_PORT=$port
+        echo "✅ Found available monitoring port: $MONITORING_PORT"
         break
+    else
+        echo "❌ Port $port is in use, trying next..."
     fi
 done
 
-if [ "$MONITORING_PORT" = "9095" ] && lsof -i :9095 >/dev/null 2>&1; then
+if [ "$MONITORING_PORT" = "9095" ] && (lsof -i :9095 >/dev/null 2>&1 || netstat -tln 2>/dev/null | grep -q ":9095 "); then
     echo "⚠️ All monitoring ports (9090-9095) are in use, using 9095 anyway"
+    echo "💡 Consider stopping other services using these ports"
 fi
 
 echo "📊 Using monitoring port: $MONITORING_PORT"
@@ -1533,7 +1537,7 @@ echo "✅ Security hardening applied"
 echo "⚡ Applying performance optimizations..."
 
 # Increase system limits
-cat >> /etc/security/limits.conf << 'EOF'
+sudo tee -a /etc/security/limits.conf > /dev/null << 'EOF'
 ubuntu soft nofile 65536
 ubuntu hard nofile 65536
 ubuntu soft nproc 65536
