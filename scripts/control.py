@@ -495,8 +495,11 @@ fi
 
 # 6. Start databases (Docker)
 echo "🗄️  Starting databases..."
-docker run -d --name kingai-postgres -e POSTGRES_USER=king -e POSTGRES_PASSWORD=LeiaPup21 -e POSTGRES_DB=kingai -p 5432:5432 postgres:15 || echo "PostgreSQL already running"
-docker run -d --name kingai-redis -p 6379:6379 redis:7 || echo "Redis already running"
+# Remove existing containers if they exist
+docker rm -f kingai-postgres 2>/dev/null || true
+docker rm -f kingai-redis 2>/dev/null || true
+docker run -d --name kingai-postgres -e POSTGRES_USER=king -e POSTGRES_PASSWORD=LeiaPup21 -e POSTGRES_DB=kingai -p 5432:5432 postgres:15
+docker run -d --name kingai-redis -p 6379:6379 redis:7
 
 # 7. Wait for databases to be ready
 echo "⏳ Waiting for databases to start..."
@@ -508,8 +511,12 @@ alembic upgrade heads
 
 # 9. Start Ollama service and pull model
 echo "🤖 Starting Ollama service..."
-ollama serve &
-sleep 5
+if ! pgrep -f "ollama serve" > /dev/null; then
+    ollama serve &
+    sleep 5
+else
+    echo "Ollama already running"
+fi
 timeout 600 ollama pull llama3.1:8b || echo "Model download timed out or already downloaded"
 
 # 10. Configure and test all integrations using available API keys
@@ -788,10 +795,18 @@ class IntegrationTester:
         
         for path in [audit_path, docs_path]:
             try:
-                Path(path).parent.mkdir(parents=True, exist_ok=True)
+                Path(path).mkdir(parents=True, exist_ok=True)
                 print(f"✅ Data path: {path}")
-            except:
-                issues.append(f"Cannot create data path: {path}")
+            except Exception as e:
+                print(f"⚠️  Cannot create data path: {path} - {e}")
+                # Try with sudo if regular creation fails
+                try:
+                    import subprocess
+                    subprocess.run(["sudo", "mkdir", "-p", path], check=True)
+                    subprocess.run(["sudo", "chown", "-R", os.getenv("USER", "ubuntu"), path], check=True)
+                    print(f"✅ Data path created with sudo: {path}")
+                except:
+                    issues.append(f"Cannot create data path: {path}")
         
         # Check numeric values
         try:
@@ -1171,7 +1186,7 @@ WantedBy=multi-user.target
 EOF
 
 # Create systemd service for dashboard
-cat > /etc/systemd/system/king-ai-dashboard.service << 'EOF'
+sudo tee /etc/systemd/system/king-ai-dashboard.service > /dev/null << 'EOF'
 [Unit]
 Description=King AI v2 Dashboard
 After=network.target king-ai-api.service
@@ -1622,7 +1637,7 @@ receivers:
 EOF
 
 # Create AlertManager systemd service
-cat > /etc/systemd/system/alertmanager.service << 'EOF'
+sudo tee /etc/systemd/system/alertmanager.service > /dev/null << 'EOF'
 [Unit]
 Description=AlertManager
 Wants=network-online.target
@@ -1866,7 +1881,7 @@ echo "🎯 Ready to build your AI empire!"
             run(f'scp {ssh_opts} ".env" ubuntu@{ip}:~/king-ai-v2/.env')
         else:
             # Create basic .env on server
-            run(f'ssh {ssh_opts} ubuntu@{ip} "cat > king-ai-v2/.env << \'EOF\'\n# Basic King AI v2 Configuration\n# Add your API keys here\n\n# Database\nDATABASE_URL=postgresql+asyncpg://kingadmin:changeme@localhost/kingai\nREDIS_URL=redis://localhost:6379\n\n# API Keys (replace with your keys)\nOPENAI_API_KEY=your_openai_key\nANTHROPIC_API_KEY=your_anthropic_key\n\n# System Settings\nRISK_PROFILE=moderate\nENABLE_AUTONOMOUS_MODE=false\nMAX_AUTO_APPROVE_AMOUNT=100.0\nEOF"')
+            run(f'ssh {ssh_opts} ubuntu@{ip} "cat > king-ai-v2/.env << \'EOF\'\n# Basic King AI v2 Configuration\n# Add your API keys here\n\n# Database\nDATABASE_URL=postgresql+asyncpg://kingadmin:changeme@localhost/kingai\nREDIS_URL=redis://localhost:6379\n\n# API Keys (replace with your keys)\nOPENAI_API_KEY=your_openai_key\nANTHROPIC_API_KEY=your_anthropic_key\n\n# System Settings\nRISK_PROFILE=moderate\nPRIMARY_MODEL=ollama\nENABLE_AUTONOMOUS_MODE=false\nMAX_AUTO_APPROVE_AMOUNT=100.0\nEOF"')
 
         # Then run the setup script
         run(f'scp {ssh_opts} "{setup_script_path}" ubuntu@{ip}:~/automated_setup.sh')
