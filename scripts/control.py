@@ -2967,7 +2967,7 @@ echo "🎯 Ready to build your AI empire!"
 '''
 
     # Upload and run automated setup script
-    setup_script_path = ROOT_DIR / "automated_setup.sh"
+    setup_script_path = ROOT_DIR / "temp_setup.sh"
     
     # Ensure Unix line endings
     setup_script = setup_script.replace('\r\n', '\n').replace('\r', '\n')
@@ -2989,9 +2989,10 @@ echo "🎯 Ready to build your AI empire!"
             run(f'ssh {ssh_opts} ubuntu@{ip} "cat > king-ai-v2/.env << \'EOF\'\n# Basic King AI v2 Configuration\n# Add your API keys here\n\n# Database\nDATABASE_URL=postgresql+asyncpg://kingadmin:changeme@localhost/kingai\nREDIS_URL=redis://localhost:6379\n\n# API Keys (replace with your keys)\nOPENAI_API_KEY=your_openai_key\nANTHROPIC_API_KEY=your_anthropic_key\n\n# System Settings\nRISK_PROFILE=moderate\nPRIMARY_MODEL=ollama\nENABLE_AUTONOMOUS_MODE=false\nMAX_AUTO_APPROVE_AMOUNT=100.0\nEOF"')
 
         # Then run the setup script
-        run(f'scp {ssh_opts} "{setup_script_path}" ubuntu@{ip}:~/automated_setup.sh')
+        run(f'scp {ssh_opts} "{setup_script_path}" ubuntu@{ip}:/tmp/setup.sh')
+        run(f'ssh {ssh_opts} ubuntu@{ip} chmod +x /tmp/setup.sh')
         try:
-            run(f'ssh {ssh_opts} ubuntu@{ip} "chmod +x automated_setup.sh && cp automated_setup.sh king-ai-v2/ && cd king-ai-v2 && bash automated_setup.sh"')
+            run(f'ssh {ssh_opts} ubuntu@{ip} /tmp/setup.sh')
         except Exception as e:
             log(f"Automated setup failed: {e}", "ERROR")
             log("Attempting to continue with manual service startup...", "WARN")
