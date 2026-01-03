@@ -581,7 +581,7 @@ sleep 10
 
 # 8. Run database migrations
 echo "🗃️  Running database migrations..."
-alembic upgrade head
+alembic upgrade heads
 
 # 9. Start Ollama service and pull model
 echo "🤖 Starting Ollama service..."
