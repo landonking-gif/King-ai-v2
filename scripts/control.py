@@ -2968,6 +2968,10 @@ echo "🎯 Ready to build your AI empire!"
 
     # Upload and run automated setup script
     setup_script_path = ROOT_DIR / "automated_setup.sh"
+    
+    # Ensure Unix line endings
+    setup_script = setup_script.replace('\r\n', '\n').replace('\r', '\n')
+    
     with open(setup_script_path, "w", newline='\n', encoding='utf-8') as f:
         f.write(setup_script)
 
