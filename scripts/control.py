@@ -395,11 +395,12 @@ pip install --upgrade pip
 echo "📦 Installing Python dependencies..."
 pip install -e .
 
-# 3. Install dashboard dependencies
-echo "💻 Installing dashboard dependencies..."
-cd dashboard
-npm install
-cd ..
+# 3. Install Node.js 20+ (required for Vite)
+echo "📦 Installing Node.js 20+ (required for dashboard)..."
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt-get install -y nodejs
+node --version
+npm --version
 
 # 4. Configure environment
 echo "⚙️  Configuring environment..."
@@ -775,24 +776,24 @@ class IntegrationTester:
             pass
         return False
     
-    async def test_plaid(self) -> bool:
-        """Test Plaid integration"""
-        client_id = os.getenv("PLAID_CLIENT_ID")
-        secret = os.getenv("PLAID_SECRET")
-        
-        if not client_id or not secret:
-            return False
-            
+    async def test_redis(self) -> bool:
+        """Test Redis connection"""
         try:
-            # Test Plaid API (get institutions)
-            response = requests.post(
-                "https://sandbox.plaid.com/institutions/get",
-                json={"count": 1, "offset": 0},
-                auth=(client_id, secret),
-                timeout=10
-            )
-            if response.status_code == 200:
-                print("✅ Plaid: Configured and tested")
+            import redis
+            redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+            
+            # Parse Redis URL
+            if redis_url.startswith("redis://"):
+                # Extract host and port from URL
+                import urllib.parse
+                parsed = urllib.parse.urlparse(redis_url)
+                host = parsed.hostname or "localhost"
+                port = parsed.port or 6379
+                password = parsed.password
+                
+                r = redis.Redis(host=host, port=port, password=password, decode_responses=True)
+                r.ping()
+                print("✅ Redis: Connected successfully")
                 return True
         except:
             pass
@@ -1112,18 +1113,28 @@ async def update_metrics():
         await checker.close_session()
 
 if __name__ == '__main__':
-    # Start Prometheus metrics server on port 9090
-    start_http_server(9090)
-    print("🚀 Advanced monitoring server started on port 9090")
-    print("📊 Metrics available at: http://localhost:9090")
+    import sys
+    port = int(sys.argv[1]) if len(sys.argv) > 1 else 9090
+    # Start Prometheus metrics server
+    start_http_server(port)
+    print(f"🚀 Advanced monitoring server started on port {port}")
+    print(f"📊 Metrics available at: http://localhost:{port}")
     
     # Start monitoring loop
     asyncio.run(update_metrics())
 EOF
 
+# Check if port 9090 is already in use
+if lsof -i :9090 >/dev/null 2>&1; then
+    echo "⚠️ Port 9090 already in use, using port 9091 for monitoring"
+    MONITORING_PORT=9091
+else
+    MONITORING_PORT=9090
+fi
+
 # Start advanced monitoring
-python3 advanced_monitoring.py &
-echo "Monitoring setup complete - metrics available at :9090"
+python3 advanced_monitoring.py $MONITORING_PORT &
+echo "Monitoring setup complete - metrics available at :$MONITORING_PORT"
 
 # 12. Start the API server
 echo "🚀 Starting API server..."
