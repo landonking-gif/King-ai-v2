@@ -373,9 +373,22 @@ def upload_env_file(ip, key_path):
         log(f"Failed to upload .env file: {e}", "ERROR")
         return False
 
-def sync_to_github(repo_url=None, branch="main", commit_msg=None):
+def sync_to_github(repo_url=None, branch=None, commit_msg=None):
     """Sync local code to GitHub repository with improved error handling."""
     log("Syncing code to GitHub...", "ACTION")
+
+    # Detect current branch if not specified
+    if not branch:
+        try:
+            current_branch = run("git branch --show-current", capture=True)
+            if current_branch:
+                branch = current_branch.strip()
+            else:
+                branch = "main"  # fallback
+        except:
+            branch = "main"  # fallback
+    
+    log(f"Using branch: {branch}", "INFO")
 
     remote_name = "origin"  # Default fallback
     
