@@ -138,7 +138,7 @@ def find_key_file():
         return None
     return keys[0]
 
-def run(cmd, cwd=None, capture=False):
+def run(cmd, cwd=None, capture=False, check=True):
     """Run a shell command."""
     if cmd.startswith("terraform "):
         cmd = TERRAFORM_PATH + cmd[9:]
@@ -165,7 +165,7 @@ def run(cmd, cwd=None, capture=False):
         result = subprocess.run(
             cmd,
             shell=True,
-            check=True,
+            check=check,
             cwd=cwd or ROOT_DIR,
             stdout=subprocess.PIPE if capture else None,
             stderr=subprocess.PIPE if capture else None,
@@ -177,7 +177,8 @@ def run(cmd, cwd=None, capture=False):
         if capture:
             return None
         log(f"Command failed: {cmd}", "ERROR")
-        return None
+        log(f"Error output: {e.stderr}", "ERROR")
+        raise  # Re-raise to let caller handle
 
 def upload_env_file(ip, key_path):
     """Upload the local .env file to the remote server project directory."""
@@ -233,7 +234,7 @@ echo "Checking system dependencies..."
 sudo apt update
 
 # Install required packages if not present
-PACKAGES="python3 python3-pip python3-venv postgresql postgresql-contrib redis-server curl docker.io"
+PACKAGES="python3 python3-pip python3-venv postgresql postgresql-contrib redis-server curl"
 for pkg in $PACKAGES; do
     if ! dpkg -l | grep -q "^ii  $pkg"; then
         echo "Installing $pkg..."
@@ -242,6 +243,19 @@ for pkg in $PACKAGES; do
         echo "$pkg already installed"
     fi
 done
+
+# Resolve Docker containerd conflict before installing Docker
+echo "Resolving Docker containerd conflict..."
+sudo apt remove --purge containerd.io || true
+sudo apt autoremove -y || true
+
+# Install Docker if not present
+if ! dpkg -l | grep -q "^ii  docker.io"; then
+    echo "Installing docker.io..."
+    sudo apt install -y docker.io
+else
+    echo "docker.io already installed"
+fi
 
 # Install Node.js 18+ if not present
 if ! command -v node &> /dev/null || [[ $(node -v | sed 's/v//') < "18.0.0" ]]; then
@@ -283,6 +297,8 @@ def pull_from_github(ip, key_path):
 
     pull_script = '''
 #!/bin/bash
+# Ensure king-ai-v2 directory exists
+mkdir -p king-ai-v2
 cd king-ai-v2
 
 # Initialize git if not already done
@@ -1834,6 +1850,9 @@ echo "🎯 Ready to build your AI empire!"
         f.write(setup_script)
 
     try:
+        # Ensure king-ai-v2 directory exists on server
+        run(f'ssh {ssh_opts} ubuntu@{ip} "mkdir -p king-ai-v2"')
+        
         # First upload the .env file with API keys
         log("Uploading configuration with API keys...", "ACTION")
         run(f'scp {ssh_opts} ".env" ubuntu@{ip}:~/king-ai-v2/.env', capture=True)
@@ -2460,6 +2479,9 @@ def main():
         sync_to_github()
         check_server_dependencies(target_ip, key_file)
         pull_from_github(target_ip, key_file)
+        # Reload config in case it was updated by git pull
+        config = load_config()
+        target_ip = config.get("aws_ip", target_ip)
         automated_setup(target_ip, key_file)
         
         # Start local dashboard
@@ -2470,9 +2492,21 @@ def main():
             dashboard_dir = ROOT_DIR / "dashboard"
             if dashboard_dir.exists():
                 log("Dashboard will start in background. Access at http://localhost:5173", "INFO")
+                # Check if npm is available
+                try:
+                    subprocess.run(["npm", "--version"], capture_output=True, check=True)
+                    npm_cmd = ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
+                except:
+                    # Try with npx or full path
+                    try:
+                        subprocess.run(["npx", "--version"], capture_output=True, check=True)
+                        npm_cmd = ["npx", "vite", "--host", "0.0.0.0", "--port", "5173"]
+                    except:
+                        log("npm/npx not found. Please install Node.js and npm.", "ERROR")
+                        raise
                 # Start dashboard in background
                 subprocess.Popen(
-                    ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"],
+                    npm_cmd,
                     cwd=str(dashboard_dir),
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
