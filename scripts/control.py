@@ -548,15 +548,30 @@ def pull_from_github(ip, key_path):
 
     ssh_opts = f"-o StrictHostKeyChecking=no -i \"{key_path}\""
 
-    # Try to get repo URL from local git config
+    # Detect remote name and URL from local git config
+    remote_name = "origin"  # Default fallback
+    repo_url = None
+    
     try:
+        # First try origin
         repo_url = run("git config --get remote.origin.url", capture=True)
+        if repo_url:
+            remote_name = "origin"
+        else:
+            # If no origin, try to get any remote
+            remotes = run("git remote", capture=True)
+            if remotes:
+                remote_name = remotes.strip().split('\n')[0]
+                repo_url = run(f"git config --get remote.{remote_name}.url", capture=True)
+        
         if not repo_url:
             log("No git remote configured locally. Using default.", "WARN")
             repo_url = "https://github.com/landonking-gif/King-ai-v2.git"
+            remote_name = "origin"
     except Exception as e:
         log(f"Could not get local git remote: {e}", "WARN")
         repo_url = "https://github.com/landonking-gif/King-ai-v2.git"
+        remote_name = "origin"
 
     pull_script = f'''
 #!/bin/bash
@@ -581,27 +596,27 @@ cd king-ai-v2
 if [ ! -d ".git" ]; then
     log "Initializing git repository..."
     git init
-    git remote add origin {repo_url}
+    git remote add {remote_name} {repo_url}
     log "Git repository initialized with remote: {repo_url}"
 fi
 
 # Fetch latest changes
 log "Fetching latest changes..."
-git fetch origin
+git fetch {remote_name}
 
 # Try to pull from main branch first, then master
 log "Pulling latest changes..."
-if git ls-remote --heads origin main | grep -q main; then
+if git ls-remote --heads {remote_name} main | grep -q main; then
     log "Using main branch..."
-    git checkout main 2>/dev/null || git checkout -b main origin/main
-    git pull origin main
-elif git ls-remote --heads origin master | grep -q master; then
+    git checkout main 2>/dev/null || git checkout -b main {remote_name}/main
+    git pull {remote_name} main
+elif git ls-remote --heads {remote_name} master | grep -q master; then
     log "Using master branch..."
-    git checkout master 2>/dev/null || git checkout -b master origin/master
-    git pull origin master
+    git checkout master 2>/dev/null || git checkout -b master {remote_name}/master
+    git pull {remote_name} master
 else
     log "No main or master branch found, using current branch..."
-    git pull origin HEAD || log "Pull failed, but continuing..."
+    git pull {remote_name} HEAD || log "Pull failed, but continuing..."
 fi
 
 log "Git pull completed successfully!"
