@@ -1105,19 +1105,25 @@ EOF
 
 # Check if ports 9090-9095 are available
 MONITORING_PORT=9090
+FOUND_AVAILABLE=false
+
+echo "🔍 Checking for available monitoring ports..."
 for port in 9090 9091 9092 9093 9094 9095; do
+    echo "Checking port $port..."
     if ! lsof -i :$port >/dev/null 2>&1 && ! netstat -tln 2>/dev/null | grep -q ":$port "; then
         MONITORING_PORT=$port
+        FOUND_AVAILABLE=true
         echo "✅ Found available monitoring port: $MONITORING_PORT"
         break
     else
-        echo "❌ Port $port is in use, trying next..."
+        echo "❌ Port $port is in use"
     fi
 done
 
-if [ "$MONITORING_PORT" = "9095" ] && (lsof -i :9095 >/dev/null 2>&1 || netstat -tln 2>/dev/null | grep -q ":9095 "); then
-    echo "⚠️ All monitoring ports (9090-9095) are in use, using 9095 anyway"
-    echo "💡 Consider stopping other services using these ports"
+if [ "$FOUND_AVAILABLE" = false ]; then
+    echo "⚠️ All monitoring ports (9090-9095) are in use"
+    echo "💡 Using port 9090 anyway - monitoring may fail"
+    MONITORING_PORT=9090
 fi
 
 echo "📊 Using monitoring port: $MONITORING_PORT"
@@ -1545,7 +1551,7 @@ ubuntu hard nproc 65536
 EOF
 
 # Optimize kernel parameters
-cat >> /etc/sysctl.conf << 'EOF'
+sudo tee -a /etc/sysctl.conf > /dev/null << 'EOF'
 # Network optimization
 net.core.somaxconn = 65536
 net.ipv4.tcp_max_syn_backlog = 65536
