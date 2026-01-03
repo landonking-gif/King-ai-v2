@@ -1268,16 +1268,12 @@ sudo apt install -y nginx certbot python3-certbot-nginx
 
 # Get server domain/IP for SSL
 
-# --- System Cleanup: Fix apt sources and Docker dependencies ---
-echo "\n🧹 Cleaning up apt sources and Docker dependencies..."
+# --- System Cleanup: Fix apt sources ---
+echo "\n🧹 Cleaning up apt sources..."
 sudo rm -f /etc/apt/sources.list.d/archive_uri-https_developer_download_nvidia_com_compute_cuda_repos_ubuntu2204_x86_64_-jammy.list
 sudo rm -f /etc/apt/sources.list.d/cuda-ubuntu2204-x86_64.list
-sudo apt-mark unhold docker-ce docker-ce-cli containerd.io
-sudo apt-get remove -y containerd containerd.io docker-ce docker-ce-cli docker-compose-plugin
-sudo apt-get update
-sudo apt-get install -y docker.io
 sudo apt-get autoremove -y
-echo "Apt sources cleaned and Docker reinstalled."
+echo "Apt sources cleaned."
 
 read -p "Enter your domain name (or press Enter to skip SSL): " domain
 
