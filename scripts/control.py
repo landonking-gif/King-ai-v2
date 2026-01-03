@@ -458,6 +458,7 @@ if command -v terraform &> /dev/null && [ -d "infrastructure/terraform" ]; then
         fi
     else
         echo "⚠️  Terraform state not found or not initialized. Using existing configuration."
+        cd ../..
         if [ ! -f ".env" ]; then
             echo "⚠️  .env file not found. Please ensure .env is uploaded to the server."
             exit 1
@@ -1901,7 +1902,7 @@ echo "🎯 Ready to build your AI empire!"
 
         # Then run the setup script
         run(f'scp {ssh_opts} "{setup_script_path}" ubuntu@{ip}:~/automated_setup.sh')
-        run(f'ssh {ssh_opts} ubuntu@{ip} "chmod +x automated_setup.sh && cp automated_setup.sh king-ai-v2/ && cd king-ai-v2 && ./automated_setup.sh"')
+        run(f'ssh {ssh_opts} ubuntu@{ip} "chmod +x automated_setup.sh && cp automated_setup.sh king-ai-v2/ && cd king-ai-v2 && bash automated_setup.sh"')
         
         # Start the services
         log("Starting King AI v2 services...", "ACTION")
