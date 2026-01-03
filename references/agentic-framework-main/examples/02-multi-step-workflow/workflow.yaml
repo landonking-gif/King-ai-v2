@@ -1,0 +1,70 @@
+manifest_id: research-workflow
+name: Multi-Step Research Workflow
+version: "1.0.0"
+description: Demonstrates a multi-step workflow with multiple agents collaborating
+
+steps:
+  - id: research
+    role: research
+    description: Research the topic and gather information
+    capabilities:
+      - web_search
+      - summarize
+    inputs:
+      - name: query
+        source: user_input
+        description: Research query from user
+    outputs:
+      - research_snippet
+    timeout: 60
+
+  - id: verify
+    role: verification
+    description: Verify facts and check sources
+    capabilities:
+      - fact_check
+    inputs:
+      - name: research_data
+        source: previous_step
+        step: research
+        artifact: research_snippet
+    outputs:
+      - claim_verification
+    timeout: 45
+
+  - id: synthesize
+    role: synthesis
+    description: Synthesize findings into final report
+    capabilities:
+      - text_generation
+      - summarize
+    inputs:
+      - name: research
+        source: step
+        step: research
+        artifact: research_snippet
+      - name: verification
+        source: previous_step
+        step: verify
+        artifact: claim_verification
+    outputs:
+      - final_report
+    timeout: 30
+
+memory:
+  persist_on:
+    - step_complete
+    - workflow_complete
+  compaction:
+    strategy: summarize
+    max_tokens: 8000
+
+tools:
+  catalog_ids:
+    - web_search
+    - fact_check
+
+policies:
+  requires_human_approval: false
+  max_retries: 3
+  on_error: fail

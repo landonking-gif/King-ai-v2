@@ -1,0 +1,199 @@
+# Example External MCP Server Configurations
+# This file shows how to define external MCP servers for registration
+
+# Example 1: GitHub MCP Server (external, API key auth)
+- tool_id: github_external
+  name: GitHub MCP Server
+  version: 1.2.0
+  owner: integrations-team
+  contact: integrations@company.com
+  endpoint: https://mcp-servers.github.com/api/v2
+  auth_flow: api_key
+  classification:
+    - external_call
+    - safe
+  rate_limits:
+    max_calls: 100
+    window_seconds: 60
+  metadata:
+    api_key_env: GITHUB_MCP_API_KEY
+    workspace_id: your-workspace-id
+  tools:
+    - name: get_repository
+      description: Get repository information
+      parameters:
+        - name: owner
+          type: string
+          description: Repository owner username
+          required: true
+        - name: repo
+          type: string
+          description: Repository name
+          required: true
+      returns: Repository details including stars, forks, and description
+
+    - name: create_issue
+      description: Create a new GitHub issue
+      parameters:
+        - name: owner
+          type: string
+          description: Repository owner
+          required: true
+        - name: repo
+          type: string
+          description: Repository name
+          required: true
+        - name: title
+          type: string
+          description: Issue title
+          required: true
+        - name: body
+          type: string
+          description: Issue body
+          required: false
+      returns: Created issue number and URL
+
+# Example 2: Slack MCP Server (external, OAuth2)
+- tool_id: slack_production
+  name: Slack MCP Server
+  version: 2.1.0
+  owner: integrations-team
+  contact: integrations@company.com
+  endpoint: https://mcp-api.slack.com/v2
+  auth_flow: oauth2
+  classification:
+    - external_call
+    - pii_risk
+    - requires_approval
+  rate_limits:
+    max_calls: 200
+    window_seconds: 60
+  metadata:
+    oauth_token_env: SLACK_BOT_TOKEN
+    workspace_id: T1234567890
+  tools:
+    - name: send_message
+      description: Send message to Slack channel
+      parameters:
+        - name: channel
+          type: string
+          description: Channel ID or name
+          required: true
+        - name: text
+          type: string
+          description: Message text
+          required: true
+        - name: attachments
+          type: array
+          description: Message attachments
+          required: false
+      returns: Message delivery confirmation with timestamp
+
+    - name: list_channels
+      description: List available Slack channels
+      parameters: []
+      returns: List of channels with IDs and names
+
+# Example 3: Internal Analytics MCP (no auth, internal network)
+- tool_id: analytics_internal
+  name: Internal Analytics MCP
+  version: 1.0.0
+  owner: data-team
+  contact: data@company.com
+  endpoint: http://analytics-mcp.internal.company.com:9000
+  auth_flow: none
+  classification:
+    - safe
+  rate_limits:
+    max_calls: 500
+    window_seconds: 60
+  metadata:
+    environment: production
+    region: us-east-1
+  tools:
+    - name: get_metrics
+      description: Get analytics metrics for date range
+      parameters:
+        - name: start_date
+          type: string
+          description: Start date (YYYY-MM-DD)
+          required: true
+        - name: end_date
+          type: string
+          description: End date (YYYY-MM-DD)
+          required: true
+        - name: metric_names
+          type: array
+          description: List of metric names
+          required: true
+      returns: Metric data as time series
+
+# Example 4: Weather API MCP (external, simple API key)
+- tool_id: weather_api
+  name: Weather API MCP
+  version: 1.0.0
+  owner: platform-team
+  contact: platform@company.com
+  endpoint: https://weather-mcp.example.com/v1
+  auth_flow: api_key
+  classification:
+    - external_call
+    - safe
+  rate_limits:
+    max_calls: 60
+    window_seconds: 60
+  metadata:
+    api_key_env: WEATHER_API_KEY
+    provider: openweathermap
+  tools:
+    - name: get_current_weather
+      description: Get current weather for a location
+      parameters:
+        - name: city
+          type: string
+          description: City name
+          required: true
+        - name: country_code
+          type: string
+          description: ISO country code (optional)
+          required: false
+        - name: units
+          type: string
+          description: Units (metric/imperial)
+          required: false
+          default: metric
+      returns: Current weather conditions including temperature, humidity, and conditions
+
+# Example 5: Custom Internal Tool (ephemeral token auth)
+- tool_id: custom_internal_tool
+  name: Custom Internal Tool
+  version: 1.0.0
+  owner: dev-team
+  contact: dev@company.com
+  endpoint: https://tools.internal.company.com/custom/v1
+  auth_flow: ephemeral_token
+  classification:
+    - side_effect
+    - requires_approval
+  rate_limits:
+    max_calls: 30
+    window_seconds: 60
+  metadata:
+    environment: staging
+  tools:
+    - name: deploy_service
+      description: Deploy a microservice to staging
+      parameters:
+        - name: service_name
+          type: string
+          description: Service identifier
+          required: true
+        - name: version
+          type: string
+          description: Version tag
+          required: true
+        - name: environment
+          type: string
+          description: Target environment
+          required: true
+      returns: Deployment status and URL

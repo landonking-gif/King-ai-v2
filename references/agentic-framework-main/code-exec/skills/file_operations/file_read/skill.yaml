@@ -1,0 +1,61 @@
+name: file_read
+version: 1.0.0
+description: |
+  Read raw contents of a file from the filesystem. Simple file access for viewing
+  source code, configuration files, and text files without semantic processing.
+
+handler: handler.read_file
+
+# Tier 1: Lightweight metadata for fast pre-filtering
+tier1:
+  short_description: "Read raw file content from filesystem"
+  category: file_operations
+  file_types: ["*"]  # Can read any file
+  intents: ["read", "show", "view", "display", "cat", "open", "see"]
+  priority: 2  # Lower priority than document_qa for document tasks
+
+# Tier 2: Rich metadata for LLM decision-making
+when_to_use: |
+  USE THIS SKILL WHEN:
+  - Reading source code files (.py, .js, .ts, .java, .go, .rs, etc.)
+  - Reading configuration files (.yaml, .json, .toml, .env, .ini)
+  - Reading small text files where raw content is sufficient
+  - User explicitly asks to "read", "show", "view", or "display" file contents
+  - Viewing log files or debugging output
+  - Reading markdown (.md) or README files for display
+  - File is small (<500 lines) and doesn't need analysis
+
+when_not_to_use: |
+  DO NOT USE THIS SKILL FOR:
+  - PDF documents - use document_qa instead (has PDF parser)
+  - Word documents (.docx) - use document_qa instead
+  - Excel files (.xlsx) - use document_qa instead
+  - PowerPoint files (.pptx) - use document_qa instead
+  - When user asks to "extract", "analyze", or "find" information - use document_qa
+  - Large documents requiring semantic search - use document_qa
+  - When source citations or page references are needed - use document_qa
+  - ESG reports, financial statements, research papers - use document_qa
+
+  IMPORTANT: If the task involves EXTRACTION or ANALYSIS of document content,
+  prefer document_qa skill which has RAG pipeline for intelligent retrieval.
+
+examples:
+  - "Show me the contents of main.py"
+  - "Read the config.yaml file"
+  - "Display the README.md"
+  - "View the .env file"
+  - "Cat the log file"
+  - "Open requirements.txt"
+
+safety_flags:
+  - file_system
+
+requires_approval: false
+
+tags:
+  - file-operations
+  - read
+  - filesystem
+  - code
+  - config
+  - text

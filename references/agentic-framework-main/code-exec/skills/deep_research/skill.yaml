@@ -1,0 +1,81 @@
+name: deep_research
+version: 1.0.0
+description: |
+  Conduct comprehensive web research with multi-iteration refinement, source fetching,
+  content extraction, fact validation, and synthesis preparation. Uses DuckDuckGo
+  for search with source validation and content extraction from multiple websites.
+
+handler: handler.deep_research
+
+# Tier 1: Lightweight metadata for fast pre-filtering
+tier1:
+  short_description: "Web research with multiple sources, validation, and synthesis"
+  category: research
+  file_types: []  # Not file-based
+  intents: ["research", "search", "find online", "look up", "compare", "investigate", "analyze market", "competitor analysis"]
+  priority: 1  # Primary skill for research tasks
+
+# Tier 2: Rich metadata for LLM decision-making
+when_to_use: |
+  ALWAYS USE THIS SKILL WHEN:
+  - User asks to "research", "investigate", or "find information" from the web
+  - User wants to compare companies, products, or industry trends
+  - Task requires gathering information from multiple external sources
+  - User needs competitor analysis or market research
+  - Validating or fact-checking information from documents
+  - Finding industry standards, benchmarks, or best practices
+  - Supplementing document extraction with external context
+  - User asks about current events or recent developments
+
+  COMBINE WITH document_qa WHEN:
+  - User has a document AND wants external research for comparison
+  - Example: "Extract KPIs from report and compare with competitors"
+
+when_not_to_use: |
+  DO NOT USE THIS SKILL WHEN:
+  - User only wants to read local files - use file_read or document_qa
+  - Information is fully contained in provided documents
+  - User explicitly says "don't search online" or "use only the document"
+  - Task is about code analysis - use code_analyzer skills
+
+examples:
+  - "Research Apple's sustainability initiatives"
+  - "Find industry standards for ESG reporting"
+  - "Compare Tata's net zero targets with competitors"
+  - "What are the latest trends in carbon emissions reporting?"
+  - "Investigate best practices for renewable energy KPIs"
+  - "Research competitor environmental commitments"
+
+safety_flags:
+  - external_call
+  - network_access
+
+requires_approval: false
+anthropic_compatible: true
+
+tags:
+  - research
+  - web
+  - analysis
+  - reports
+  - synthesis
+  - comparison
+  - competitor
+  - market
+  - trends
+  - esg
+  - sustainability
+
+dependencies:
+  - requests>=2.28.0
+  - beautifulsoup4>=4.11.0
+
+# Environment variable configuration
+config:
+  min_sources_env: DEEP_RESEARCH_MIN_SOURCES
+  max_sources_env: DEEP_RESEARCH_MAX_SOURCES
+  search_results_env: DEEP_RESEARCH_SEARCH_RESULTS
+  defaults:
+    min_sources: 10
+    max_sources: 15
+    search_results: 20

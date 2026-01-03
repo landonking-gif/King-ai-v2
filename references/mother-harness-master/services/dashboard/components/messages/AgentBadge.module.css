@@ -1,0 +1,60 @@
+/* Agent Badge Styles */
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: 2px var(--spacing-sm);
+    background: color-mix(in srgb, var(--agent-color) 15%, transparent);
+    border-radius: var(--radius-full);
+    position: relative;
+}
+
+.sm {
+    padding: 1px 6px;
+    font-size: var(--text-xs);
+}
+
+.md {
+    padding: 2px var(--spacing-sm);
+    font-size: var(--text-xs);
+}
+
+.lg {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: var(--text-sm);
+}
+
+.icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--agent-color);
+}
+
+.name {
+    color: var(--agent-color);
+    font-weight: 500;
+}
+
+.pulse {
+    width: 6px;
+    height: 6px;
+    background: var(--agent-color);
+    border-radius: 50%;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+
+    50% {
+        opacity: 0.5;
+        transform: scale(0.8);
+    }
+}

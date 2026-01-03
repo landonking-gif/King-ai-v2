@@ -1,0 +1,186 @@
+config:
+  target: "http://localhost:8000"
+  phases:
+    # Warm-up phase
+    - duration: 30
+      arrivalRate: 1
+      name: "Warm-up"
+    # Ramp up to 10 concurrent users
+    - duration: 60
+      arrivalRate: 5
+      rampTo: 10
+      name: "Ramp-up to 10 concurrent"
+    # Sustained load with 10 concurrent users
+    - duration: 180
+      arrivalRate: 10
+      name: "Sustained 10 concurrent"
+    # Cool down
+    - duration: 30
+      arrivalRate: 1
+      name: "Cool down"
+
+  # Load Artillery plugins
+  plugins:
+    metrics-by-endpoint:
+      stripQueryString: true
+
+  # Variables for test data
+  variables:
+    testQueries:
+      - "Research best practices for React testing"
+      - "Analyze API performance metrics"
+      - "Design a user authentication system"
+      - "Code a simple calculator function"
+      - "Review security vulnerabilities in web applications"
+      - "Research microservices architecture patterns"
+      - "Analyze database query optimization"
+      - "Design a caching strategy for APIs"
+      - "Implement rate limiting middleware"
+      - "Review code quality metrics"
+
+  # Performance targets
+  ensure:
+    maxErrorRate: 1              # Max 1% error rate
+    p95: 2000                     # 95th percentile under 2 seconds
+    p99: 5000                     # 99th percentile under 5 seconds
+
+  # HTTP defaults
+  http:
+    timeout: 30
+    extendedMetrics: true
+
+  # Processor for custom logic
+  processor: "./processors.js"
+
+scenarios:
+  - name: "Concurrent Task Creation and Execution"
+    weight: 70
+    flow:
+      # Authenticate
+      - post:
+          url: "/auth/google"
+          json:
+            id_token: "{{ $processEnvironment.TEST_JWT_TOKEN }}"
+          capture:
+            - json: "$.token"
+              as: "authToken"
+          expect:
+            - statusCode: 200
+
+      # Create a task
+      - post:
+          url: "/api/tasks"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          json:
+            query: "{{ $randomString() }}"
+          capture:
+            - json: "$.id"
+              as: "taskId"
+          expect:
+            - statusCode: 200
+            - hasProperty: "id"
+
+      # Wait a bit
+      - think: 1
+
+      # Get task details
+      - get:
+          url: "/api/tasks/{{ taskId }}"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          expect:
+            - statusCode: 200
+            - hasProperty: "id"
+
+      # Execute task
+      - post:
+          url: "/api/tasks/{{ taskId }}/execute"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          capture:
+            - json: "$.run_id"
+              as: "runId"
+          expect:
+            - statusCode: 200
+
+      # Poll for task completion (max 10 times)
+      - loop:
+          - get:
+              url: "/api/tasks/{{ taskId }}"
+              headers:
+                Authorization: "Bearer {{ authToken }}"
+              capture:
+                - json: "$.status"
+                  as: "taskStatus"
+          - think: 2
+          count: 10
+          whileTrue: "taskStatus != 'completed' && taskStatus != 'failed'"
+
+  - name: "Project and Library Management"
+    weight: 20
+    flow:
+      # Create a project
+      - post:
+          url: "/api/projects"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          json:
+            name: "Load Test Project {{ $randomNumber(1, 10000) }}"
+            description: "Created during load testing"
+          capture:
+            - json: "$.id"
+              as: "projectId"
+          expect:
+            - statusCode: 200
+
+      # List projects
+      - get:
+          url: "/api/projects"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          expect:
+            - statusCode: 200
+
+      # List libraries
+      - get:
+          url: "/api/libraries"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          expect:
+            - statusCode: 200
+
+  - name: "Approval Workflow"
+    weight: 10
+    flow:
+      # Get pending approvals
+      - get:
+          url: "/api/approvals/pending"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          capture:
+            - json: "$[0].id"
+              as: "approvalId"
+          expect:
+            - statusCode: 200
+
+      # If approval exists, respond to it
+      - post:
+          url: "/api/approvals/{{ approvalId }}/respond"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          json:
+            approved: true
+            notes: "Auto-approved during load test"
+          ifTrue: "approvalId"
+          expect:
+            - statusCode: [200, 404]  # 404 if no approval pending
+
+  - name: "Health Check"
+    weight: 5
+    flow:
+      - get:
+          url: "/health"
+          expect:
+            - statusCode: 200
+            - hasProperty: "status"

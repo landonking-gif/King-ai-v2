@@ -1,0 +1,78 @@
+# MCP Tool Configuration Example
+
+# This file demonstrates how to configure MCP tools for agent use
+
+mcp_servers:
+  # File System Access
+  filesystem:
+    type: builtin
+    description: Local file system operations
+    tools:
+      - file_read
+      - file_write
+      - file_list
+      - file_delete
+    scopes:
+      - path:/tmp/*
+      - path:/data/*
+    rate_limit: 100  # requests per minute
+
+  # GitHub Integration
+  github:
+    type: external
+    description: GitHub API integration
+    endpoint: https://api.github.com
+    tools:
+      - search_repos
+      - create_issue
+      - list_prs
+      - get_file_content
+    scopes:
+      - repo:read
+      - issues:write
+    auth:
+      type: bearer_token
+      env_var: GITHUB_TOKEN
+    rate_limit: 60
+
+  # Web Search
+  web_search:
+    type: external
+    description: Web search capability
+    endpoint: https://api.search.example.com
+    tools:
+      - search
+      - get_webpage
+    scopes:
+      - web:read
+    rate_limit: 30
+
+  # Firecrawl (Web Scraping)
+  firecrawl_mcp:
+    type: external
+    description: Advanced web scraping
+    tools:
+      - scrape_url
+      - crawl_site
+      - extract_content
+    scopes:
+      - web:read
+      - web:extract
+    rate_limit: 20
+
+# Default policies
+policies:
+  pii_filtering: true
+  require_approval_for:
+    - file_delete
+    - file_write
+  max_retries: 3
+  timeout_seconds: 30
+
+# Tool catalog discovery
+catalog:
+  auto_discover: true
+  refresh_interval: 3600  # seconds
+  sources:
+    - type: registry
+      url: https://mcp-registry.example.com

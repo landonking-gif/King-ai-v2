@@ -1,0 +1,154 @@
+/* Markdown Renderer Styles */
+
+.markdown {
+    font-size: var(--text-sm);
+    line-height: 1.7;
+    color: var(--text-primary);
+}
+
+/* Headers */
+.h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 1rem 0 0.5rem;
+    color: var(--text-primary);
+}
+
+.h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0.875rem 0 0.5rem;
+    color: var(--text-primary);
+}
+
+.h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0.75rem 0 0.375rem;
+    color: var(--text-primary);
+}
+
+/* Paragraphs */
+.paragraph {
+    margin: 0.5rem 0;
+}
+
+.paragraph:first-child {
+    margin-top: 0;
+}
+
+/* Lists */
+.listItem,
+.orderedItem {
+    margin: 0.25rem 0;
+    margin-left: 1.5rem;
+}
+
+.listItem {
+    list-style-type: disc;
+}
+
+.orderedItem {
+    list-style-type: decimal;
+}
+
+/* Code blocks */
+.codeBlock {
+    margin: 0.75rem 0;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-primary);
+}
+
+.codeHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.375rem 0.75rem;
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border-primary);
+}
+
+.codeLang {
+    font-size: var(--text-xs);
+    font-weight: 500;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+}
+
+.copyButton {
+    padding: 0.25rem 0.5rem;
+    font-size: var(--text-xs);
+    font-family: inherit;
+    background: transparent;
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-sm);
+    color: var(--text-tertiary);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.copyButton:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.codeContent {
+    margin: 0;
+    padding: 0.75rem;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    line-height: 1.5;
+    overflow-x: auto;
+}
+
+/* Inline code */
+.markdown :global(.inline-code) {
+    padding: 0.125rem 0.375rem;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+    color: var(--accent-primary);
+}
+
+/* Links */
+.markdown a {
+    color: var(--accent-primary);
+    text-decoration: none;
+}
+
+.markdown a:hover {
+    text-decoration: underline;
+}
+
+/* Syntax highlighting */
+.keyword {
+    color: #c678dd;
+}
+
+.string {
+    color: #98c379;
+}
+
+.number {
+    color: #d19a66;
+}
+
+.comment {
+    color: #5c6370;
+    font-style: italic;
+}
+
+.function {
+    color: #61afef;
+}
+
+.operator {
+    color: #56b6c2;
+}
+
+.default {
+    color: var(--text-secondary);
+}

@@ -1,0 +1,113 @@
+{
+  "input": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "artifacts": {
+        "type": "array",
+        "description": "List of artifacts to compact",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "Artifact ID"
+            },
+            "type": {
+              "type": "string",
+              "description": "Artifact type (research_snippet, claim_verification, etc.)"
+            },
+            "content": {
+              "type": "object",
+              "description": "Artifact content"
+            },
+            "created_at": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Creation timestamp"
+            }
+          },
+          "required": ["id", "type", "content"]
+        },
+        "minItems": 1
+      },
+      "strategy": {
+        "type": "string",
+        "description": "Compaction strategy",
+        "enum": ["summarize", "truncate", "merge", "intelligent"],
+        "default": "summarize"
+      },
+      "max_tokens": {
+        "type": "integer",
+        "description": "Maximum tokens in compacted output",
+        "minimum": 100,
+        "maximum": 8000,
+        "default": 2000
+      },
+      "preserve_fields": {
+        "type": "array",
+        "description": "Fields to always preserve (e.g., id, provenance)",
+        "items": {
+          "type": "string"
+        },
+        "default": ["id", "type", "created_at", "provenance_refs"]
+      }
+    },
+    "required": ["artifacts"],
+    "additionalProperties": false
+  },
+  "output": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "compacted_artifacts": {
+        "type": "array",
+        "description": "Compacted artifacts",
+        "items": {
+          "type": "object"
+        }
+      },
+      "original_count": {
+        "type": "integer",
+        "description": "Number of original artifacts"
+      },
+      "compacted_count": {
+        "type": "integer",
+        "description": "Number of artifacts after compaction"
+      },
+      "original_tokens_estimate": {
+        "type": "integer",
+        "description": "Estimated tokens before compaction"
+      },
+      "compacted_tokens_estimate": {
+        "type": "integer",
+        "description": "Estimated tokens after compaction"
+      },
+      "compression_ratio": {
+        "type": "number",
+        "description": "Token compression ratio"
+      },
+      "strategy_used": {
+        "type": "string",
+        "description": "Compaction strategy used"
+      },
+      "preserved_artifact_ids": {
+        "type": "array",
+        "description": "IDs of artifacts that were preserved",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "required": [
+      "compacted_artifacts",
+      "original_count",
+      "compacted_count",
+      "original_tokens_estimate",
+      "compacted_tokens_estimate",
+      "compression_ratio",
+      "strategy_used"
+    ],
+    "additionalProperties": false
+  }
+}

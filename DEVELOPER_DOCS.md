@@ -15,12 +15,36 @@ King AI v2 is a hybrid "Dual-Brain" autonomous business empire. It is designed t
 3.  **Database (PostgreSQL & Redis)**:
     *   **Role**: PG stores persistent business data; Redis handles caching and task queues.
     *   **Deployment**: Runs via Docker Compose.
-4.  **AI Brain (Hybrid)**:
-    *   **Primary**: **Ollama** running Llama 3.1 8b on AWS `g4dn.xlarge`.
-    *   **Fallback**: **Google Gemini 1.5 Flash** (via API) activates automatically if AWS is unreachable.
-    *   **Orchestrator**: `src/master_ai/brain.py` manages the routing logic.
+4.  **Load Balancer (Nginx)**:
+    *   **Port**: 80 (internal)
+    *   **Role**: Reverse proxy routing traffic to API and dashboard.
+    *   **SSL Termination**: Handled by AWS Load Balancer.
 
-### current Capabilities
+### Deployment Architecture
+
+**Production Setup (AWS):**
+- **Domain**: https://king-ai-studio.me
+- **Load Balancer**: AWS ALB (ports 80/443)
+- **EC2 Instance**: Ubuntu 22.04
+- **SSL**: AWS Certificate Manager
+- **Health Checks**: `/api/docs` endpoint
+
+**Traffic Flow:**
+```
+Internet → AWS ALB (443) → EC2:80 (Nginx) → API:8000 or Dashboard:5173
+```
+
+**Development URLs:**
+- Dashboard: http://localhost:5173
+- API: http://localhost:8000
+- API Docs: http://localhost:8000/docs
+
+**Production URLs:**
+- Dashboard: https://king-ai-studio.me
+- API: https://king-ai-studio.me/api/
+- API Docs: https://king-ai-studio.me/api/docs
+
+---
 As of v2.0, the system supports:
 1.  **Dual-Brain Intelligence**: Automatically switches between AWS Ollama (Cost-effective) and Gemini (High-intelligence fallback).
 2.  **Business Lifecycle Verification**: Can take a business idea from "Discovery" to "Active" using the `LifecycleEngine` state machine.
@@ -346,9 +370,16 @@ GET /api/analytics/revenue - Revenue metrics
 ```
 
 ### WebSocket
+**Development:**
 ```
 ws://localhost:8000/ws/chat - Real-time chat updates
 ws://localhost:8000/ws/notifications - System notifications
+```
+
+**Production:**
+```
+wss://king-ai-studio.me/ws/chat - Real-time chat updates
+wss://king-ai-studio.me/ws/notifications - System notifications
 ```
 
 ---
@@ -389,7 +420,25 @@ python -m bandit -r src/
 
 ## 9. Troubleshooting
 
-### Common Issues
+### Production Deployment Issues
+
+#### Target Group Unhealthy
+- **Cause**: Health check path returns 404
+- **Solution**: Change health check path to `/api/docs` (returns 200)
+- **AWS Console**: Target Groups → Health checks → Path: `/api/docs`
+
+#### Load Balancer Connection Issues
+- **Check Nginx**: `sudo systemctl status nginx`
+- **Test local ports**: `curl http://localhost:80/api/docs`
+- **Firewall**: `sudo ufw status`
+- **Security Groups**: Allow inbound traffic from load balancer
+
+#### SSL/HTTPS Issues
+- **SSL Termination**: Handled by AWS Load Balancer
+- **Certificate**: Check AWS Certificate Manager
+- **Load Balancer Listeners**: Verify 443 → 80 forwarding
+
+### Common Development Issues
 
 #### "Connection to King AI Failed"
 - Check if `uvicorn` is running: `ps aux | grep uvicorn`

@@ -1,0 +1,10 @@
+mcp_servers:
+  firecrawl:
+    enabled: true
+    scopes:
+    - web_search
+    - http
+  web-search:
+    enabled: false
+    scopes:
+    - search:all

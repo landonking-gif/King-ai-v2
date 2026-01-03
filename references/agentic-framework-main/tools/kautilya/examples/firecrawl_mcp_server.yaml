@@ -1,0 +1,179 @@
+# Firecrawl MCP Server Configuration
+# Based on: https://docs.firecrawl.dev/mcp-server#remote-hosted-url
+#
+# Before importing, set your Firecrawl API key:
+#   export FIRECRAWL_API_KEY=fc-your-api-key-here
+#
+# Import this server:
+#   kautilya mcp import tools/kautilya/examples/firecrawl_mcp_server.yaml
+
+tool_id: firecrawl_mcp
+name: Firecrawl Web Search
+description: Scrape websites, crawl pages, and extract structured content as clean markdown
+version: 1.0.0
+owner: platform-team
+contact: platform@example.com
+
+# Firecrawl's remote hosted MCP server endpoint (v2)
+# Docs: https://docs.firecrawl.dev/mcp-server
+endpoint: https://mcp.firecrawl.dev/v2/mcp
+
+# Transport: sse (remote server) or stdio (local subprocess)
+transport: sse
+
+auth_flow: api_key
+
+classification:
+  - external_call
+  - safe
+
+rate_limits:
+  max_calls: 100
+  window_seconds: 60
+
+metadata:
+  api_key_env: FIRECRAWL_API_KEY
+  provider: firecrawl
+  documentation: https://docs.firecrawl.dev/mcp-server
+
+tools:
+  - name: firecrawl_scrape
+    description: Scrape a single URL and return clean markdown content
+    parameters:
+      - name: url
+        type: string
+        description: The URL to scrape
+        required: true
+      - name: formats
+        type: array
+        description: Output formats (markdown, html, links, screenshot)
+        required: false
+        default: ["markdown"]
+      - name: onlyMainContent
+        type: boolean
+        description: Only return the main content, excluding headers, navs, footers
+        required: false
+        default: true
+      - name: includeTags
+        type: array
+        description: Only include tags/attributes with these values
+        required: false
+      - name: excludeTags
+        type: array
+        description: Tags to exclude from the output
+        required: false
+      - name: waitFor
+        type: number
+        description: Wait time in milliseconds for the page to load
+        required: false
+        default: 0
+    returns: Scraped content in requested formats (markdown, HTML, links, screenshot)
+
+  - name: firecrawl_crawl
+    description: Crawl a website starting from a URL with smart link discovery
+    parameters:
+      - name: url
+        type: string
+        description: The starting URL to crawl
+        required: true
+      - name: limit
+        type: number
+        description: Maximum number of pages to crawl
+        required: false
+        default: 100
+      - name: maxDepth
+        type: number
+        description: Maximum depth to crawl (how many links deep)
+        required: false
+        default: 2
+      - name: formats
+        type: array
+        description: Output formats for each page
+        required: false
+        default: ["markdown"]
+      - name: excludePaths
+        type: array
+        description: URL patterns to exclude from crawl
+        required: false
+      - name: includePaths
+        type: array
+        description: URL patterns to include in crawl (acts as allowlist)
+        required: false
+      - name: allowBackwardLinks
+        type: boolean
+        description: Allow crawling links that go back to parent pages
+        required: false
+        default: false
+      - name: ignoreSitemap
+        type: boolean
+        description: Ignore the website's sitemap.xml
+        required: false
+        default: false
+    returns: Crawl job ID and status. Use get-crawl-status to check progress
+
+  - name: firecrawl_map
+    description: Generate a comprehensive map of a website's structure and links
+    parameters:
+      - name: url
+        type: string
+        description: The website URL to map
+        required: true
+      - name: search
+        type: string
+        description: Search term to filter links (optional)
+        required: false
+      - name: ignoreSitemap
+        type: boolean
+        description: Ignore the website's sitemap.xml
+        required: false
+        default: false
+      - name: limit
+        type: number
+        description: Maximum number of links to return
+        required: false
+        default: 5000
+    returns: Comprehensive list of all links found on the website
+
+  - name: firecrawl_check_crawl_status
+    description: Check the status of an ongoing crawl job
+    parameters:
+      - name: id
+        type: string
+        description: The crawl job ID returned from the crawl command
+        required: true
+    returns: Current status and results of the crawl job
+
+  - name: firecrawl_search
+    description: Search the web and optionally extract content from search results
+    parameters:
+      - name: query
+        type: string
+        description: Search query
+        required: true
+      - name: limit
+        type: number
+        description: Maximum number of results
+        required: false
+        default: 10
+      - name: scrapeOptions
+        type: object
+        description: Options for scraping search results
+        required: false
+    returns: Search results with optional scraped content
+
+  - name: firecrawl_extract
+    description: Extract structured information from web pages using LLM capabilities
+    parameters:
+      - name: urls
+        type: array
+        description: URLs to extract data from
+        required: true
+      - name: prompt
+        type: string
+        description: Prompt describing what to extract
+        required: true
+      - name: schema
+        type: object
+        description: JSON schema for structured output
+        required: false
+    returns: Extracted structured data

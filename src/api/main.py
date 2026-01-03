@@ -3,6 +3,7 @@
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+from datetime import datetime
 
 from src.api.routes import (
     chat, businesses, approvals, evolution, health, playbook, portfolio, system,
@@ -217,12 +218,13 @@ async def websocket_endpoint(websocket: WebSocket):
     except Exception:
         manager.disconnect(websocket)
 
-@app.get("/api/health")
-async def health():
-    return {"status": "ok", "master_ai": master_ai is not None}
-
 def get_master_ai() -> MasterAI:
     """Dependency to get MasterAI instance."""
     if master_ai is None:
         raise RuntimeError("MasterAI not initialized")
     return master_ai
+
+@app.get("/api/health")
+async def simple_health_check():
+    """Simple health check endpoint for load balancer monitoring."""
+    return {"status": "healthy", "service": "king-ai-v2", "timestamp": datetime.now().isoformat()}

@@ -1,0 +1,12 @@
+name: extract_entities
+version: 1.0.0
+description: Extract named entities from text (person, organization, location, date, etc.)
+safety_flags:
+  - pii_risk
+requires_approval: false
+handler: handler.extract_entities
+tags:
+  - text-processing
+  - nlp
+  - named-entity-recognition
+  - ner

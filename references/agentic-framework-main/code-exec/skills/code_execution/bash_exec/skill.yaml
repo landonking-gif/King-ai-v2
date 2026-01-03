@@ -1,0 +1,13 @@
+name: bash_exec
+version: 1.0.0
+description: Execute bash commands in a shell environment with timeout protection
+safety_flags:
+  - side_effect
+  - external_call
+requires_approval: true
+handler: handler.execute_bash
+tags:
+  - execution
+  - bash
+  - shell
+  - prepackaged

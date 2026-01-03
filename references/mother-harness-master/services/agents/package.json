@@ -1,0 +1,33 @@
+{
+    "name": "@mother-harness/agents",
+    "version": "0.1.0",
+    "description": "Specialist agents for Mother-Harness orchestration",
+    "type": "module",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
+    "scripts": {
+        "build": "tsc",
+        "clean": "rimraf dist",
+        "dev": "tsx watch src/index.ts",
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run",
+        "test:watch": "vitest"
+    },
+    "dependencies": {
+        "@mother-harness/shared": "workspace:*",
+        "nanoid": "^5.0.0"
+    },
+    "devDependencies": {
+        "@types/node": "^20.10.0",
+        "rimraf": "^5.0.0",
+        "tsx": "^4.7.0",
+        "typescript": "^5.3.0",
+        "vitest": "^1.0.0"
+    }
+}

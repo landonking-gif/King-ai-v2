@@ -1,0 +1,115 @@
+/* Status Bar Styles */
+
+.statusBar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: var(--statusbar-height);
+    padding: 0 var(--spacing-lg);
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border-primary);
+    flex-shrink: 0;
+}
+
+.section {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+/* Connection indicators */
+.connection {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+}
+
+.dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+}
+
+.connected {
+    background: var(--status-success);
+}
+
+.disconnected {
+    background: var(--status-error);
+}
+
+.checking {
+    background: var(--status-warning);
+    animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* Metrics */
+.metric {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    font-size: var(--text-xs);
+}
+
+.metricLabel {
+    color: var(--text-muted);
+}
+
+.metricValue {
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.divider {
+    width: 1px;
+    height: 12px;
+    background: var(--border-primary);
+}
+
+/* Keyboard hint */
+.hint {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+}
+
+.kbd {
+    padding: 1px 6px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-muted);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .statusBar {
+        padding: 0 var(--spacing-sm);
+    }
+
+    .section:nth-child(2) {
+        display: none;
+    }
+
+    .metric:not(:first-child) {
+        display: none;
+    }
+}

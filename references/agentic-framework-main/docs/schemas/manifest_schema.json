@@ -1,0 +1,213 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agentic-framework.dev/schemas/manifest.json",
+  "title": "Workflow Manifest Schema",
+  "description": "JSON Schema for validating workflow manifests in the Agentic Framework",
+  "type": "object",
+  "required": ["name", "version", "steps"],
+  "properties": {
+    "manifest_id": {
+      "type": "string",
+      "description": "Unique manifest identifier (UUID)",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "name": {
+      "type": "string",
+      "description": "Workflow name",
+      "minLength": 1,
+      "maxLength": 255
+    },
+    "version": {
+      "type": "string",
+      "description": "Workflow version (semver)",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "description": {
+      "type": "string",
+      "description": "Human-readable workflow description"
+    },
+    "steps": {
+      "type": "array",
+      "description": "Ordered list of workflow steps",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/WorkflowStep"
+      }
+    },
+    "memory": {
+      "$ref": "#/definitions/MemoryConfig"
+    },
+    "tools": {
+      "type": "object",
+      "description": "Tool catalog configuration",
+      "properties": {
+        "catalog_ids": {
+          "type": "array",
+          "description": "List of MCP tool catalog IDs",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "policies": {
+      "$ref": "#/definitions/PolicyConfig"
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional metadata",
+      "additionalProperties": true
+    }
+  },
+  "definitions": {
+    "WorkflowStep": {
+      "type": "object",
+      "required": ["id", "role", "capabilities", "inputs", "outputs"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique step identifier",
+          "minLength": 1
+        },
+        "role": {
+          "type": "string",
+          "description": "Subagent role",
+          "enum": ["research", "verify", "code", "synthesis"]
+        },
+        "capabilities": {
+          "type": "array",
+          "description": "Required capabilities",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "inputs": {
+          "type": "array",
+          "description": "Input specifications",
+          "items": {
+            "$ref": "#/definitions/WorkflowStepInput"
+          }
+        },
+        "outputs": {
+          "type": "array",
+          "description": "Output specifications",
+          "items": {
+            "$ref": "#/definitions/WorkflowStepOutput"
+          },
+          "minItems": 1
+        },
+        "timeout": {
+          "type": "integer",
+          "description": "Step timeout in seconds",
+          "minimum": 1,
+          "maximum": 3600,
+          "default": 300
+        },
+        "retry_on_failure": {
+          "type": "boolean",
+          "description": "Whether to retry on failure",
+          "default": true
+        },
+        "max_retries": {
+          "type": "integer",
+          "description": "Maximum retry attempts",
+          "minimum": 0,
+          "maximum": 10,
+          "default": 3
+        }
+      }
+    },
+    "WorkflowStepInput": {
+      "type": "object",
+      "required": ["name", "source"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Input parameter name",
+          "minLength": 1
+        },
+        "source": {
+          "type": "string",
+          "description": "Source of input (user_input, previous_step, artifact:<id>, memory)",
+          "minLength": 1
+        },
+        "required": {
+          "type": "boolean",
+          "description": "Whether input is required",
+          "default": true
+        }
+      }
+    },
+    "WorkflowStepOutput": {
+      "type": "object",
+      "required": ["name", "artifact_type"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Output parameter name",
+          "minLength": 1
+        },
+        "artifact_type": {
+          "type": "string",
+          "description": "Expected artifact type",
+          "enum": ["research_snippet", "claim_verification", "code_patch", "synthesis_result"]
+        }
+      }
+    },
+    "MemoryConfig": {
+      "type": "object",
+      "properties": {
+        "persist_on": {
+          "type": "array",
+          "description": "Events that trigger memory persistence",
+          "items": {
+            "type": "string",
+            "enum": ["on_complete", "per_step", "on_error"]
+          },
+          "default": ["on_complete"]
+        },
+        "compaction": {
+          "type": "object",
+          "description": "Memory compaction configuration",
+          "properties": {
+            "strategy": {
+              "type": "string",
+              "enum": ["summarize", "truncate", "none"],
+              "default": "summarize"
+            },
+            "max_tokens": {
+              "type": "integer",
+              "minimum": 1000,
+              "maximum": 100000,
+              "default": 8000
+            }
+          }
+        }
+      }
+    },
+    "PolicyConfig": {
+      "type": "object",
+      "properties": {
+        "requires_human_approval": {
+          "type": "boolean",
+          "description": "Whether workflow requires human approval",
+          "default": false
+        },
+        "allowed_tool_categories": {
+          "type": "array",
+          "description": "Allowed tool categories from MCP",
+          "items": {
+            "type": "string"
+          }
+        },
+        "max_tool_calls_per_step": {
+          "type": "integer",
+          "description": "Maximum tool calls per step",
+          "minimum": 1,
+          "default": 10
+        }
+      }
+    }
+  }
+}

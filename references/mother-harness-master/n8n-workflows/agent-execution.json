@@ -1,0 +1,303 @@
+{
+    "name": "agent-execution",
+    "description": "n8n workflow template for executing Mother-Harness agents",
+    "nodes": [
+        {
+            "name": "Webhook Trigger",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                100,
+                300
+            ],
+            "parameters": {
+                "path": "agent/execute",
+                "method": "POST",
+                "authentication": "headerAuth"
+            }
+        },
+        {
+            "name": "Extract Request",
+            "type": "n8n-nodes-base.set",
+            "typeVersion": 2,
+            "position": [
+                300,
+                300
+            ],
+            "parameters": {
+                "values": {
+                    "string": [
+                        {
+                            "name": "agent_type",
+                            "value": "={{ $json.agent_type }}"
+                        },
+                        {
+                            "name": "task_id",
+                            "value": "={{ $json.task_id }}"
+                        },
+                        {
+                            "name": "inputs",
+                            "value": "={{ $json.inputs }}"
+                        },
+                        {
+                            "name": "context",
+                            "value": "={{ $json.context }}"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "Route by Agent",
+            "type": "n8n-nodes-base.switch",
+            "typeVersion": 2,
+            "position": [
+                500,
+                300
+            ],
+            "parameters": {
+                "dataPropertyName": "agent_type",
+                "rules": {
+                    "rules": [
+                        {
+                            "value": "researcher",
+                            "output": 0
+                        },
+                        {
+                            "value": "coder",
+                            "output": 1
+                        },
+                        {
+                            "value": "critic",
+                            "output": 2
+                        },
+                        {
+                            "value": "default",
+                            "output": 3
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "Execute Researcher",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4,
+            "position": [
+                700,
+                100
+            ],
+            "parameters": {
+                "method": "POST",
+                "url": "={{ $env.OLLAMA_URL }}/api/chat",
+                "sendBody": true,
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "name": "model",
+                            "value": "gpt-oss:20b"
+                        },
+                        {
+                            "name": "messages",
+                            "value": "={{ JSON.stringify([{role: 'system', content: 'You are a research assistant. Conduct thorough research and provide citations.'}, {role: 'user', content: $json.inputs}]) }}"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "Execute Coder",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4,
+            "position": [
+                700,
+                250
+            ],
+            "parameters": {
+                "method": "POST",
+                "url": "={{ $env.OLLAMA_URL }}/api/chat",
+                "sendBody": true,
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "name": "model",
+                            "value": "gpt-oss:20b"
+                        },
+                        {
+                            "name": "messages",
+                            "value": "={{ JSON.stringify([{role: 'system', content: 'You are a coding assistant. Generate clean, well-documented code.'}, {role: 'user', content: $json.inputs}]) }}"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "Execute Critic",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4,
+            "position": [
+                700,
+                400
+            ],
+            "parameters": {
+                "method": "POST",
+                "url": "={{ $env.OLLAMA_URL }}/api/chat",
+                "sendBody": true,
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "name": "model",
+                            "value": "gpt-oss:20b"
+                        },
+                        {
+                            "name": "messages",
+                            "value": "={{ JSON.stringify([{role: 'system', content: 'You are a code reviewer. Identify issues and suggest improvements.'}, {role: 'user', content: $json.inputs}]) }}"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "Format Response",
+            "type": "n8n-nodes-base.set",
+            "typeVersion": 2,
+            "position": [
+                900,
+                300
+            ],
+            "parameters": {
+                "values": {
+                    "string": [
+                        {
+                            "name": "result",
+                            "value": "={{ $json.message?.content || $json.response }}"
+                        },
+                        {
+                            "name": "model",
+                            "value": "={{ $json.model }}"
+                        }
+                    ],
+                    "number": [
+                        {
+                            "name": "tokens_used",
+                            "value": "={{ ($json.prompt_eval_count || 0) + ($json.eval_count || 0) }}"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "Return Response",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1,
+            "position": [
+                1100,
+                300
+            ],
+            "parameters": {
+                "respondWith": "json",
+                "options": {}
+            }
+        }
+    ],
+    "connections": {
+        "Webhook Trigger": {
+            "main": [
+                [
+                    {
+                        "node": "Extract Request",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Extract Request": {
+            "main": [
+                [
+                    {
+                        "node": "Route by Agent",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Route by Agent": {
+            "main": [
+                [
+                    {
+                        "node": "Execute Researcher",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Execute Coder",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Execute Critic",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Format Response",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Execute Researcher": {
+            "main": [
+                [
+                    {
+                        "node": "Format Response",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Execute Coder": {
+            "main": [
+                [
+                    {
+                        "node": "Format Response",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Execute Critic": {
+            "main": [
+                [
+                    {
+                        "node": "Format Response",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Format Response": {
+            "main": [
+                [
+                    {
+                        "node": "Return Response",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}

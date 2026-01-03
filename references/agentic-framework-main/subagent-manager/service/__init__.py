@@ -1,0 +1,3 @@
+"""
+Subagent Manager service implementation.
+"""

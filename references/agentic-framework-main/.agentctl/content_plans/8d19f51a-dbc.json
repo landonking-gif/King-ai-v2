@@ -1,0 +1,67 @@
+{
+  "plan_id": "8d19f51a-dbc",
+  "description": "Comprehensive, well-researched detailed outlook report on silver (USD/oz) covering 3-, 5-, and 7-year horizons. Include: executive summary, macro drivers, supply/demand analysis, ETF & retail flows, industrial demand (PV, EVs, electronics), mining and recycling supply, central bank/sovereign inventory dynamics, scenario-based price paths (Bull/Base/Bear) with probability weights, quantitative sensitivity analysis to real U.S. rates and USD strength, risk factors, investment opportunities and strategies (physical, ETFs, miners, royalty/streaming, futures/options, industrial hedging), monitoring checklist with indicators and triggers, recommended position sizing frameworks, tax/liquidity considerations, and a bibliography of sources (World Silver Survey, Silver Institute, major banks, ETF flow data, TradingEconomics, Reuters, Kitco, etc.). Target audience: institutional and sophisticated retail investors. Include charts/tables placeholders and suggested data sources. Output format: markdown. Estimated size: large (6,000\u201312,000 words). Target output file: reports/silver_outlook_3-5-7_years.md",
+  "target_format": "markdown",
+  "output_file": "reports/silver_outlook_3-5-7_years.md",
+  "estimated_size": "large",
+  "total_estimated_tokens": 8800,
+  "strategy": "streaming_generation",
+  "strategy_description": "Use streaming file writer for very large content",
+  "sections": [
+    {
+      "section_id": "frontmatter",
+      "name": "Frontmatter",
+      "description": "YAML frontmatter with metadata",
+      "order": 1,
+      "estimated_tokens": 200,
+      "dependencies": []
+    },
+    {
+      "section_id": "introduction",
+      "name": "Introduction",
+      "description": "Title, hook, and introduction",
+      "order": 2,
+      "estimated_tokens": 1000,
+      "dependencies": []
+    },
+    {
+      "section_id": "body_sections",
+      "name": "Body Sections",
+      "description": "Main content sections",
+      "order": 3,
+      "estimated_tokens": 4000,
+      "dependencies": [
+        "introduction"
+      ]
+    },
+    {
+      "section_id": "examples",
+      "name": "Examples & Code",
+      "description": "Code examples and demonstrations",
+      "order": 4,
+      "estimated_tokens": 3000,
+      "dependencies": [
+        "body_sections"
+      ],
+      "status": "completed",
+      "completed_at": "2025-12-31T14:29:02.391259",
+      "bytes_written": 1700
+    },
+    {
+      "section_id": "conclusion",
+      "name": "Conclusion",
+      "description": "Summary and call to action",
+      "order": 5,
+      "estimated_tokens": 600,
+      "dependencies": [
+        "body_sections"
+      ],
+      "status": "completed",
+      "completed_at": "2025-12-31T14:29:10.245728",
+      "bytes_written": 1277
+    }
+  ],
+  "section_count": 5,
+  "created_at": "2025-12-31T14:25:51.729474",
+  "status": "in_progress"
+}

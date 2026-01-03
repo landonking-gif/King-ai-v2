@@ -1,0 +1,26 @@
+{
+    "name": "mother-harness",
+    "version": "0.1.0",
+    "description": "Multi-agent orchestration system with multimodal RAG, Redis Stack, and n8n integration",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "build": "pnpm -r build",
+        "dev": "pnpm --filter orchestrator dev",
+        "test": "pnpm -r test",
+        "test:integration": "pnpm --filter orchestrator test:integration",
+        "lint": "pnpm -r lint",
+        "clean": "pnpm -r clean",
+        "typecheck": "pnpm -r typecheck"
+    },
+    "devDependencies": {
+        "@types/node": "^20.10.0",
+        "typescript": "^5.3.0",
+        "vitest": "^1.0.0"
+    },
+    "engines": {
+        "node": ">=20.0.0",
+        "pnpm": ">=8.0.0"
+    },
+    "packageManager": "pnpm@8.15.0"
+}

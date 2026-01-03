@@ -1,0 +1,157 @@
+name: document-qa
+version: 1.0.0
+description: |
+  RAG-based document Q&A skill for extracting content, answering questions, and analyzing
+  documents (PDF, Word, Excel, PowerPoint) with semantic search and source citations.
+  Uses Haystack 2.x pipeline with MarkItDown conversion, semantic chunking, hybrid retrieval,
+  and LLM reranking for accurate extraction.
+
+author: Agentic Framework
+
+handler: handler.document_qa
+async: false
+
+# Tier 1: Lightweight metadata for fast pre-filtering (loaded always)
+tier1:
+  short_description: "RAG-based document Q&A for PDF/DOCX/XLSX extraction with semantic search"
+  category: document_processing
+  file_types: [".pdf", ".docx", ".xlsx", ".pptx", ".html", ".csv"]
+  intents: ["extract", "analyze", "find", "summarize", "get", "pull", "identify", "list"]
+  priority: 1  # Higher priority than file_read for document tasks
+
+# Tier 2: Rich metadata for LLM decision-making (loaded on-demand)
+when_to_use: |
+  ALWAYS USE THIS SKILL WHEN:
+  - User asks to "extract", "analyze", "find", or "summarize" information from documents
+  - Document is PDF, Word, Excel, PowerPoint, HTML, or CSV
+  - Query requires understanding context across multiple pages or sections
+  - User wants specific data points, KPIs, metrics, figures from reports
+  - Document is large (>5 pages) or contains complex structures (tables, charts)
+  - User needs source citations or page references
+  - Task involves ESG reports, financial statements, research papers, contracts
+
+  PREFER THIS SKILL OVER file_read BECAUSE:
+  - Uses semantic search (understands meaning, not just keywords)
+  - Chunks documents intelligently (preserves tables, sections, context)
+  - Handles large documents without token limit issues
+  - Provides source citations with page numbers
+  - Uses hybrid retrieval (Vector + BM25) for better accuracy
+  - LLM reranking ensures most relevant content is used
+  - Processes images and charts via vision model
+
+when_not_to_use: |
+  DO NOT USE THIS SKILL WHEN:
+  - Reading source code files (.py, .js, .ts, etc.) - use file_read
+  - Reading configuration files (.yaml, .json, .env) - use file_read
+  - User explicitly asks to "just read" or "show raw content"
+  - File is a simple text file with <100 lines
+  - No extraction or analysis needed, just viewing file
+
+examples:
+  - "Extract all ESG KPIs from the annual report"
+  - "What are the net zero targets mentioned in this PDF?"
+  - "Find revenue figures in the quarterly earnings report"
+  - "Summarize the key findings from this research paper"
+  - "List all environmental metrics from the sustainability report"
+  - "Get the carbon emission targets from Apple's ESG report"
+  - "Analyze the financial projections in this Excel file"
+
+safety_flags:
+  - file_system
+  - external_call
+  - network_access
+
+requires_approval: false
+anthropic_compatible: true
+
+tags:
+  - document
+  - qa
+  - extraction
+  - rag
+  - haystack
+  - pdf
+  - word
+  - excel
+  - powerpoint
+  - analysis
+  - semantic-search
+  - kpi
+  - metrics
+
+dependencies:
+  - haystack-ai>=2.0.0
+  - markitdown>=0.1.0
+  - sentence-transformers>=2.2.0
+  - openai>=1.0.0
+  - Pillow>=10.0.0
+
+supported_formats:
+  - .pdf
+  - .docx
+  - .xlsx
+  - .pptx
+  - .html
+  - .htm
+  - .csv
+
+# Environment variable configuration
+config:
+  llm_api_key_env: OPENAI_API_KEY
+  llm_model_env: OPENAI_MODEL
+  max_images_env: DOCUMENT_QA_MAX_IMAGES
+  chunk_size_env: DOCUMENT_QA_CHUNK_SIZE
+  chunk_overlap_env: DOCUMENT_QA_CHUNK_OVERLAP
+  image_min_size_env: DOCUMENT_QA_IMAGE_MIN_SIZE_KB
+
+  defaults:
+    max_images: 10
+    chunk_size: 512
+    chunk_overlap: 50
+    image_min_size_kb: 50
+    max_context_tokens: 6000
+    rerank_top_k: 5
+
+# Pipeline components
+components:
+  - name: markitdown_converter
+    type: custom
+    module: components.markitdown_converter.MarkItDownConverter
+
+  - name: vision_describer
+    type: custom
+    module: components.vision_describer.VisionImageDescriber
+
+  - name: semantic_chunker
+    type: custom
+    module: components.semantic_chunker.SemanticChunker
+
+  - name: llm_reranker
+    type: custom
+    module: components.llm_reranker.LLMReranker
+
+  - name: context_assembler
+    type: custom
+    module: components.context_assembler.ContextAssembler
+
+# Pipelines
+pipelines:
+  extraction:
+    components:
+      - markitdown_converter
+      - vision_describer
+      - semantic_chunker
+
+  indexing:
+    components:
+      - sentence_transformers_embedder
+      - document_writer
+
+  generation:
+    components:
+      - vector_retriever
+      - bm25_retriever
+      - document_joiner
+      - llm_reranker
+      - context_assembler
+      - llm_generator

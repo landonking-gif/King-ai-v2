@@ -1,0 +1,15 @@
+/* Message List Styles */
+
+.list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
+    padding: var(--spacing-lg);
+}
+
+.list:empty::before {
+    content: 'No messages yet. Start a conversation!';
+    text-align: center;
+    color: var(--text-muted);
+    padding: var(--spacing-xl);
+}

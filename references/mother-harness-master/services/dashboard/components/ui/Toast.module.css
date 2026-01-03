@@ -1,0 +1,104 @@
+/* Toast Notification Styles */
+
+.container {
+    position: fixed;
+    bottom: calc(var(--statusbar-height, 32px) + var(--spacing-md));
+    right: var(--spacing-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    z-index: 9999;
+    pointer-events: none;
+}
+
+.toast {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    pointer-events: auto;
+    animation: slideIn 0.3s ease-out;
+    max-width: 400px;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.toast.success {
+    border-left: 3px solid var(--status-success);
+}
+
+.toast.error {
+    border-left: 3px solid var(--status-error);
+}
+
+.toast.warning {
+    border-left: 3px solid var(--status-warning);
+}
+
+.toast.info {
+    border-left: 3px solid var(--accent-primary);
+}
+
+.icon {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.toast.success .icon {
+    color: var(--status-success);
+}
+
+.toast.error .icon {
+    color: var(--status-error);
+}
+
+.toast.warning .icon {
+    color: var(--status-warning);
+}
+
+.toast.info .icon {
+    color: var(--accent-primary);
+}
+
+.message {
+    flex: 1;
+    font-size: var(--text-sm);
+    color: var(--text-primary);
+    line-height: 1.4;
+}
+
+.close {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--text-tertiary);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.close:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
