@@ -49,6 +49,11 @@ data/
 *.db
 *.sqlite
 
+# Generated scripts
+automated_setup.sh
+check_deps.sh
+git_pull.sh
+
 # Docker
 .docker/
 
