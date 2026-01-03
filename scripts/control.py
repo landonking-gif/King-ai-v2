@@ -2970,7 +2970,7 @@ echo "🎯 Ready to build your AI empire!"
     setup_script_path = ROOT_DIR / "temp_setup.sh"
     
     # Ensure Unix line endings
-    setup_script = setup_script.replace('\r\n', '\n').replace('\r', '\n')
+    setup_script = setup_script.replace('\r\n', '\n').replace('\r', '')
     
     with open(setup_script_path, "w", newline='\n', encoding='utf-8') as f:
         f.write(setup_script)
