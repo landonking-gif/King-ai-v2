@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-👑 King AI v2 - Imperial Control Center
+King AI v2 - Imperial Control Center
 The unified command interface for deploying and managing the autonomous empire.
 """
 
@@ -18,6 +18,16 @@ ROOT_DIR = Path(__file__).parent.parent
 CONFIG_FILE = ROOT_DIR / "scripts" / "control_config.json"
 DEFAULT_IP = "127.0.0.1"
 PEM_GLOB = "*.pem"
+
+# --- Windows Encoding Fix ---
+if sys.platform == 'win32':
+    # Force UTF-8 encoding on Windows console
+    try:
+        import io
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace', line_buffering=True)
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace', line_buffering=True)
+    except Exception:
+        pass  # Fallback if it fails
 
 # --- Input Validation ---
 def validate_ip(ip):
@@ -52,7 +62,7 @@ def validate_key_path(key_path):
     except:
         return False
 
-def run(cmd, check=True, capture=False, cwd=None, timeout=60):
+def run(cmd, check=True, capture=False, cwd=None, timeout=1200):
     """Execute shell command with robust error handling and optional output capture."""
     if not cmd or not isinstance(cmd, str):
         log("Invalid command provided", "ERROR")
@@ -125,21 +135,26 @@ def clear_screen():
 def header():
     clear_screen()
     print("""
-\033[96m╔══════════════════════════════════════════════════════════════════╗
-║               👑 KING AI v2 - IMPERIAL CONTROL                   ║
-║             "The Empire Builds Itself While You Sleep"           ║
-╚══════════════════════════════════════════════════════════════════╝\033[0m
+\033[96m+======================================================================+
+|               [*] KING AI v2 - IMPERIAL CONTROL                    |
+|             "The Empire Builds Itself While You Sleep"              |
++======================================================================+\033[0m
 """)
 
 def log(msg, type="INFO"):
     colors = {
-        "INFO": "\033[94m[ℹ️ INFO]\033[0m",
-        "SUCCESS": "\033[92m[✅ SUCCESS]\033[0m",
-        "WARN": "\033[93m[⚠️ WARN]\033[0m",
-        "ERROR": "\033[91m[❌ ERROR]\033[0m",
-        "ACTION": "\033[95m[🚀 ACTION]\033[0m"
+        "INFO": "\033[94m[i INFO]\033[0m",
+        "SUCCESS": "\033[92m[+ SUCCESS]\033[0m",
+        "WARN": "\033[93m[! WARN]\033[0m",
+        "ERROR": "\033[91m[X ERROR]\033[0m",
+        "ACTION": "\033[95m[> ACTION]\033[0m"
     }
-    print(f"{colors.get(type, type)} {msg}")
+    try:
+        print(f"{colors.get(type, type)} {msg}")
+    except UnicodeEncodeError:
+        # Fallback for Windows console encoding issues
+        safe_msg = msg.encode('ascii', 'replace').decode('ascii')
+        print(f"{colors.get(type, type)} {safe_msg}")
 
 # --- Configuration Management ---
 def save_config(ip, additional_data=None):
@@ -352,6 +367,9 @@ def upload_env_file(ip, key_path):
     remote_path = f"ubuntu@{ip}:~/king-ai-v2/.env"
 
     try:
+        # Ensure remote directory exists
+        run(f'ssh {ssh_opts} ubuntu@{ip} "mkdir -p ~/king-ai-v2"')
+        
         result = run(f'scp {ssh_opts} "{env_path}" {remote_path}')
         if result:
             log(".env file uploaded successfully!", "SUCCESS")
@@ -1382,6 +1400,10 @@ sudo apt-get install -y nodejs
 node --version
 npm --version
 
+# 3.5. Install Ollama
+echo "🤖 Installing Ollama..."
+curl -fsSL https://ollama.ai/install.sh | sh
+
 # 4. Configure environment
 echo "⚙️  Configuring environment..."
 
@@ -1538,7 +1560,7 @@ echo "🗃️  Setting up database user and database..."
 if systemctl is-active --quiet postgresql; then
     echo "📡 Using system PostgreSQL service..."
     # Create user and database if they don't exist
-    sudo -u postgres psql -c "DO \$\$ BEGIN CREATE USER king WITH PASSWORD 'LeiaPup21'; EXCEPTION WHEN duplicate_object THEN RAISE NOTICE 'User king already exists'; END \$\$;" 2>/dev/null || echo "User setup attempted"
+    sudo -u postgres psql -c "DO \\$\\$ BEGIN CREATE USER king WITH PASSWORD 'LeiaPup21'; EXCEPTION WHEN duplicate_object THEN RAISE NOTICE 'User king already exists'; END \\$\\$;" 2>/dev/null || echo "User setup attempted"
     sudo -u postgres psql -c "SELECT 1 FROM pg_database WHERE datname = 'kingai'" | grep -q 1 || sudo -u postgres psql -c "CREATE DATABASE kingai OWNER king;" 2>/dev/null || echo "Database creation attempted"
     sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE kingai TO king;" 2>/dev/null || echo "Privileges granted"
     
@@ -2416,7 +2438,7 @@ server {
     server_name $domain;
     
     # Redirect HTTP to HTTPS
-    return 301 https://\$server_name\$request_uri;
+    return 301 https://\\$server_name\\$request_uri;
 }
 
 server {
@@ -2437,19 +2459,19 @@ server {
     # API proxy
     location /api/ {
         proxy_pass http://localhost:8000/;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header Host \\$host;
+        proxy_set_header X-Real-IP \\$remote_addr;
+        proxy_set_header X-Forwarded-For \\$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \\$scheme;
     }
     
     # Dashboard proxy
     location / {
         proxy_pass http://localhost:5173/;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header Host \\$host;
+        proxy_set_header X-Real-IP \\$remote_addr;
+        proxy_set_header X-Forwarded-For \\$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \\$scheme;
     }
     
     # Metrics proxy (protected)
@@ -2479,24 +2501,24 @@ server {
     # API proxy
     location /api/ {
         proxy_pass http://localhost:8000/;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header Host \\$host;
+        proxy_set_header X-Real-IP \\$remote_addr;
+        proxy_set_header X-Forwarded-For \\$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \\$scheme;
     }
     
     # Dashboard proxy
     location / {
         proxy_pass http://localhost:5173/;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header Host \\$host;
+        proxy_set_header X-Real-IP \\$remote_addr;
+        proxy_set_header X-Forwarded-For \\$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \\$scheme;
     }
     
     # Metrics proxy
     location /metrics/ {
-        proxy_pass http://localhost:\$MONITORING_PORT/;
+        proxy_pass http://localhost:$MONITORING_PORT/;
     }
 }
 EOF
@@ -2568,7 +2590,7 @@ echo "Backing up application files..."
 cp -r /home/ubuntu/king-ai-v2/data "$BACKUP_DIR/$BACKUP_NAME/" 2>/dev/null || echo "No data directory to backup"
 
 # Backup environment file (without secrets)
-grep -v "API_KEY\|SECRET\|PASSWORD" /home/ubuntu/king-ai-v2/.env > "$BACKUP_DIR/$BACKUP_NAME/env_backup.txt" 2>/dev/null || echo "No .env file to backup"
+grep -vE "API_KEY|SECRET|PASSWORD" /home/ubuntu/king-ai-v2/.env > "$BACKUP_DIR/$BACKUP_NAME/env_backup.txt" 2>/dev/null || echo "No .env file to backup"
 
 # Compress backup
 cd "$BACKUP_DIR"
@@ -2976,9 +2998,20 @@ echo "🎯 Ready to build your AI empire!"
         f.write(setup_script)
 
     try:
+        # Upload SSH key to instance
+        log("Uploading SSH key to AWS instance...", "INFO")
+        instance_id = run(f'aws ec2 describe-instances --filters "Name=tag:Environment,Values=prod" --query "Reservations[0].Instances[0].InstanceId" --output text', capture=True).strip()
+        if instance_id and instance_id != 'None':
+            log(f"Found instance: {instance_id}", "INFO")
+            with open(f"{key_path}.pub", 'r') as f:
+                pub_key = f.read().strip()
+            run(f'aws ec2-instance-connect send-ssh-public-key --instance-id {instance_id} --ssh-public-key "{pub_key}" --region us-east-1')
+            log("✅ SSH key uploaded to instance", "SUCCESS")
+        else:
+            log(f"No instance found with tag Environment=prod, instance_id: {instance_id}", "WARN")
+        
         # Ensure king-ai-v2 directory exists on server
         run(f'ssh {ssh_opts} ubuntu@{ip} "mkdir -p king-ai-v2"')
-        
         # First upload the .env file with API keys, or create basic one if missing
         log("Uploading configuration with API keys...", "ACTION")
         env_path = ROOT_DIR / ".env"
@@ -3050,7 +3083,7 @@ def sync_secrets(ip, key_path):
     try:
         # Secure upload
         ssh_opts = f"-o StrictHostKeyChecking=no -i \"{key_path}\""
-        run(f'ssh {ssh_opts} ubuntu@{ip} "mkdir -p ~/king-ai-v2"', capture=True)
+        run(f'ssh {ssh_opts} ubuntu@{ip} "mkdir -p king-ai-v2"', capture=True)
         run(f'scp {ssh_opts} "{temp_env}" ubuntu@{ip}:~/king-ai-v2/.env', capture=True)
         log("Secrets deployed successfully.", "SUCCESS")
         return True
