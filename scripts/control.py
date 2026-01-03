@@ -932,8 +932,9 @@ if __name__ == "__main__":
     asyncio.run(main())
 EOF
 
-# Install required testing dependencies
-pip install asyncpg redis requests pytz pinecone-client
+# Install required testing dependencies (remove conflicting packages first)
+pip uninstall -y pinecone-client 2>/dev/null || true
+pip install asyncpg redis requests pytz pinecone[grpc]
 
 # Run integration tests
 timeout 120 python3 configure_integrations.py || echo "Integration testing timed out or failed"
@@ -1135,6 +1136,23 @@ echo "Monitoring setup complete - metrics available at :$MONITORING_PORT"
 # 12. Start the API server
 echo "🚀 Starting API server..."
 nohup uvicorn src.api.main:app --host 0.0.0.0 --port 8000 > api.log 2>&1 &
+
+# Wait for API server to be ready
+echo "⏳ Waiting for API server to start..."
+for i in {1..30}; do
+    if curl -s --max-time 5 http://localhost:8000/docs > /dev/null 2>&1; then
+        echo "✅ API server is ready!"
+        break
+    fi
+    echo "Waiting for API server... ($i/30)"
+    sleep 2
+done
+
+if ! curl -s --max-time 5 http://localhost:8000/docs > /dev/null 2>&1; then
+    echo "❌ API server failed to start properly. Check api.log for details."
+    cat api.log | tail -20
+    exit 1
+fi
 
 # 13. Start the React dashboard
 echo "💻 Starting React dashboard..."
@@ -1914,7 +1932,11 @@ echo "🎯 Ready to build your AI empire!"
 
         # Then run the setup script
         run(f'scp {ssh_opts} "{setup_script_path}" ubuntu@{ip}:~/automated_setup.sh')
-        run(f'ssh {ssh_opts} ubuntu@{ip} "chmod +x automated_setup.sh && cp automated_setup.sh king-ai-v2/ && cd king-ai-v2 && bash automated_setup.sh"')
+        try:
+            run(f'ssh {ssh_opts} ubuntu@{ip} "chmod +x automated_setup.sh && cp automated_setup.sh king-ai-v2/ && cd king-ai-v2 && bash automated_setup.sh"')
+        except Exception as e:
+            log(f"Automated setup failed: {e}", "ERROR")
+            log("Attempting to continue with manual service startup...", "WARN")
         
         # Start the services
         log("Starting King AI v2 services...", "ACTION")
