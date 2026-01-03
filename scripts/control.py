@@ -548,6 +548,11 @@ import asyncio
 import requests
 import json
 from typing import Dict, List, Optional
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 class IntegrationTester:
     def __init__(self):
@@ -1323,7 +1328,7 @@ echo "✅ Dependency check and installation complete."
 
 if [ ! -z "$domain" ]; then
     # Configure Nginx with SSL
-    cat > /etc/nginx/sites-available/king-ai << EOF
+    sudo tee /etc/nginx/sites-available/king-ai > /dev/null << EOF
 server {
     listen 80;
     server_name $domain;
@@ -1384,7 +1389,7 @@ EOF
     echo "✅ Nginx with SSL configured for $domain"
 else
     # Configure Nginx without SSL
-    cat > /etc/nginx/sites-available/king-ai << 'EOF'
+    sudo tee /etc/nginx/sites-available/king-ai > /dev/null << 'EOF'
 server {
     listen 80;
     server_name _;
