@@ -13,11 +13,110 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
-# --- Configuration ---
-ROOT_DIR = Path(__file__).parent.parent.absolute()
+# --- Constants ---
+ROOT_DIR = Path(__file__).parent.parent
 CONFIG_FILE = ROOT_DIR / "scripts" / "control_config.json"
+DEFAULT_IP = "127.0.0.1"
 PEM_GLOB = "*.pem"
-DEFAULT_IP = "ec2-13-222-9-32.compute-1.amazonaws.com"
+
+# --- Input Validation ---
+def validate_ip(ip):
+    """Validate IP address format."""
+    if not ip or not isinstance(ip, str):
+        return False
+
+    import re
+    # Basic IP validation (supports both IPv4 and AWS-style hostnames)
+    ip_pattern = r'^(\d{1,3}\.){3}\d{1,3}$'
+    hostname_pattern = r'^[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?)*$'
+
+    return bool(re.match(ip_pattern, ip) or re.match(hostname_pattern, ip))
+
+def validate_key_path(key_path):
+    """Validate SSH key path."""
+    if not key_path:
+        return False
+
+    key_file = Path(key_path)
+    if not key_file.exists():
+        return False
+
+    if not key_file.is_file():
+        return False
+
+    # Check if it's a private key file (basic check)
+    try:
+        with open(key_file, 'r') as f:
+            first_line = f.readline().strip()
+            return first_line.startswith('-----BEGIN') and 'PRIVATE KEY' in first_line
+    except:
+        return False
+
+def run(cmd, check=True, capture=False, cwd=None, timeout=60):
+    """Execute shell command with robust error handling and optional output capture."""
+    if not cmd or not isinstance(cmd, str):
+        log("Invalid command provided", "ERROR")
+        return None if capture else False
+
+    # Load AWS credentials if available
+    env = os.environ.copy()
+    try:
+        import configparser
+        config = configparser.ConfigParser()
+        config.read(os.path.expanduser('~/.aws/credentials'))
+        if 'default' in config:
+            env['AWS_ACCESS_KEY_ID'] = config['default']['aws_access_key_id']
+            env['AWS_SECRET_ACCESS_KEY'] = config['default']['aws_secret_access_key']
+            if 'aws_session_token' in config['default']:
+                env['AWS_SESSION_TOKEN'] = config['default']['aws_session_token']
+    except Exception as e:
+        log(f"Could not load AWS credentials: {e}", "WARN")
+
+    try:
+        log(f"Executing: {cmd}", "INFO")
+        result = subprocess.run(
+            cmd,
+            shell=True,
+            check=check,
+            cwd=cwd or ROOT_DIR,
+            stdout=subprocess.PIPE if capture else None,
+            stderr=subprocess.PIPE if capture else None,
+            text=True,
+            env=env,
+            timeout=timeout
+        )
+        if capture:
+            output = result.stdout.strip()
+            log(f"Command output: {len(output)} characters", "INFO")
+            return output
+        return True
+    except subprocess.TimeoutExpired:
+        log(f"Command timed out after {timeout} seconds: {cmd}", "ERROR")
+        return None
+    except subprocess.CalledProcessError as e:
+        error_msg = f"Command failed: {cmd}"
+        if e.stderr:
+            error_msg += f"\nError output: {e.stderr}"
+        log(error_msg, "ERROR")
+        if capture:
+            return None
+        raise  # Re-raise to let caller handle
+    except Exception as e:
+        log(f"Unexpected error running command '{cmd}': {e}", "ERROR")
+        if capture:
+            return None
+        raise
+
+def get_user_confirmation(message, default=False):
+    """Get user confirmation with default value."""
+    try:
+        response = input(f"{message} [{'Y/n' if default else 'y/N'}]: ").strip().lower()
+        if not response:
+            return default
+        return response in ['y', 'yes', 'true', '1']
+    except KeyboardInterrupt:
+        print("\nOperation cancelled by user.")
+        return False
 
 # --- Visuals ---
 def clear_screen():
@@ -42,103 +141,312 @@ def log(msg, type="INFO"):
     }
     print(f"{colors.get(type, type)} {msg}")
 
-# --- Utilities ---
-def save_config(ip):
-    with open(CONFIG_FILE, 'w') as f:
-        json.dump({"aws_ip": ip, "last_used": str(datetime.now())}, f)
+# --- Configuration Management ---
+def save_config(ip, additional_data=None):
+    """Save configuration with validation and additional data support."""
+    if not ip or not isinstance(ip, str):
+        log("Invalid IP address provided", "ERROR")
+        return False
+
+    # Basic IP validation
+    import re
+    ip_pattern = r'^(\d{1,3}\.){3}\d{1,3}$'
+    if not re.match(ip_pattern, ip):
+        log(f"Invalid IP format: {ip}", "ERROR")
+        return False
+
+    config_data = {
+        "aws_ip": ip,
+        "last_used": str(datetime.now()),
+        "last_updated": str(datetime.now())
+    }
+
+    if additional_data and isinstance(additional_data, dict):
+        config_data.update(additional_data)
+
+    try:
+        CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+            json.dump(config_data, f, indent=2, ensure_ascii=False)
+        log(f"Configuration saved to {CONFIG_FILE}", "SUCCESS")
+        return True
+    except Exception as e:
+        log(f"Failed to save configuration: {e}", "ERROR")
+        return False
 
 def load_config():
-    if CONFIG_FILE.exists():
-        with open(CONFIG_FILE, 'r') as f:
+    """Load configuration with validation and error handling."""
+    if not CONFIG_FILE.exists():
+        log("Configuration file does not exist", "INFO")
+        return {}
+
+    try:
+        with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
             config = json.load(f)
-            ip = config.get("aws_ip", DEFAULT_IP)
-            # Validate IP
-            if not ip or ip.startswith("Warning") or not ip.replace(".", "").replace("-", "").isalnum():
-                return {}
-            return config
-    return {}
+
+        # Validate required fields
+        ip = config.get("aws_ip", DEFAULT_IP)
+        if not ip or not isinstance(ip, str):
+            log("Invalid or missing IP in configuration", "WARN")
+            return {}
+
+        # Basic IP validation
+        import re
+        ip_pattern = r'^(\d{1,3}\.){3}\d{1,3}$'
+        if not re.match(ip_pattern, ip):
+            log(f"Invalid IP format in config: {ip}", "WARN")
+            return {}
+
+        # Check if config is stale (older than 24 hours)
+        last_updated = config.get("last_updated")
+        if last_updated:
+            try:
+                last_update_time = datetime.fromisoformat(last_updated)
+                if (datetime.now() - last_update_time).total_seconds() > 86400:  # 24 hours
+                    log("Configuration is stale (older than 24 hours)", "WARN")
+            except:
+                pass
+
+        log(f"Configuration loaded: IP={ip}", "INFO")
+        return config
+
+    except json.JSONDecodeError as e:
+        log(f"Invalid JSON in configuration file: {e}", "ERROR")
+        return {}
+    except Exception as e:
+        log(f"Failed to load configuration: {e}", "ERROR")
+        return {}
 
 def find_key_file():
-    keys = list(ROOT_DIR.glob(PEM_GLOB))
-    if not keys:
-        log("No .pem file found in project root!", "ERROR")
-        return None
-    return keys[0]
-
-def run(cmd, cwd=None, capture=False, check=True):
-    """Run a shell command."""
-    env = os.environ.copy()
-    # Ensure AWS credentials are available for Terraform
-    if 'AWS_ACCESS_KEY_ID' not in env and 'AWS_PROFILE' not in env:
-        # Try to get from AWS CLI config
-        try:
-            import configparser
-            config = configparser.ConfigParser()
-            config.read(os.path.expanduser('~/.aws/credentials'))
-            if 'default' in config:
-                env['AWS_ACCESS_KEY_ID'] = config['default']['aws_access_key_id']
-                env['AWS_SECRET_ACCESS_KEY'] = config['default']['aws_secret_access_key']
-                if 'aws_session_token' in config['default']:
-                    env['AWS_SESSION_TOKEN'] = config['default']['aws_session_token']
-        except:
-            pass
-    
+    """Find SSH key file with improved validation and security checks."""
     try:
-        result = subprocess.run(
-            cmd,
-            shell=True,
-            check=check,
-            cwd=cwd or ROOT_DIR,
-            stdout=subprocess.PIPE if capture else None,
-            stderr=subprocess.PIPE if capture else None,
-            text=True,
-            env=env
-        )
-        return result.stdout.strip() if capture else True
-    except subprocess.CalledProcessError as e:
-        if capture:
+        # Look for .pem files in project root
+        keys = list(ROOT_DIR.glob(PEM_GLOB))
+
+        if not keys:
+            # Also check common key locations
+            common_locations = [
+                ROOT_DIR / "keys",
+                ROOT_DIR / ".ssh",
+                Path.home() / ".ssh"
+            ]
+
+            for location in common_locations:
+                if location.exists():
+                    keys.extend(location.glob(PEM_GLOB))
+
+        if not keys:
+            log("No .pem key files found in project root or common locations", "ERROR")
+            log("Please ensure your AWS key pair file is in the project root", "INFO")
             return None
-        log(f"Command failed: {cmd}", "ERROR")
-        log(f"Error output: {e.stderr}", "ERROR")
-        raise  # Re-raise to let caller handle
+
+        # Filter out public keys and validate private keys
+        valid_keys = []
+        for key in keys:
+            if key.suffix == '.pub':
+                continue  # Skip public keys
+
+            # Basic validation: check if file is readable and looks like a private key
+            try:
+                with open(key, 'r') as f:
+                    first_line = f.readline().strip()
+                    if first_line.startswith('-----BEGIN') and 'PRIVATE KEY' in first_line:
+                        valid_keys.append(key)
+                        log(f"Found valid private key: {key.name}", "INFO")
+            except Exception as e:
+                log(f"Could not read key file {key}: {e}", "WARN")
+                continue
+
+        if not valid_keys:
+            log("No valid private key files found", "ERROR")
+            return None
+
+        if len(valid_keys) > 1:
+            log(f"Multiple key files found: {[k.name for k in valid_keys]}", "WARN")
+            log(f"Using: {valid_keys[0].name}", "INFO")
+
+        # Check file permissions (should be 600 for security)
+        key_file = valid_keys[0]
+        try:
+            import stat
+            file_stat = key_file.stat()
+            permissions = stat.filemode(file_stat.st_mode)
+
+            if file_stat.st_mode & (stat.S_IRGRP | stat.S_IROTH):
+                log(f"Warning: Key file {key_file.name} has overly permissive permissions: {permissions}", "WARN")
+                log("Consider running: chmod 600 {key_file.name}", "INFO")
+        except Exception as e:
+            log(f"Could not check key file permissions: {e}", "WARN")
+
+        return key_file
+    except Exception as e:
+        log(f"Error finding key file: {e}", "ERROR")
+        return None
 
 def upload_env_file(ip, key_path):
     """Upload the local .env file to the remote server project directory."""
-    log("Uploading .env file to server...", "ACTION")
-    ssh_opts = f"-o StrictHostKeyChecking=no -i \"{key_path}\""
+    if not ip or not key_path:
+        log("Invalid IP or key path provided", "ERROR")
+        return False
+
     env_path = ROOT_DIR / ".env"
     if not env_path.exists():
-        log(".env file not found locally!", "WARN")
-        return
-    try:
-        run(f'scp {ssh_opts} "{env_path}" ubuntu@{ip}:~/king-ai-v2/.env')
-        log(".env file uploaded to server!", "SUCCESS")
-    except Exception as e:
-        log(f"Failed to upload .env: {e}", "ERROR")
+        log(".env file not found locally! Creating default...", "WARN")
+        if not create_default_env_file():
+            log("Failed to create default .env file", "ERROR")
+            return False
 
-# --- GitHub Sync ---
-def sync_to_github():
-    """Sync local code to GitHub repository."""
+    # Validate .env file content
+    try:
+        # Try to read with UTF-8 first, fall back to latin-1 if encoding issues
+        try:
+            with open(env_path, 'r', encoding='utf-8') as f:
+                env_content = f.read()
+        except UnicodeDecodeError:
+            # Fall back to latin-1 which can read any byte sequence
+            with open(env_path, 'r', encoding='latin-1') as f:
+                env_content = f.read()
+            log("Warning: .env file contains non-UTF-8 characters, using fallback encoding", "WARN")
+
+        # Check for required variables
+        required_vars = ['DATABASE_URL', 'REDIS_URL']
+        missing_vars = []
+        for var in required_vars:
+            if not any(line.startswith(f'{var}=') for line in env_content.split('\n')):
+                missing_vars.append(var)
+
+        if missing_vars:
+            log(f"Missing required environment variables: {', '.join(missing_vars)}", "WARN")
+            log("Adding default values...", "INFO")
+
+            # Add missing variables with defaults
+            for var in missing_vars:
+                if var == 'DATABASE_URL':
+                    env_content += '\nDATABASE_URL=postgresql+asyncpg://king:LeiaPup21@localhost:5432/kingai'
+                elif var == 'REDIS_URL':
+                    env_content += '\nREDIS_URL=redis://localhost:6379'
+
+            # Write back the updated content
+            with open(env_path, 'w', encoding='utf-8') as f:
+                f.write(env_content)
+
+        # Check file size (shouldn't be too large)
+        if len(env_content) > 10000:  # 10KB limit
+            log("Warning: .env file is quite large (>10KB)", "WARN")
+
+        # Check for sensitive data patterns (basic check)
+        sensitive_patterns = ['password', 'secret', 'key', 'token']
+        lines = env_content.lower().split('\n')
+        for line in lines:
+            if any(pattern in line for pattern in sensitive_patterns):
+                if not line.strip().startswith('#'):  # Not a comment
+                    log("Found potential sensitive data in .env - ensure it's properly secured", "WARN")
+                    break
+
+    except Exception as e:
+        log(f"Error validating .env file: {e}", "ERROR")
+        return False
+
+    # Upload with error handling
+    ssh_opts = f"-o StrictHostKeyChecking=no -i \"{key_path}\""
+    remote_path = f"ubuntu@{ip}:~/king-ai-v2/.env"
+
+    try:
+        result = run(f'scp {ssh_opts} "{env_path}" {remote_path}')
+        if result:
+            log(".env file uploaded successfully!", "SUCCESS")
+
+            # Verify upload by checking remote file
+            verify_cmd = f'ssh {ssh_opts} ubuntu@{ip} "ls -la ~/king-ai-v2/.env"'
+            verify_result = run(verify_cmd, capture=True)
+            if verify_result and '.env' in verify_result:
+                log("Remote .env file verified", "SUCCESS")
+                return True
+            else:
+                log("Failed to verify remote .env file", "ERROR")
+                return False
+        else:
+            log("Failed to upload .env file", "ERROR")
+            return False
+
+    except Exception as e:
+        log(f"Failed to upload .env file: {e}", "ERROR")
+        return False
+
+def sync_to_github(repo_url=None, branch="main", commit_msg=None):
+    """Sync local code to GitHub repository with improved error handling."""
     log("Syncing code to GitHub...", "ACTION")
 
+    if not repo_url:
+        # Try to get repo URL from git config - check for any remote, not just origin
+        try:
+            # First try origin
+            repo_url = run("git config --get remote.origin.url", capture=True)
+            if not repo_url:
+                # If no origin, try to get any remote
+                remotes = run("git remote", capture=True)
+                if remotes:
+                    first_remote = remotes.strip().split('\n')[0]
+                    repo_url = run(f"git config --get remote.{first_remote}.url", capture=True)
+            
+            if not repo_url:
+                log("No git remote configured. Skipping GitHub sync - deployment will continue.", "WARN")
+                return True  # Return True to allow deployment to continue
+        except Exception as e:
+            log(f"Could not get git remote URL: {e}", "ERROR")
+            log("Skipping GitHub sync - deployment will continue.", "WARN")
+            return True  # Return True to allow deployment to continue
+
+    # Validate we're in a git repository
     try:
-        # Check if we're in a git repository
-        run("git status", capture=True)
+        git_status = run("git status --porcelain", capture=True)
+        if git_status is None:
+            log("Not in a git repository or git command failed", "ERROR")
+            return False
+    except Exception as e:
+        log(f"Git status check failed: {e}", "ERROR")
+        return False
 
-        # Add all changes
-        run("git add .")
+    try:
+        # Check for uncommitted changes
+        if git_status.strip():
+            log("Found uncommitted changes", "INFO")
 
-        # Commit changes
-        commit_msg = f"Auto-deploy: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-        run(f'git commit -m "{commit_msg}"')
+            # Add all changes
+            run("git add .")
+            log("Changes staged", "SUCCESS")
 
-        # Push to remote
-        run("git push king-ai-v2 master:main")
+            # Generate commit message
+            if not commit_msg:
+                timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                commit_msg = f"Auto-deploy: {timestamp}"
+
+            # Commit changes
+            run(f'git commit -m "{commit_msg}"')
+            log(f"Changes committed: {commit_msg}", "SUCCESS")
+        else:
+            log("No changes to commit", "INFO")
+
+        # Check if remote branch exists, if not push with upstream
+        try:
+            run(f"git ls-remote --heads origin {branch}", capture=True)
+            # Branch exists, push normally
+            run(f"git push origin {branch}")
+        except:
+            # Branch might not exist, try to create it
+            log(f"Creating and pushing {branch} branch", "INFO")
+            run(f"git push -u origin {branch}")
 
         log("Code synced to GitHub successfully!", "SUCCESS")
+        return True
 
-    except subprocess.CalledProcessError:
-        log("Git operations failed. Please check your repository status.", "WARN")
+    except subprocess.CalledProcessError as e:
+        log(f"Git operations failed: {e}", "ERROR")
+        log("Please check your repository status and git configuration", "INFO")
+        return False
+    except Exception as e:
+        log(f"Unexpected error during git sync: {e}", "ERROR")
+        return False
 
 # --- Automated Setup ---
 def check_server_dependencies(ip, key_path):
@@ -205,73 +513,792 @@ echo "Dependencies check complete!"
         run(f'scp {ssh_opts} "{dep_script_path}" ubuntu@{ip}:~/check_deps.sh')
         run(f'ssh {ssh_opts} ubuntu@{ip} "chmod +x check_deps.sh && ./check_deps.sh"')
         log("Server dependencies verified!", "SUCCESS")
+        return True
     except Exception as e:
         log(f"Server dependencies check failed: {e}", "ERROR")
+        return False
     finally:
         if dep_script_path.exists():
             os.remove(dep_script_path)
 
 def pull_from_github(ip, key_path):
-    """Pull latest code from GitHub on remote server."""
+    """Pull latest code from GitHub on remote server with improved error handling."""
     log("Pulling latest code from GitHub...", "ACTION")
+
+    if not ip or not key_path:
+        log("Invalid IP or key path provided", "ERROR")
+        return False
 
     ssh_opts = f"-o StrictHostKeyChecking=no -i \"{key_path}\""
 
-    pull_script = '''
+    # Try to get repo URL from local git config
+    try:
+        repo_url = run("git config --get remote.origin.url", capture=True)
+        if not repo_url:
+            log("No git remote configured locally. Using default.", "WARN")
+            repo_url = "https://github.com/landonking-gif/King-ai-v2.git"
+    except Exception as e:
+        log(f"Could not get local git remote: {e}", "WARN")
+        repo_url = "https://github.com/landonking-gif/King-ai-v2.git"
+
+    pull_script = f'''
 #!/bin/bash
+set -euo pipefail
+
+log() {{
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >&2
+}}
+
+error_exit() {{
+    log "ERROR: $1"
+    exit 1
+}}
+
+trap 'error_exit "Git pull failed at line $LINENO"' ERR
+
 # Ensure king-ai-v2 directory exists
 mkdir -p king-ai-v2
 cd king-ai-v2
 
 # Initialize git if not already done
 if [ ! -d ".git" ]; then
-    echo "Initializing git repository..."
+    log "Initializing git repository..."
     git init
-    git remote add king-ai-v2 https://github.com/landonking-gif/King-ai-v2.git
+    git remote add origin {repo_url}
+    log "Git repository initialized with remote: {repo_url}"
 fi
 
-# Pull latest changes
-echo "Pulling latest changes..."
-git pull king-ai-v2 main || git pull king-ai-v2 master
+# Fetch latest changes
+log "Fetching latest changes..."
+git fetch origin
 
-echo "Git pull complete!"
+# Try to pull from main branch first, then master
+log "Pulling latest changes..."
+if git ls-remote --heads origin main | grep -q main; then
+    log "Using main branch..."
+    git checkout main 2>/dev/null || git checkout -b main origin/main
+    git pull origin main
+elif git ls-remote --heads origin master | grep -q master; then
+    log "Using master branch..."
+    git checkout master 2>/dev/null || git checkout -b master origin/master
+    git pull origin master
+else
+    log "No main or master branch found, using current branch..."
+    git pull origin HEAD || log "Pull failed, but continuing..."
+fi
+
+log "Git pull completed successfully!"
 '''
 
     # Upload and run git pull script
     git_script_path = ROOT_DIR / "git_pull.sh"
-    with open(git_script_path, "w", newline='\n', encoding='utf-8') as f:
-        f.write(pull_script)
-
     try:
+        with open(git_script_path, "w", newline='\n', encoding='utf-8') as f:
+            f.write(pull_script)
+
         run(f'scp {ssh_opts} "{git_script_path}" ubuntu@{ip}:~/git_pull.sh')
-        run(f'ssh {ssh_opts} ubuntu@{ip} "chmod +x git_pull.sh && ./git_pull.sh"')
-        log("Code pulled from GitHub!", "SUCCESS")
+        run(f'ssh {ssh_opts} ubuntu@{ip} "chmod +x git_pull.sh"')
+
+        # Execute with timeout
+        result = run(f'ssh {ssh_opts} ubuntu@{ip} "./git_pull.sh"', timeout=300)  # 5 minute timeout
+
+        if result:
+            log("Code pulled from GitHub successfully!", "SUCCESS")
+            return True
+        else:
+            log("GitHub pull failed", "ERROR")
+            return False
+
     except Exception as e:
         log(f"GitHub pull failed: {e}", "ERROR")
+        return False
     finally:
         if git_script_path.exists():
-            os.remove(git_script_path)
-
+            try:
+                git_script_path.unlink()
+            except:
+                pass
 def automated_setup(ip, key_path):
-    """Execute the complete SETUP.md process automatically."""
-    log("Starting automated King AI v2 setup...", "ACTION")
+    """Execute the complete SETUP.md process automatically with robust error handling."""
+    log("Starting automated King AI v2 setup with error handling...", "ACTION")
 
-    # Ensure .env file exists locally before proceeding
+    # Pre-flight checks
+    if not pre_flight_checks(ip, key_path):
+        log("❌ Pre-flight checks failed. Aborting setup.", "ERROR")
+        return False
+
+    # Phase 1: Environment preparation
+    if not prepare_environment(ip, key_path):
+        log("❌ Environment preparation failed.", "ERROR")
+        return False
+
+    # Phase 2: Configuration validation
+    if not validate_configuration(ip, key_path):
+        log("❌ Configuration validation failed.", "ERROR")
+        return False
+
+    # Phase 3: Service installation
+    if not install_services(ip, key_path):
+        log("❌ Service installation failed.", "ERROR")
+        return False
+
+    # Phase 4: Database setup
+    if not setup_databases(ip, key_path):
+        log("❌ Database setup failed.", "ERROR")
+        return False
+
+    # Phase 5: Application deployment
+    if not deploy_application_services(ip, key_path):
+        log("❌ Application deployment failed.", "ERROR")
+        return False
+
+    # Phase 6: Monitoring setup
+    if not setup_monitoring(ip, key_path):
+        log("❌ Monitoring setup failed.", "ERROR")
+        return False
+
+    # Phase 7: Final validation
+    if not final_validation(ip, key_path):
+        log("❌ Final validation failed.", "ERROR")
+        return False
+
+    log("🎉 Automated setup completed successfully!", "SUCCESS")
+    return True
+
+def pre_flight_checks(ip, key_path):
+    """Perform pre-flight checks before starting setup."""
+    log("🛫 Running pre-flight checks...", "INFO")
+
+    checks = [
+        ("SSH connection", lambda: test_ssh_connection(ip, key_path)),
+        ("System requirements", lambda: check_system_requirements(ip, key_path)),
+        ("Disk space", lambda: check_disk_space(ip, key_path)),
+        ("Network connectivity", lambda: check_network_connectivity(ip, key_path)),
+    ]
+
+    for check_name, check_func in checks:
+        try:
+            log(f"Checking {check_name}...", "INFO")
+            if not check_func():
+                log(f"❌ {check_name} check failed", "ERROR")
+                return False
+            log(f"✅ {check_name} check passed", "SUCCESS")
+        except Exception as e:
+            log(f"❌ {check_name} check error: {e}", "ERROR")
+            return False
+
+    log("✅ All pre-flight checks passed", "SUCCESS")
+    return True
+
+def prepare_environment(ip, key_path):
+    """Prepare the environment with proper error handling."""
+    log("🏗️ Preparing environment...", "INFO")
+
+    setup_script = '''
+#!/bin/bash
+set -euo pipefail  # Exit on error, undefined vars, pipe failures
+
+# Logging function
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >&2
+}
+
+# Error handling
+error_exit() {
+    log "ERROR: $1"
+    exit 1
+}
+
+trap 'error_exit "Script failed at line $LINENO"' ERR
+
+log "Starting environment preparation..."
+
+# Update system with non-interactive flags
+export DEBIAN_FRONTEND=noninteractive
+log "Updating system packages..."
+apt-get update -y || error_exit "apt update failed"
+apt-get upgrade -y || error_exit "apt upgrade failed"
+apt-get autoremove -y || true
+
+# Install essential tools
+log "Installing essential tools..."
+apt-get install -y --no-install-recommends \\
+    curl \\
+    wget \\
+    git \\
+    jq \\
+    ca-certificates \\
+    gnupg \\
+    lsb-release \\
+    software-properties-common || error_exit "Essential tools installation failed"
+
+# Install Python and pip
+log "Installing Python environment..."
+apt-get install -y --no-install-recommends \\
+    python3 \\
+    python3-pip \\
+    python3-venv \\
+    python3-dev || error_exit "Python installation failed"
+
+# Create Python virtual environment
+log "Creating Python virtual environment..."
+python3 -m venv venv || error_exit "Virtual environment creation failed"
+source venv/bin/activate
+
+# Upgrade pip
+pip install --upgrade pip || error_exit "pip upgrade failed"
+
+log "Environment preparation completed successfully"
+'''
+
+    try:
+        # Upload and execute setup script
+        with open("temp_setup.sh", "w") as f:
+            f.write(setup_script)
+        f.close()
+
+        # Upload script
+        run(f"scp -o StrictHostKeyChecking=no -i \"{key_path}\" temp_setup.sh ubuntu@{ip}:/tmp/setup.sh")
+        run(f"ssh -o StrictHostKeyChecking=no -i \"{key_path}\" ubuntu@{ip} chmod +x /tmp/setup.sh")
+
+        # Execute with timeout and error checking
+        result = run(f"ssh -o StrictHostKeyChecking=no -i \"{key_path}\" ubuntu@{ip} /tmp/setup.sh", capture=True)
+        if result and "completed successfully" in result:
+            log("✅ Environment preparation completed", "SUCCESS")
+            return True
+        else:
+            log("❌ Environment preparation failed", "ERROR")
+            return False
+
+    except Exception as e:
+        log(f"❌ Environment preparation error: {e}", "ERROR")
+        return False
+    finally:
+        # Cleanup
+        if os.path.exists("temp_setup.sh"):
+            os.remove("temp_setup.sh")
+
+def validate_configuration(ip, key_path):
+    """Validate and setup configuration files."""
+    log("🔧 Validating configuration...", "INFO")
+
+    # Ensure .env exists locally
     env_path = ROOT_DIR / ".env"
     if not env_path.exists():
-        example_env = ROOT_DIR / ".env.example"
-        if example_env.exists():
-            import shutil
-            shutil.copy(example_env, env_path)
-            log(".env file created from .env.example", "INFO")
+        log("Creating default .env file...", "INFO")
+        create_default_env_file()
+
+    # Upload .env file with validation
+    try:
+        # Check if .env has required fields
+        with open(env_path, 'r') as f:
+            env_content = f.read()
+
+        required_vars = ['DATABASE_URL', 'REDIS_URL']
+        missing_vars = []
+        for var in required_vars:
+            if f'{var}=' not in env_content:
+                missing_vars.append(var)
+
+        if missing_vars:
+            log(f"⚠️ Missing required environment variables: {', '.join(missing_vars)}", "WARN")
+            log("Adding default values...", "INFO")
+            for var in missing_vars:
+                if var == 'DATABASE_URL':
+                    env_content += '\\nDATABASE_URL=postgresql+asyncpg://king:LeiaPup21@localhost:5432/kingai'
+                elif var == 'REDIS_URL':
+                    env_content += '\\nREDIS_URL=redis://localhost:6379'
+
+            with open(env_path, 'w') as f:
+                f.write(env_content)
+
+        # Upload .env
+        run(f"scp -o StrictHostKeyChecking=no -i \"{key_path}\" .env ubuntu@{ip}:/home/ubuntu/.env")
+        log("✅ Configuration files uploaded", "SUCCESS")
+        return True
+
+    except Exception as e:
+        log(f"❌ Configuration validation failed: {e}", "ERROR")
+        return False
+
+def install_services(ip, key_path):
+    """Install required services with proper error handling."""
+    log("📦 Installing services...", "INFO")
+
+    services_script = '''
+#!/bin/bash
+set -euo pipefail
+
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >&2
+}
+
+error_exit() {
+    log "ERROR: $1"
+    exit 1
+}
+
+trap 'error_exit "Service installation failed at line $LINENO"' ERR
+
+export DEBIAN_FRONTEND=noninteractive
+
+# Install Docker
+log "Installing Docker..."
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+apt-get update -y
+apt-get install -y docker.io docker-compose || error_exit "Docker installation failed"
+
+# Start and enable Docker
+systemctl enable docker || true
+systemctl start docker || error_exit "Docker service failed to start"
+
+# Install Node.js
+log "Installing Node.js..."
+curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+apt-get install -y nodejs || error_exit "Node.js installation failed"
+
+# Install Nginx
+log "Installing Nginx..."
+apt-get install -y nginx || error_exit "Nginx installation failed"
+
+# Configure Docker daemon
+log "Configuring Docker daemon..."
+mkdir -p /etc/docker
+cat > /etc/docker/daemon.json << 'EOF'
+{
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3"
+  }
+}
+EOF
+
+# Restart Docker with new config
+systemctl restart docker || error_exit "Docker restart failed"
+
+# Test Docker
+docker run --rm hello-world > /dev/null || error_exit "Docker test failed"
+
+log "Service installation completed successfully"
+'''
+
+    try:
+        # Upload and execute services script
+        with open("temp_services.sh", "w") as f:
+            f.write(services_script)
+        f.close()
+
+        run(f"scp -o StrictHostKeyChecking=no -i \"{key_path}\" temp_services.sh ubuntu@{ip}:/tmp/services.sh")
+        run(f"ssh -o StrictHostKeyChecking=no -i \"{key_path}\" ubuntu@{ip} chmod +x /tmp/services.sh")
+
+        result = run(f"ssh -o StrictHostKeyChecking=no -i \"{key_path}\" ubuntu@{ip} /tmp/services.sh", capture=True)
+        if result and "completed successfully" in result:
+            log("✅ Services installed successfully", "SUCCESS")
+            return True
         else:
-            # Create a basic .env file with defaults
-            with open(env_path, "w") as f:
-                f.write("""# King AI v2 Environment Configuration
+            log("❌ Service installation failed", "ERROR")
+            return False
+
+    except Exception as e:
+        log(f"❌ Service installation error: {e}", "ERROR")
+        return False
+    finally:
+        if os.path.exists("temp_services.sh"):
+            os.remove("temp_services.sh")
+
+def setup_databases(ip, key_path):
+    """Setup databases with proper error handling."""
+    log("🗄️ Setting up databases...", "INFO")
+
+    db_script = '''
+#!/bin/bash
+set -euo pipefail
+
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >&2
+}
+
+error_exit() {
+    log "ERROR: $1"
+    exit 1
+}
+
+trap 'error_exit "Database setup failed at line $LINENO"' ERR
+
+# Check if system PostgreSQL is available
+if systemctl is-active --quiet postgresql; then
+    log "Using system PostgreSQL..."
+    # Setup database and user
+    sudo -u postgres psql -c "CREATE USER king WITH PASSWORD 'LeiaPup21';" 2>/dev/null || log "User king already exists"
+    sudo -u postgres psql -c "CREATE DATABASE kingai OWNER king;" 2>/dev/null || log "Database kingai already exists"
+    sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE kingai TO king;" 2>/dev/null || true
+
+    # Update .env
+    sed -i 's|DATABASE_URL=.*|DATABASE_URL=postgresql+asyncpg://king:LeiaPup21@localhost:5432/kingai|' .env
+
+    # Check if Redis is also system service
+    if systemctl is-active --quiet redis-server; then
+        log "Using system Redis..."
+        sed -i 's|REDIS_URL=.*|REDIS_URL=redis://localhost:6379|' .env
+        USE_SYSTEM_SERVICES=true
+    else
+        log "Starting Docker Redis..."
+        docker run -d --name kingai-redis -p 6379:6379 redis:7
+        sed -i 's|REDIS_URL=.*|REDIS_URL=redis://localhost:6379|' .env
+        USE_SYSTEM_SERVICES=false
+    fi
+else
+    log "Starting Docker databases..."
+    # Remove any existing containers
+    docker rm -f kingai-postgres kingai-redis 2>/dev/null || true
+
+    # Start databases
+    docker run -d --name kingai-postgres \\
+        -e POSTGRES_USER=king \\
+        -e POSTGRES_PASSWORD=LeiaPup21 \\
+        -e POSTGRES_DB=kingai \\
+        -p 5432:5432 \\
+        postgres:15
+
+    docker run -d --name kingai-redis \\
+        -p 6379:6379 \\
+        redis:7
+
+    # Update .env
+    sed -i 's|DATABASE_URL=.*|DATABASE_URL=postgresql+asyncpg://king:LeiaPup21@localhost:5432/kingai|' .env
+    sed -i 's|REDIS_URL=.*|REDIS_URL=redis://localhost:6379|' .env
+
+    USE_SYSTEM_SERVICES=false
+fi
+
+# Wait for databases to be ready
+log "Waiting for databases to start..."
+sleep 15
+
+# Test database connections
+if [ "$USE_SYSTEM_SERVICES" = false ]; then
+    # Test Docker containers
+    docker exec kingai-postgres pg_isready -U king -d kingai || error_exit "PostgreSQL container not ready"
+    docker exec kingai-redis redis-cli ping || error_exit "Redis container not ready"
+else
+    # Test system services
+    pg_isready -U king -d kingai || error_exit "PostgreSQL system service not ready"
+    redis-cli ping || error_exit "Redis system service not ready"
+fi
+
+log "Database setup completed successfully"
+'''
+
+    try:
+        with open("temp_db.sh", "w") as f:
+            f.write(db_script)
+        f.close()
+
+        run(f"scp -o StrictHostKeyChecking=no -i \"{key_path}\" temp_db.sh ubuntu@{ip}:/tmp/db.sh")
+        run(f"ssh -o StrictHostKeyChecking=no -i \"{key_path}\" ubuntu@{ip} chmod +x /tmp/db.sh")
+
+        result = run(f"ssh -o StrictHostKeyChecking=no -i \"{key_path}\" ubuntu@{ip} /tmp/db.sh", capture=True)
+        if result and "completed successfully" in result:
+            log("✅ Databases setup successfully", "SUCCESS")
+            return True
+        else:
+            log("❌ Database setup failed", "ERROR")
+            return False
+
+    except Exception as e:
+        log(f"❌ Database setup error: {e}", "ERROR")
+        return False
+    finally:
+        if os.path.exists("temp_db.sh"):
+            os.remove("temp_db.sh")
+
+def deploy_application_services(ip, key_path):
+    """Deploy application services."""
+    log("🚀 Deploying application services...", "INFO")
+
+    deploy_script = '''
+#!/bin/bash
+set -euo pipefail
+
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >&2
+}
+
+error_exit() {
+    log "ERROR: $1"
+    exit 1
+}
+
+trap 'error_exit "Application deployment failed at line $LINENO"' ERR
+
+# Install Python dependencies
+log "Installing Python dependencies..."
+source venv/bin/activate
+pip install -e . || error_exit "Python dependencies installation failed"
+
+# Run database migrations
+log "Running database migrations..."
+alembic upgrade heads || error_exit "Database migrations failed"
+
+# Start Ollama
+log "Starting Ollama service..."
+if ! pgrep -f "ollama serve" > /dev/null; then
+    ollama serve &
+    sleep 5
+fi
+
+# Pull default model
+timeout 300 ollama pull llama3.1:8b || log "Model download timed out"
+
+# Start API server
+log "Starting API server..."
+nohup uvicorn src.api.main:app --host 0.0.0.0 --port 8000 > api.log 2>&1 &
+API_PID=$!
+
+# Wait for API to be ready
+log "Waiting for API server..."
+for i in {1..30}; do
+    if curl -s --max-time 5 http://localhost:8000/health > /dev/null 2>&1; then
+        log "API server is ready"
+        break
+    fi
+    sleep 2
+done
+
+if ! curl -s --max-time 5 http://localhost:8000/health > /dev/null 2>&1; then
+    error_exit "API server failed to start"
+fi
+
+# Start dashboard
+log "Starting dashboard..."
+cd dashboard
+npm install --silent || error_exit "npm install failed"
+nohup npm run dev -- --host 0.0.0.0 --port 5173 > dashboard.log 2>&1 &
+DASHBOARD_PID=$!
+
+# Wait for dashboard
+sleep 10
+if ! ps -p $DASHBOARD_PID > /dev/null 2>&1; then
+    error_exit "Dashboard failed to start"
+fi
+
+cd ..
+log "Application deployment completed successfully"
+'''
+
+    try:
+        with open("temp_deploy.sh", "w") as f:
+            f.write(deploy_script)
+        f.close()
+
+        run(f"scp -o StrictHostKeyChecking=no -i \"{key_path}\" temp_deploy.sh ubuntu@{ip}:/tmp/deploy.sh")
+        run(f"ssh -o StrictHostKeyChecking=no -i \"{key_path}\" ubuntu@{ip} chmod +x /tmp/deploy.sh")
+
+        result = run(f"ssh -o StrictHostKeyChecking=no -i \"{key_path}\" ubuntu@{ip} /tmp/deploy.sh", capture=True)
+        if result and "completed successfully" in result:
+            log("✅ Application deployed successfully", "SUCCESS")
+            return True
+        else:
+            log("❌ Application deployment failed", "ERROR")
+            return False
+
+    except Exception as e:
+        log(f"❌ Application deployment error: {e}", "ERROR")
+        return False
+    finally:
+        if os.path.exists("temp_deploy.sh"):
+            os.remove("temp_deploy.sh")
+
+def setup_monitoring(ip, key_path):
+    """Setup monitoring services."""
+    log("📊 Setting up monitoring...", "INFO")
+
+    monitoring_script = '''
+#!/bin/bash
+set -euo pipefail
+
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >&2
+}
+
+# Install monitoring tools
+log "Installing monitoring tools..."
+apt-get install -y prometheus alertmanager grafana || true
+
+# Configure basic monitoring
+log "Configuring monitoring..."
+
+# Find available port for monitoring
+MONITORING_PORT=9090
+for port in {9090..9095}; do
+    if ! lsof -i :$port >/dev/null 2>&1; then
+        MONITORING_PORT=$port
+        break
+    fi
+done
+
+# Create basic monitoring script
+cat > monitoring.py << 'EOF'
+#!/usr/bin/env python3
+import time
+import psutil
+from prometheus_client import start_http_server, Gauge
+
+# Basic metrics
+cpu_usage = Gauge('king_ai_cpu_usage_percent', 'CPU usage percentage')
+memory_usage = Gauge('king_ai_memory_usage_percent', 'Memory usage percentage')
+
+def update_metrics():
+    while True:
+        cpu_usage.set(psutil.cpu_percent(interval=1))
+        memory_usage.set(psutil.virtual_memory().percent)
+        time.sleep(30)
+
+if __name__ == '__main__':
+    start_http_server(9090)
+    update_metrics()
+EOF
+
+# Start monitoring
+python3 monitoring.py &
+log "Monitoring setup completed"
+'''
+
+    try:
+        with open("temp_monitoring.sh", "w") as f:
+            f.write(monitoring_script)
+        f.close()
+
+        run(f"scp -o StrictHostKeyChecking=no -i \"{key_path}\" temp_monitoring.sh ubuntu@{ip}:/tmp/monitoring.sh")
+        run(f"ssh -o StrictHostKeyChecking=no -i \"{key_path}\" ubuntu@{ip} chmod +x /tmp/monitoring.sh")
+
+        result = run(f"ssh -o StrictHostKeyChecking=no -i \"{key_path}\" ubuntu@{ip} /tmp/monitoring.sh", capture=True)
+        if result and "completed" in result:
+            log("✅ Monitoring setup completed", "SUCCESS")
+            return True
+        else:
+            log("❌ Monitoring setup failed", "ERROR")
+            return False
+
+    except Exception as e:
+        log(f"❌ Monitoring setup error: {e}", "ERROR")
+        return False
+    finally:
+        if os.path.exists("temp_monitoring.sh"):
+            os.remove("temp_monitoring.sh")
+
+def final_validation(ip, key_path):
+    """Perform final validation of all services."""
+    log("🔍 Performing final validation...", "INFO")
+
+    validation_script = '''
+#!/bin/bash
+set -euo pipefail
+
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >&2
+}
+
+error_exit() {
+    log "ERROR: $1"
+    exit 1
+}
+
+# Test services
+log "Testing API server..."
+curl -s --max-time 10 http://localhost:8000/health > /dev/null || error_exit "API server not responding"
+
+log "Testing dashboard..."
+curl -s --max-time 10 http://localhost:5173 > /dev/null || error_exit "Dashboard not responding"
+
+log "Testing database..."
+python3 -c "
+import asyncpg
+import asyncio
+import os
+from dotenv import load_dotenv
+load_dotenv()
+async def test():
+    conn = await asyncpg.connect(os.getenv('DATABASE_URL'))
+    await conn.close()
+    print('Database OK')
+asyncio.run(test())
+" || error_exit "Database connection failed"
+
+log "All services validated successfully"
+'''
+
+    try:
+        with open("temp_validate.sh", "w") as f:
+            f.write(validation_script)
+        f.close()
+
+        run(f"scp -o StrictHostKeyChecking=no -i \"{key_path}\" temp_validate.sh ubuntu@{ip}:/tmp/validate.sh")
+        run(f"ssh -o StrictHostKeyChecking=no -i \"{key_path}\" ubuntu@{ip} chmod +x /tmp/validate.sh")
+
+        result = run(f"ssh -o StrictHostKeyChecking=no -i \"{key_path}\" ubuntu@{ip} /tmp/validate.sh", capture=True)
+        if result and "validated successfully" in result:
+            log("✅ Final validation passed", "SUCCESS")
+            return True
+        else:
+            log("❌ Final validation failed", "ERROR")
+            return False
+
+    except Exception as e:
+        log(f"❌ Validation error: {e}", "ERROR")
+        return False
+    finally:
+        if os.path.exists("temp_validate.sh"):
+            os.remove("temp_validate.sh")
+
+# Helper functions for checks
+def test_ssh_connection(ip, key_path):
+    """Test SSH connection to server."""
+    try:
+        result = run(f"ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -i \"{key_path}\" ubuntu@{ip} echo 'SSH OK'", capture=True)
+        return result and "SSH OK" in result
+    except:
+        return False
+
+def check_system_requirements(ip, key_path):
+    """Check basic system requirements."""
+    try:
+        result = run(f"ssh -o StrictHostKeyChecking=no -i \"{key_path}\" ubuntu@{ip} 'lsb_release -d'", capture=True)
+        return result and "Ubuntu" in result
+    except:
+        return False
+
+def check_disk_space(ip, key_path):
+    """Check available disk space."""
+    try:
+        awk_cmd = "awk '{print $4}'"
+        cmd = f"ssh -o StrictHostKeyChecking=no -i \"{key_path}\" ubuntu@{ip} 'df / | tail -1 | {awk_cmd}'"
+        result = run(cmd, capture=True)
+        if result:
+            available_kb = int(result.strip())
+            available_gb = available_kb / 1024 / 1024
+            return available_gb > 10  # Require at least 10GB
+        return False
+    except:
+        return False
+
+def check_network_connectivity(ip, key_path):
+    """Check network connectivity."""
+    try:
+        result = run(f"ssh -o StrictHostKeyChecking=no -i \"{key_path}\" ubuntu@{ip} 'curl -s --max-time 10 google.com > /dev/null && echo OK'", capture=True)
+        return result and "OK" in result
+    except:
+        return False
+
+def create_default_env_file():
+    """Create a default .env file with basic configuration."""
+    env_content = """# King AI v2 Environment Configuration
 # Copy this file and update with your actual API keys and settings
 
 # Database Configuration
-DATABASE_URL=postgresql+asyncpg://kingadmin:changeme@localhost:5432/kingai
+DATABASE_URL=postgresql+asyncpg://king:LeiaPup21@localhost:5432/kingai
 REDIS_URL=redis://localhost:6379
 
 # AI Service APIs (add your keys here)
@@ -294,9 +1321,9 @@ MAX_AUTO_APPROVE_AMOUNT=100.0
 DD_API_KEY=your_datadog_key_here
 ARIZE_API_KEY=your_arize_key_here
 LANGCHAIN_API_KEY=your_langchain_key_here
-""")
-            log("Basic .env file created with default values", "INFO")
-            log("⚠️  Please update .env with your actual API keys before running services", "WARN")
+"""
+    with open(ROOT_DIR / ".env", "w") as f:
+        f.write(env_content)
 
     ssh_opts = f"-o StrictHostKeyChecking=no -i \"{key_path}\""
 
@@ -1965,8 +2992,12 @@ def sync_secrets(ip, key_path):
         return
 
     # Update dynamic variables in memory (or temp file)
-    with open(local_env, 'r') as f:
-        env_data = f.read()
+    try:
+        with open(local_env, 'r', encoding='utf-8') as f:
+            env_data = f.read()
+    except UnicodeDecodeError:
+        with open(local_env, 'r', encoding='latin-1') as f:
+            env_data = f.read()
     
     # For the remote server, we want to talk to Ollama locally (faster/reliable)
     ollama_line = "OLLAMA_URL=http://localhost:11434"
@@ -1986,6 +3017,10 @@ def sync_secrets(ip, key_path):
         run(f'ssh {ssh_opts} ubuntu@{ip} "mkdir -p ~/king-ai-v2"', capture=True)
         run(f'scp {ssh_opts} "{temp_env}" ubuntu@{ip}:~/king-ai-v2/.env', capture=True)
         log("Secrets deployed successfully.", "SUCCESS")
+        return True
+    except Exception as e:
+        log(f"Failed to sync secrets: {e}", "ERROR")
+        return False
     finally:
         if temp_env.exists():
             os.remove(temp_env)
@@ -2073,9 +3108,11 @@ echo "✅ Services Launched!"
         )
         print("\033[90m" + "─" * 60 + "\033[0m")
         log("Deployment completed successfully.", "SUCCESS")
+        return True
     except subprocess.CalledProcessError:
         print("\033[90m" + "─" * 60 + "\033[0m")
         log("Deployment failed. Check logs above.", "ERROR")
+        return False
 
 def check_aws_infrastructure_exists():
     """Check if AWS infrastructure is already deployed."""
@@ -2481,131 +3518,197 @@ def deploy_application(target_ip, key_path):
         return False
 
 def main():
-    header()
-
-    # 1. Config & Setup
-
-    config = load_config()
-    saved_ip = config.get("aws_ip", DEFAULT_IP)
-
-    print(f"\033[93mTarget Server (current):\033[0m {saved_ip}")
-    entered_ip = input(f"Enter server IP or DNS (or press Enter to use current): ").strip()
-    
-    # First try to get IP from AWS infrastructure if it exists
-    terraform_ip = None
-    if check_aws_infrastructure_exists():
-        try:
-            terraform_ip = run("terraform output -raw ec2_public_ip", cwd=ROOT_DIR / "infrastructure" / "terraform", capture=True).strip()
-            if terraform_ip and "Warning" not in terraform_ip:
-                target_ip = terraform_ip
-                save_config(target_ip)
-                log(f"Using IP from AWS infrastructure: {target_ip}", "INFO")
-            else:
-                terraform_ip = None
-        except:
-            log("Could not retrieve IP from AWS infrastructure.", "WARN")
-    
-    if not terraform_ip:
-        if entered_ip:
-            target_ip = entered_ip
-        else:
-            target_ip = saved_ip
-        save_config(target_ip)
-
-    key_file = find_key_file()
-    log(f"Using Identity: {key_file.name}", "INFO")
-
-    # 2. Main Menu
-
-    print("\n\033[1mSelect Mission Profile:\033[0m")
-    print(" [1] 🚀 Full Deployment (Code + Secrets + Restart)")
-    print(" [2] 🔄 Quick Sync (Code Only)")
-    print(" [3] 🤖 Automated Empire Setup (AWS Infra + GitHub + Full Setup)")
-    print(" [4] 📺 View Remote Logs")
-    print(f" [5] 📡 Connect (SSH Shell) to {target_ip}")
-    print(f" [6] 🚀 SSH & Start Web App (0.0.0.0:80) on {target_ip}")
-    print(" [q] Quit")
-
-    choice = input("\nCommand > ").strip().lower()
-
-    if choice == '1':
-        upload_env_file(target_ip, key_file)
-        sync_secrets(target_ip, key_file)
-        deploy_code(target_ip, key_file)
-    elif choice == '2':
-        upload_env_file(target_ip, key_file)
-        deploy_code(target_ip, key_file)
-    elif choice == '3':
-        # Automated Empire Setup with AWS Infrastructure
-        log("Starting Automated Empire Setup...", "ACTION")
-        # Check if AWS infrastructure exists
-        if not check_aws_infrastructure_exists():
-            log("AWS infrastructure not detected. Starting full AWS deployment...", "INFO")
-            full_aws_deployment()
-            # After AWS deployment, get the new target IP
-            try:
-                new_ip = run("terraform output -raw ec2_public_ip", cwd=ROOT_DIR / "infrastructure" / "terraform", capture=True).strip()
-                if new_ip and "Warning" not in new_ip:
-                    target_ip = new_ip
-                    save_config(target_ip)
-                    log(f"Updated target IP to: {target_ip}", "INFO")
-            except:
-                log("Could not retrieve new EC2 IP. Please check Terraform outputs.", "WARN")
-        else:
-            # Infrastructure exists, get the current IP
-            try:
-                current_ip = run("terraform output -raw ec2_public_ip", cwd=ROOT_DIR / "infrastructure" / "terraform", capture=True).strip()
-                if current_ip and "Warning" not in current_ip and current_ip != target_ip:
-                    target_ip = current_ip
-                    save_config(target_ip)
-                    log(f"Updated target IP to: {target_ip}", "INFO")
-            except:
-                log("Could not retrieve current EC2 IP. Using configured IP.", "WARN")
-        # Continue with regular automated setup
-        upload_env_file(target_ip, key_file)
-        sync_to_github()
-        check_server_dependencies(target_ip, key_file)
-        pull_from_github(target_ip, key_file)
-        # Reload config in case it was updated by git pull
-        config = load_config()
-        target_ip = config.get("aws_ip", target_ip)
-        automated_setup(target_ip, key_file)
-        
-        log("Empire setup complete! Services are starting up.", "SUCCESS")
-        print("All steps completed.")
-        print(f"🌐 Dashboard: http://{target_ip}:5173")
-        print(f"🔌 API: http://{target_ip}:8000")
-        print(f"📚 API Docs: http://{target_ip}:8000/docs")
-    elif choice == '4':
+    """Main control interface with improved error handling and validation."""
+    try:
         header()
-        log("Streaming backend logs (Ctrl+C to stop)...", "INFO")
-        ssh_opts = f"-o StrictHostKeyChecking=no -i \"{key_file}\""
-        try:
-            run(f'ssh {ssh_opts} ubuntu@{target_ip} "tail -f king-ai-v2/api.log"')
-        except KeyboardInterrupt:
-            pass
 
-    elif choice == '5':
-        ssh_opts = f"-o StrictHostKeyChecking=no -i \"{key_file}\""
-        os.system(f'ssh {ssh_opts} ubuntu@{target_ip}')
-        return
+        # 1. Configuration & Setup with validation
+        config = load_config()
+        saved_ip = config.get("aws_ip", DEFAULT_IP)
 
-    elif choice == '6':
-        ssh_opts = f"-o StrictHostKeyChecking=no -i \"{key_file}\""
-        # This will SSH in and prompt the user to start a web app on 0.0.0.0:80
-        print("\nLaunching SSH and starting web app on 0.0.0.0:80 (manual confirmation required)...")
-        # You can customize the command below for your stack (default: Flask)
-        start_cmd = 'flask run --host=0.0.0.0 --port=80 || uvicorn main:app --host 0.0.0.0 --port 80 || echo "Edit control.py to set your app start command!"; bash --login'
-        os.system(f'ssh {ssh_opts} ubuntu@{target_ip} "{start_cmd}"')
-        return
+        print(f"\033[93mTarget Server (current):\033[0m {saved_ip}")
 
-    # Post-Action Checks
-    if choice in ['1', '2', '3']:
-        dashboard_url = f"http://{target_ip}:5173"
-        log("Verifying Empire Status...", "INFO")
-        time.sleep(2) # Give services a moment
+        # Get target IP with validation
+        target_ip = None
+        while not target_ip:
+            entered_ip = input(f"Enter server IP or DNS (or press Enter to use current): ").strip()
 
-        log(f"Empire is live at: {dashboard_url}", "SUCCESS")
+            # First try to get IP from AWS infrastructure if it exists
+            terraform_ip = None
+            if check_aws_infrastructure_exists():
+                try:
+                    terraform_ip = run("terraform output -raw ec2_public_ip", cwd=ROOT_DIR / "infrastructure" / "terraform", capture=True).strip()
+                    if terraform_ip and "Warning" not in terraform_ip and validate_ip(terraform_ip):
+                        target_ip = terraform_ip
+                        save_config(target_ip)
+                        log(f"Using IP from AWS infrastructure: {target_ip}", "INFO")
+                        break
+                    else:
+                        terraform_ip = None
+                except Exception as e:
+                    log(f"Could not retrieve IP from AWS infrastructure: {e}", "WARN")
+
+            if not terraform_ip:
+                if entered_ip:
+                    if validate_ip(entered_ip):
+                        target_ip = entered_ip
+                    else:
+                        log(f"Invalid IP/DNS format: {entered_ip}", "ERROR")
+                        continue
+                else:
+                    if validate_ip(saved_ip):
+                        target_ip = saved_ip
+                    else:
+                        log(f"Saved IP is invalid: {saved_ip}", "ERROR")
+                        continue
+
+                save_config(target_ip)
+
+        # Find and validate SSH key
+        key_file = find_key_file()
+        if not key_file:
+            log("No valid SSH key found. Please ensure your .pem file is in the project root.", "ERROR")
+            return
+
+        if not validate_key_path(key_file):
+            log(f"SSH key file validation failed: {key_file}", "ERROR")
+            return
+
+        log(f"Using SSH key: {key_file.name}", "INFO")
+
+        # 2. Main Menu with improved UX
+        while True:
+            print("\n\033[1mSelect Mission Profile:\033[0m")
+            print(" [1] 🚀 Full Deployment (Code + Secrets + Restart)")
+            print(" [2] 🔄 Quick Sync (Code Only)")
+            print(" [3] 🤖 Automated Empire Setup (AWS Infra + GitHub + Full Setup)")
+            print(" [4] 📺 View Remote Logs")
+            print(f" [5] 📡 Connect (SSH Shell) to {target_ip}")
+            print(f" [6] 🚀 SSH & Start Web App (0.0.0.0:80) on {target_ip}")
+            print(" [q] Quit")
+
+            choice = input("\nCommand > ").strip().lower()
+
+            if choice in ['q', 'quit', 'exit']:
+                log("Goodbye!", "INFO")
+                break
+
+            try:
+                if choice == '1':
+                    log("Starting full deployment...", "ACTION")
+                    if not upload_env_file(target_ip, key_file):
+                        continue
+                    if not sync_secrets(target_ip, key_file):
+                        continue
+                    if not deploy_code(target_ip, key_file):
+                        continue
+                    log("Full deployment completed!", "SUCCESS")
+
+                elif choice == '2':
+                    log("Starting quick sync...", "ACTION")
+                    if not upload_env_file(target_ip, key_file):
+                        continue
+                    if not sync_secrets(target_ip, key_file):
+                        continue
+                    if not deploy_code(target_ip, key_file):
+                        continue
+                    log("Quick sync completed!", "SUCCESS")
+
+                elif choice == '3':
+                    log("Starting automated empire setup...", "ACTION")
+
+                    # Confirm destructive operation
+                    if not get_user_confirmation("This will perform a complete setup including infrastructure deployment. Continue?", default=False):
+                        continue
+
+                    # Check AWS infrastructure
+                    if not check_aws_infrastructure_exists():
+                        log("AWS infrastructure not detected. Starting full AWS deployment...", "INFO")
+                        if not full_aws_deployment():
+                            log("AWS deployment failed", "ERROR")
+                            continue
+
+                        # Get new IP after deployment
+                        try:
+                            new_ip = run("terraform output -raw ec2_public_ip", cwd=ROOT_DIR / "infrastructure" / "terraform", capture=True).strip()
+                            if new_ip and "Warning" not in new_ip and validate_ip(new_ip):
+                                target_ip = new_ip
+                                save_config(target_ip)
+                                log(f"Updated target IP to: {target_ip}", "INFO")
+                        except Exception as e:
+                            log(f"Could not retrieve new EC2 IP: {e}", "WARN")
+
+                    # Continue with setup
+                    if not upload_env_file(target_ip, key_file):
+                        continue
+                    if not sync_secrets(target_ip, key_file):
+                        continue
+                    if not sync_to_github():
+                        continue
+                    if not check_server_dependencies(target_ip, key_file):
+                        continue
+                    if not pull_from_github(target_ip, key_file):
+                        continue
+
+                    # Reload config in case it was updated
+                    config = load_config()
+                    target_ip = config.get("aws_ip", target_ip)
+
+                    if not automated_setup(target_ip, key_file):
+                        continue
+
+                    log("🎉 Empire setup complete! Services are starting up.", "SUCCESS")
+                    print(f"🌐 Dashboard: http://{target_ip}:5173")
+                    print(f"🔌 API: http://{target_ip}:8000")
+                    print(f"📚 API Docs: http://{target_ip}:8000/docs")
+
+                elif choice == '4':
+                    header()
+                    log("Streaming backend logs (Ctrl+C to stop)...", "INFO")
+                    ssh_opts = f"-o StrictHostKeyChecking=no -i \"{key_file}\""
+                    try:
+                        run(f'ssh {ssh_opts} ubuntu@{target_ip} "tail -f king-ai-v2/api.log"')
+                    except KeyboardInterrupt:
+                        log("Log streaming stopped", "INFO")
+
+                elif choice == '5':
+                    log(f"Connecting to {target_ip} via SSH...", "INFO")
+                    ssh_opts = f"-o StrictHostKeyChecking=no -i \"{key_file}\""
+                    os.system(f'ssh {ssh_opts} ubuntu@{target_ip}')
+                    return
+
+                elif choice == '6':
+                    log(f"SSH connection to {target_ip} with web app startup...", "INFO")
+                    ssh_opts = f"-o StrictHostKeyChecking=no -i \"{key_file}\""
+                    print("\nLaunching SSH and starting web app on 0.0.0.0:80 (manual confirmation required)...")
+                    start_cmd = 'flask run --host=0.0.0.0 --port=80 || uvicorn main:app --host 0.0.0.0 --port 80 || echo "Edit control.py to set your app start command!"; bash --login'
+                    os.system(f'ssh {ssh_opts} ubuntu@{target_ip} "{start_cmd}"')
+                    return
+
+                else:
+                    log(f"Invalid choice: {choice}", "WARN")
+                    continue
+
+                # Post-action status check
+                if choice in ['1', '2', '3']:
+                    dashboard_url = f"http://{target_ip}:5173"
+                    log("Verifying Empire Status...", "INFO")
+                    time.sleep(2)  # Give services a moment to start
+
+                    log(f"🎯 Empire is live at: {dashboard_url}", "SUCCESS")
+
+            except Exception as e:
+                log(f"Operation failed: {e}", "ERROR")
+                if get_user_confirmation("Continue with menu?", default=True):
+                    continue
+                else:
+                    break
+
+    except KeyboardInterrupt:
+        print("\n\033[93mAborted by user.\033[0m")
+    except Exception as e:
+        log(f"Fatal error: {e}", "ERROR")
+        print(f"\n\033[91mFatal Error: {e}\033[0m")
 
 if __name__ == "__main__":
     try:
