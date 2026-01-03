@@ -334,6 +334,48 @@ def automated_setup(ip, key_path):
     """Execute the complete SETUP.md process automatically."""
     log("Starting automated King AI v2 setup...", "ACTION")
 
+    # Ensure .env file exists locally before proceeding
+    env_path = ROOT_DIR / ".env"
+    if not env_path.exists():
+        example_env = ROOT_DIR / ".env.example"
+        if example_env.exists():
+            import shutil
+            shutil.copy(example_env, env_path)
+            log(".env file created from .env.example", "INFO")
+        else:
+            # Create a basic .env file with defaults
+            with open(env_path, "w") as f:
+                f.write("""# King AI v2 Environment Configuration
+# Copy this file and update with your actual API keys and settings
+
+# Database Configuration
+DATABASE_URL=postgresql+asyncpg://kingadmin:changeme@localhost:5432/kingai
+REDIS_URL=redis://localhost:6379
+
+# AI Service APIs (add your keys here)
+OPENAI_API_KEY=your_openai_key_here
+ANTHROPIC_API_KEY=your_anthropic_key_here
+GEMINI_API_KEY=your_gemini_key_here
+
+# Other Services
+PINECONE_API_KEY=your_pinecone_key_here
+STRIPE_API_KEY=your_stripe_key_here
+PAYPAL_CLIENT_ID=your_paypal_client_id_here
+PLAID_CLIENT_ID=your_plaid_client_id_here
+
+# System Configuration
+RISK_PROFILE=moderate
+ENABLE_AUTONOMOUS_MODE=false
+MAX_AUTO_APPROVE_AMOUNT=100.0
+
+# Monitoring
+DD_API_KEY=your_datadog_key_here
+ARIZE_API_KEY=your_arize_key_here
+LANGCHAIN_API_KEY=your_langchain_key_here
+""")
+            log("Basic .env file created with default values", "INFO")
+            log("⚠️  Please update .env with your actual API keys before running services", "WARN")
+
     ssh_opts = f"-o StrictHostKeyChecking=no -i \"{key_path}\""
 
     setup_script = '''
@@ -2418,11 +2460,27 @@ def main():
 
     print(f"\033[93mTarget Server (current):\033[0m {saved_ip}")
     entered_ip = input(f"Enter server IP or DNS (or press Enter to use current): ").strip()
-    if entered_ip:
-        target_ip = entered_ip
-    else:
-        target_ip = saved_ip
-    save_config(target_ip)
+    
+    # First try to get IP from AWS infrastructure if it exists
+    terraform_ip = None
+    if check_aws_infrastructure_exists():
+        try:
+            terraform_ip = run("terraform output -raw ec2_public_ip", cwd=ROOT_DIR / "infrastructure" / "terraform", capture=True).strip()
+            if terraform_ip and "Warning" not in terraform_ip:
+                target_ip = terraform_ip
+                save_config(target_ip)
+                log(f"Using IP from AWS infrastructure: {target_ip}", "INFO")
+            else:
+                terraform_ip = None
+        except:
+            log("Could not retrieve IP from AWS infrastructure.", "WARN")
+    
+    if not terraform_ip:
+        if entered_ip:
+            target_ip = entered_ip
+        else:
+            target_ip = saved_ip
+        save_config(target_ip)
 
     key_file = find_key_file()
     log(f"Using Identity: {key_file.name}", "INFO")
@@ -2493,17 +2551,27 @@ def main():
             if dashboard_dir.exists():
                 log("Dashboard will start in background. Access at http://localhost:5173", "INFO")
                 # Check if npm is available
+                npm_available = False
                 try:
-                    subprocess.run(["npm", "--version"], capture_output=True, check=True)
+                    subprocess.run(["npm", "--version"], capture_output=True, check=True, timeout=5)
                     npm_cmd = ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
-                except:
-                    # Try with npx or full path
+                    npm_available = True
+                except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+                    pass
+                
+                if not npm_available:
+                    # Try with npx
                     try:
-                        subprocess.run(["npx", "--version"], capture_output=True, check=True)
+                        subprocess.run(["npx", "--version"], capture_output=True, check=True, timeout=5)
                         npm_cmd = ["npx", "vite", "--host", "0.0.0.0", "--port", "5173"]
-                    except:
-                        log("npm/npx not found. Please install Node.js and npm.", "ERROR")
-                        raise
+                        npm_available = True
+                    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+                        pass
+                
+                if not npm_available:
+                    log("npm/npx not found. Local dashboard will not start. Install Node.js to run locally.", "WARN")
+                    return
+                
                 # Start dashboard in background
                 subprocess.Popen(
                     npm_cmd,
