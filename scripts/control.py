@@ -803,7 +803,7 @@ log "Environment preparation completed successfully"
 
     try:
         # Upload and execute setup script
-        with open("temp_setup.sh", "w") as f:
+        with open("temp_setup.sh", "w", newline='\n') as f:
             f.write(setup_script)
         f.close()
 
@@ -1217,7 +1217,7 @@ log "Monitoring setup completed"
 '''
 
     try:
-        with open("temp_monitoring.sh", "w") as f:
+        with open("temp_monitoring.sh", "w", newline='\n') as f:
             f.write(monitoring_script)
         f.close()
 
@@ -1281,7 +1281,7 @@ log "All services validated successfully"
 '''
 
     try:
-        with open("temp_validate.sh", "w") as f:
+        with open("temp_validate.sh", "w", newline='\n') as f:
             f.write(validation_script)
         f.close()
 
