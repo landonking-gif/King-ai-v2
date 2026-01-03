@@ -1,0 +1,8 @@
+description: Execute test-skill operation
+handler: handler.test_skill
+input_schema: ./schema.json#/input
+name: test-skill
+output_schema: ./schema.json#/output
+requires_approval: false
+safety_flags: []
+version: 1.0.0

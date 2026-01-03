@@ -1,0 +1,61 @@
+{
+  "plan_id": "3043a959-1ce",
+  "description": "Create a detailed 15,000-word markdown report titled 'Silver Outlook: 3-, 5-, and 7-Year Analytical Report' for institutional and sophisticated retail investors. Include: executive summary, macro context, detailed supply/demand tables and analysis, mining production profiles, recycling analysis, industrial demand deep dives (PV, EV, electronics, medical, antimicrobial uses), investment demand (ETFs, coins, bars), market structure and liquidity, scenario analysis (Bull/Base/Bear) with quantitative price paths and probability weights, sensitivity analysis to real US rates, USD, ETF flows and industrial demand shocks, stochastic Monte Carlo modelling of price under macro scenarios, recommended investment strategies across instruments (physical, ETFs, miners, royalties, futures, options, structured products), detailed miner/royalty/ETF selection criteria and a shortlist of representative tickers, hedging strategies for corporates, tax/liquidity/legal considerations, position sizing frameworks, monitoring checklist with concrete thresholds, data sources and reproducible code snippets (Python) to recreate models and charts, bibliography and appendices. Output format: markdown. Estimated size: very_large. Output file: reports/silver_outlook_3-5-7_years.md",
+  "target_format": "markdown",
+  "output_file": "reports/silver_outlook_3-5-7_years.md",
+  "estimated_size": "very_large",
+  "total_estimated_tokens": 15400,
+  "strategy": "streaming_generation",
+  "strategy_description": "Use streaming file writer for very large content",
+  "sections": [
+    {
+      "section_id": "frontmatter",
+      "name": "Frontmatter",
+      "description": "YAML frontmatter with metadata",
+      "order": 1,
+      "estimated_tokens": 350,
+      "dependencies": []
+    },
+    {
+      "section_id": "introduction",
+      "name": "Introduction",
+      "description": "Title, hook, and introduction",
+      "order": 2,
+      "estimated_tokens": 1750,
+      "dependencies": []
+    },
+    {
+      "section_id": "body_sections",
+      "name": "Body Sections",
+      "description": "Main content sections",
+      "order": 3,
+      "estimated_tokens": 7000,
+      "dependencies": [
+        "introduction"
+      ]
+    },
+    {
+      "section_id": "examples",
+      "name": "Examples & Code",
+      "description": "Code examples and demonstrations",
+      "order": 4,
+      "estimated_tokens": 5250,
+      "dependencies": [
+        "body_sections"
+      ]
+    },
+    {
+      "section_id": "conclusion",
+      "name": "Conclusion",
+      "description": "Summary and call to action",
+      "order": 5,
+      "estimated_tokens": 1050,
+      "dependencies": [
+        "body_sections"
+      ]
+    }
+  ],
+  "section_count": 5,
+  "created_at": "2025-12-31T14:32:07.239989",
+  "status": "planned"
+}

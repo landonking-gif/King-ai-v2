@@ -1,0 +1,81 @@
+# Simple Research Workflow Manifest
+# Demonstrates a basic two-step workflow with research and synthesis
+
+manifest_id: "550e8400-e29b-41d4-a716-446655440002"
+name: "simple-research-workflow"
+version: "1.0.0"
+description: "Simple workflow for conducting research and generating a summary report"
+
+steps:
+  # Step 1: Research - Gather information on a topic
+  - id: "research-topic"
+    role: "research"
+    capabilities:
+      - "web_search"
+      - "document_read"
+      - "summarize"
+    inputs:
+      - name: "topic"
+        source: "user_input"
+        required: true
+      - name: "depth"
+        source: "user_input"
+        required: false
+    outputs:
+      - name: "research_results"
+        artifact_type: "research_snippet"
+    timeout: 300
+    retry_on_failure: true
+    max_retries: 3
+
+  # Step 2: Synthesis - Create final report
+  - id: "generate-report"
+    role: "synthesis"
+    capabilities:
+      - "summarize"
+      - "format_report"
+    inputs:
+      - name: "research_results"
+        source: "previous_step"
+        required: true
+      - name: "format"
+        source: "user_input"
+        required: false
+    outputs:
+      - name: "final_report"
+        artifact_type: "synthesis_result"
+    timeout: 180
+    retry_on_failure: true
+    max_retries: 2
+
+# Memory configuration
+memory:
+  persist_on:
+    - "on_complete"
+  compaction:
+    strategy: "summarize"
+    max_tokens: 8000
+
+# Tool catalog configuration
+tools:
+  catalog_ids:
+    - "web_search"
+    - "document_reader"
+
+# Policy configuration
+policies:
+  requires_human_approval: false
+  allowed_tool_categories:
+    - "read_only"
+    - "search"
+  max_tool_calls_per_step: 10
+
+# Metadata
+metadata:
+  created_by: "admin"
+  created_at: "2025-01-15T10:00:00Z"
+  tags:
+    - "research"
+    - "simple"
+    - "two-step"
+  priority: "medium"

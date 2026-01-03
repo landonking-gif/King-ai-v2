@@ -1,0 +1,13 @@
+name: file_grep
+version: 1.0.0
+description: Search for text patterns in files using regex (like ripgrep)
+safety_flags:
+  - file_system
+requires_approval: false
+handler: handler.grep_files
+tags:
+  - file-operations
+  - search
+  - regex
+  - grep
+  - prepackaged

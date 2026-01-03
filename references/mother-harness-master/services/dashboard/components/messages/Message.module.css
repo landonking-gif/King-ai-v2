@@ -1,0 +1,566 @@
+/* Message Styles */
+
+.message {
+    display: flex;
+    gap: var(--spacing-md);
+    animation: fadeIn var(--transition-fast) ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* User message */
+.userMessage {
+    flex-direction: row-reverse;
+}
+
+.userMessage .content {
+    align-items: flex-end;
+}
+
+.userMessage .text {
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-lg);
+}
+
+.userMessage .header {
+    justify-content: flex-end;
+}
+
+/* Assistant message */
+.assistantMessage .text {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-lg) var(--radius-lg) var(--radius-lg) var(--radius-sm);
+}
+
+/* Avatar */
+.avatar {
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-full);
+    color: var(--text-secondary);
+}
+
+.agentAvatar {
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Content */
+.content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    max-width: 80%;
+}
+
+/* Header */
+.header {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.name {
+    font-size: var(--text-sm);
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.time {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+}
+
+/* Text */
+.text {
+    padding: var(--spacing-md);
+    font-size: var(--text-sm);
+    line-height: 1.6;
+    color: var(--text-primary);
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.streaming {
+    /* No special styling needed, cursor handles it */
+}
+
+.cursor {
+    display: inline-block;
+    animation: blink 1s step-end infinite;
+    color: var(--accent-primary);
+}
+
+@keyframes blink {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0;
+    }
+}
+
+/* Metadata */
+.metadata {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: 0 var(--spacing-md);
+}
+
+.metaItem {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+}
+
+/* Actions */
+.actions {
+    display: flex;
+    gap: var(--spacing-xs);
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+}
+
+.message:hover .actions {
+    opacity: 1;
+}
+
+.actionButton {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-md);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.actionButton:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .content {
+        max-width: 90%;
+    }
+
+    .actions {
+        opacity: 1;
+    }
+}
+
+/* ========================================
+   System Message Styles
+   ======================================== */
+
+.systemMessage {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-md);
+    border-left: 3px solid var(--text-muted);
+    animation: fadeIn var(--transition-fast) ease-out;
+}
+
+.systemMessage.info {
+    border-left-color: var(--accent-primary);
+}
+
+.systemMessage.success {
+    border-left-color: var(--status-success);
+}
+
+.systemMessage.warning {
+    border-left-color: var(--status-warning);
+}
+
+.systemMessage.error {
+    border-left-color: var(--status-error);
+}
+
+.systemIcon {
+    flex-shrink: 0;
+}
+
+.systemContent {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-md);
+}
+
+.systemText {
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+}
+
+.systemTime {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+
+.iconInfo {
+    color: var(--accent-primary);
+}
+
+.iconSuccess {
+    color: var(--status-success);
+}
+
+.iconWarning {
+    color: var(--status-warning);
+}
+
+.iconError {
+    color: var(--status-error);
+}
+
+/* ========================================
+   Tool Message Styles
+   ======================================== */
+
+.toolMessage {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    animation: fadeIn var(--transition-fast) ease-out;
+}
+
+.toolMessage.completed {
+    border-left: 3px solid var(--status-success);
+}
+
+.toolMessage.error {
+    border-left: 3px solid var(--status-error);
+}
+
+.toolMessage.running {
+    border-left: 3px solid var(--accent-primary);
+}
+
+.toolHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-family: inherit;
+    text-align: left;
+    transition: background var(--transition-fast);
+}
+
+.toolHeader:hover {
+    background: var(--bg-hover);
+}
+
+.toolInfo {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.toolName {
+    font-size: var(--text-sm);
+    font-weight: 500;
+    font-family: var(--font-mono);
+}
+
+.toolMeta {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.toolDuration {
+    font-size: var(--text-xs);
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+}
+
+.toolTime {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+}
+
+.toolDetails {
+    padding: 0 var(--spacing-md) var(--spacing-md);
+    border-top: 1px solid var(--border-primary);
+}
+
+.toolSection {
+    margin-top: var(--spacing-sm);
+}
+
+.toolSectionLabel {
+    display: block;
+    font-size: var(--text-xs);
+    font-weight: 500;
+    color: var(--text-tertiary);
+    margin-bottom: var(--spacing-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.toolCode {
+    margin: 0;
+    padding: var(--spacing-sm);
+    background: var(--bg-primary);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-xs);
+    font-family: var(--font-mono);
+    color: var(--text-secondary);
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+/* ========================================
+   Approval Message Styles
+   ======================================== */
+
+.approvalMessage {
+    background: var(--bg-secondary);
+    border: 1px solid var(--status-warning);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    animation: fadeIn var(--transition-fast) ease-out;
+}
+
+.approvalMessage.approved {
+    border-color: var(--status-success);
+}
+
+.approvalMessage.rejected {
+    border-color: var(--status-error);
+}
+
+.approvalHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: rgba(245, 158, 11, 0.1);
+}
+
+.approvalMessage.approved .approvalHeader {
+    background: rgba(16, 185, 129, 0.1);
+}
+
+.approvalMessage.rejected .approvalHeader {
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.approvalTitle {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.approvalIcon {
+    color: var(--status-warning);
+}
+
+.approvalMessage.approved .approvalIcon {
+    color: var(--status-success);
+}
+
+.approvalMessage.rejected .approvalIcon {
+    color: var(--status-error);
+}
+
+.approvalTime {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+}
+
+.riskBadge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    font-size: var(--text-xs);
+    font-weight: 500;
+    border-radius: var(--radius-full);
+    text-transform: capitalize;
+}
+
+.riskLow {
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--status-success);
+}
+
+.riskMedium {
+    background: rgba(245, 158, 11, 0.15);
+    color: var(--status-warning);
+}
+
+.riskHigh {
+    background: rgba(239, 68, 68, 0.15);
+    color: var(--status-error);
+}
+
+.approvalBody {
+    padding: var(--spacing-md);
+}
+
+.approvalDescription {
+    margin: 0 0 var(--spacing-sm) 0;
+    font-size: var(--text-sm);
+    color: var(--text-primary);
+}
+
+.approvalReason {
+    margin: 0 0 var(--spacing-sm) 0;
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+}
+
+.approvalFiles {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-xs);
+    margin-left: calc(-1 * var(--spacing-xs));
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+    font-family: inherit;
+    cursor: pointer;
+    transition: color var(--transition-fast);
+}
+
+.approvalFiles:hover {
+    color: var(--text-primary);
+}
+
+.fileList {
+    margin-top: var(--spacing-sm);
+    padding: var(--spacing-sm);
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-md);
+}
+
+.fileItem {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-xs) 0;
+    font-size: var(--text-xs);
+    font-family: var(--font-mono);
+    color: var(--text-secondary);
+}
+
+.approvalActions {
+    display: flex;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md);
+    border-top: 1px solid var(--border-primary);
+}
+
+.approvalButton {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.approvalButton.approve {
+    background: var(--status-success);
+    color: white;
+}
+
+.approvalButton.approve:hover:not(:disabled) {
+    filter: brightness(1.1);
+}
+
+.approvalButton.reject {
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-primary);
+}
+
+.approvalButton.reject:hover:not(:disabled) {
+    background: rgba(239, 68, 68, 0.15);
+    color: var(--status-error);
+    border-color: var(--status-error);
+}
+
+.approvalButton:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.approvalStatus {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-sm);
+    border-top: 1px solid var(--border-primary);
+    font-size: var(--text-sm);
+    font-weight: 500;
+}
+
+.approvalStatus.approved {
+    color: var(--status-success);
+}
+
+.approvalStatus.rejected {
+    color: var(--status-error);
+}

@@ -4,42 +4,72 @@ Discipline. Autonomy. Success.
 
 This comprehensive guide covers everything you need to know about King AI v2 - from initial setup to operating your autonomous business empire.
 
-## 🟢 Getting Started
+## 🟢 Production Deployment
 
-### Automated Setup (Recommended)
+### Current Live System
+- **Domain**: https://king-ai-studio.me
+- **Status**: ✅ Operational
+- **Infrastructure**: AWS EC2 + Load Balancer
+- **SSL**: ✅ Enabled via AWS Load Balancer
 
-The easiest way to get started is using the automated setup:
+### Quick Access
+- **Dashboard**: https://king-ai-studio.me
+- **API Documentation**: https://king-ai-studio.me/api/docs
+- **Health Check**: https://king-ai-studio.me/api/docs (health endpoint)
 
-1. **Open PowerShell or Terminal**
-2. **Navigate to the project folder**
-3. **Run the automated setup:**
+## 🛠️ Development & Deployment
+
+### Automated Production Deployment (Recommended)
+
+The easiest way to deploy is using the automated setup:
+
+1. **Prerequisites**:
+   - AWS Account with EC2 access
+   - SSH key pair (`.pem` file)
+   - GitHub repository access
+
+2. **Run Automated Deployment**:
    ```bash
+   # From project root directory
    python scripts/control.py
    ```
-4. **Select option [3] 🤖 Automated Empire Setup (AWS Infra + GitHub + Full Setup)**
 
-This will automatically:
-- Check and install prerequisites (Python, Git, AWS CLI, Terraform)
-- Configure AWS credentials and infrastructure (if needed)
-- Set up databases, Redis, and all services
-- Deploy the application and start all services
+3. **Select Deployment Option**:
+   - `[3] 🤖 Automated Empire Setup (AWS Infra + GitHub + Full Setup)`
 
-### Manual Setup
+4. **Enter Server Details**:
+   - Server IP/DNS: `ec2-98-93-25-182.compute-1.amazonaws.com`
+   - SSH Key: `king-ai-studio.pem`
 
-If you prefer manual control:
+This automated process will:
+- ✅ Check AWS infrastructure
+- ✅ Sync latest code to GitHub
+- ✅ Install system dependencies (Python, Node.js, PostgreSQL, Redis)
+- ✅ Set up Python virtual environment
+- ✅ Install all dependencies
+- ✅ Configure databases and services
+- ✅ Start API server (port 8000)
+- ✅ Start dashboard (port 5173)
+- ✅ Configure Nginx reverse proxy (port 80)
+- ✅ Set up monitoring and health checks
+- ✅ Configure firewall and security
+
+### Local Development Setup
+
+For development work:
 
 #### Prerequisites
 - Python 3.10+
 - PostgreSQL 14+
 - Redis 6+
-- Node.js 18+
+- Node.js 20+
 - Git
 
 #### Installation Steps
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/king-ai-v2.git
+git clone https://github.com/landonking-gif/King-ai-v2.git
 cd king-ai-v2
 
 # Create Python virtual environment
@@ -134,6 +164,13 @@ npm run dev
 
 ### Access the System
 
+#### Production (Live System)
+- **Dashboard**: https://king-ai-studio.me
+- **API**: https://king-ai-studio.me/api/
+- **API Docs**: https://king-ai-studio.me/api/docs
+- **Health Check**: https://king-ai-studio.me/api/docs
+
+#### Local Development
 - **Dashboard**: http://localhost:5173
 - **API**: http://localhost:8000
 - **API Docs**: http://localhost:8000/docs

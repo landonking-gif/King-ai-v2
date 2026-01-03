@@ -1,0 +1,611 @@
+openapi: 3.0.3
+info:
+  title: Mother-Harness Orchestrator API
+  description: |
+    The Mother-Harness Orchestrator API provides endpoints for task management,
+    approval workflows, library management, and system monitoring.
+
+    ## Authentication
+    All endpoints (except /health) require JWT authentication via Bearer token.
+
+    ## Roles
+    - **user**: Can create and view their own tasks
+    - **approver**: Can approve/reject approval requests
+    - **admin**: Full system access
+  version: 0.1.0
+  contact:
+    name: Mother-Harness Team
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:8000
+    description: Development server
+  - url: https://orchestrator.production.com
+    description: Production server
+
+security:
+  - BearerAuth: []
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      description: Returns service health status
+      operationId: getHealth
+      security: []
+      tags:
+        - System
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  uptime:
+                    type: number
+                    example: 12345.67
+                  version:
+                    type: string
+                    example: 0.1.0
+
+  /api/tasks:
+    post:
+      summary: Create a new task
+      description: Creates a new task from a user query
+      operationId: createTask
+      tags:
+        - Tasks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - query
+              properties:
+                query:
+                  type: string
+                  description: Natural language task description
+                  example: "Research best practices for React testing and create a summary"
+                project_id:
+                  type: string
+                  description: Optional project ID to associate with
+                  example: "project-abc123"
+      responses:
+        '200':
+          description: Task created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    get:
+      summary: List tasks
+      description: List all tasks for the authenticated user
+      operationId: listTasks
+      tags:
+        - Tasks
+      parameters:
+        - name: user_id
+          in: query
+          description: Filter by user ID (admin only)
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Filter by task status
+          schema:
+            type: string
+            enum: [planning, executing, approval_needed, completed, failed]
+      responses:
+        '200':
+          description: List of tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Task'
+
+  /api/tasks/{taskId}:
+    get:
+      summary: Get task details
+      description: Retrieve detailed information about a specific task
+      operationId: getTask
+      tags:
+        - Tasks
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Task ID
+      responses:
+        '200':
+          description: Task details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/tasks/{taskId}/execute:
+    post:
+      summary: Execute a task
+      description: Start execution of a planned task
+      operationId: executeTask
+      tags:
+        - Tasks
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Execution started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  run_id:
+                    type: string
+                  status:
+                    type: string
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/projects:
+    post:
+      summary: Create a project
+      description: Create a new project to group related tasks
+      operationId: createProject
+      tags:
+        - Projects
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                  example: "E-commerce Platform"
+                description:
+                  type: string
+                  example: "Online shopping platform development"
+      responses:
+        '200':
+          description: Project created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+
+    get:
+      summary: List projects
+      description: List all projects for the authenticated user
+      operationId: listProjects
+      tags:
+        - Projects
+      parameters:
+        - name: user_id
+          in: query
+          description: Filter by user ID (admin only)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Project'
+
+  /api/approvals/pending:
+    get:
+      summary: Get pending approvals
+      description: Retrieve all pending approval requests for the user
+      operationId: getPendingApprovals
+      tags:
+        - Approvals
+      responses:
+        '200':
+          description: List of pending approvals
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Approval'
+
+  /api/approvals/{id}/respond:
+    post:
+      summary: Respond to approval request
+      description: Approve or reject an approval request
+      operationId: respondToApproval
+      tags:
+        - Approvals
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Approval ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - approved
+              properties:
+                approved:
+                  type: boolean
+                  description: Whether to approve or reject
+                  example: true
+                notes:
+                  type: string
+                  description: Optional notes explaining the decision
+                  example: "Approved after security review"
+      responses:
+        '200':
+          description: Response recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/libraries:
+    get:
+      summary: List libraries
+      description: List all document libraries
+      operationId: listLibraries
+      tags:
+        - Libraries
+      parameters:
+        - name: search
+          in: query
+          description: Search term to filter libraries
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of libraries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Library'
+
+    post:
+      summary: Create library
+      description: Create a new document library
+      operationId: createLibrary
+      tags:
+        - Libraries
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - folder_path
+              properties:
+                name:
+                  type: string
+                  example: "Technical Documentation"
+                folder_path:
+                  type: string
+                  example: "/libraries/tech-docs"
+                description:
+                  type: string
+                  example: "Internal technical documentation repository"
+                auto_scan:
+                  type: boolean
+                  default: true
+      responses:
+        '200':
+          description: Library created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Library'
+
+  /ws:
+    get:
+      summary: WebSocket connection
+      description: Establish WebSocket connection for real-time updates
+      operationId: websocketConnection
+      tags:
+        - System
+      responses:
+        '101':
+          description: WebSocket connection established
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Task:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "task-abc123"
+        project_id:
+          type: string
+          example: "project-xyz"
+        user_id:
+          type: string
+          example: "user-789"
+        description:
+          type: string
+          example: "Research and implement user authentication"
+        status:
+          type: string
+          enum: [planning, executing, approval_needed, completed, failed]
+        todo_list:
+          type: array
+          items:
+            $ref: '#/components/schemas/TodoItem'
+        steps_completed:
+          type: array
+          items:
+            type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+
+    TodoItem:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "step-1"
+        description:
+          type: string
+          example: "Research authentication best practices"
+        agent:
+          type: string
+          enum: [orchestrator, researcher, coder, design, analyst, critic, skeptic, rag, librarian, vision, update, toolsmith]
+        status:
+          type: string
+          enum: [pending, in_progress, completed, failed]
+        depends_on:
+          type: array
+          items:
+            type: string
+        require_approval:
+          type: boolean
+        approval_type:
+          type: string
+          enum: [file_write, code_execution, git_push, workflow_creation, api_call]
+        risk:
+          type: string
+          enum: [low, medium, high]
+        result:
+          type: object
+          description: Step execution result
+        error:
+          type: string
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+
+    Project:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "project-abc123"
+        user_id:
+          type: string
+        name:
+          type: string
+          example: "E-commerce Platform"
+        description:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    Approval:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "approval-abc123"
+        run_id:
+          type: string
+        task_id:
+          type: string
+        project_id:
+          type: string
+        step_id:
+          type: string
+        user_id:
+          type: string
+        type:
+          type: string
+          enum: [file_write, code_execution, git_push, workflow_creation, api_call]
+        description:
+          type: string
+        risk_level:
+          type: string
+          enum: [low, medium, high]
+        preview:
+          $ref: '#/components/schemas/ApprovalPreview'
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        response_notes:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        responded_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+
+    ApprovalPreview:
+      type: object
+      properties:
+        files:
+          type: array
+          items:
+            type: string
+          example: ["src/auth.ts", "src/middleware/auth.ts"]
+        commands:
+          type: array
+          items:
+            type: string
+          example: ["npm test", "npm run build"]
+        api_calls:
+          type: array
+          items:
+            $ref: '#/components/schemas/ApiCallPreview'
+        workflow:
+          type: object
+          description: Workflow configuration
+
+    ApiCallPreview:
+      type: object
+      properties:
+        method:
+          type: string
+          example: "POST"
+        url:
+          type: string
+          example: "https://api.example.com/users"
+        description:
+          type: string
+          example: "Create new user"
+
+    Library:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "library-abc123"
+        name:
+          type: string
+          example: "Technical Documentation"
+        folder_path:
+          type: string
+          example: "/libraries/tech-docs"
+        description:
+          type: string
+        auto_scan:
+          type: boolean
+        last_scan:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "Invalid request parameters"
+
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "Authentication required"
+
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "Insufficient permissions"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "Resource not found"
+
+tags:
+  - name: System
+    description: System health and monitoring
+  - name: Tasks
+    description: Task management operations
+  - name: Projects
+    description: Project management operations
+  - name: Approvals
+    description: Approval workflow operations
+  - name: Libraries
+    description: Document library management

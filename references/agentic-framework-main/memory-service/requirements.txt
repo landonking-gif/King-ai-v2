@@ -1,0 +1,8 @@
+# Memory Service Dependencies
+# Extends parent requirements.txt
+
+# Core
+-r ../requirements.txt
+
+# Additional dependencies specific to memory service
+tiktoken>=0.5.1

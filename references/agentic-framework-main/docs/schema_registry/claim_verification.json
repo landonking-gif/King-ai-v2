@@ -1,0 +1,237 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agent-framework.io/schemas/claim_verification.json",
+  "title": "Claim Verification",
+  "description": "A structured artifact representing the verification of a factual claim, including verdict, confidence, and supporting evidence",
+  "type": "object",
+  "required": [
+    "id",
+    "claim_text",
+    "verdict",
+    "confidence",
+    "method",
+    "verifier",
+    "created_at",
+    "provenance"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for the claim verification (UUID v4 recommended)",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "examples": ["650e8400-e29b-41d4-a716-446655440000"]
+    },
+    "claim_text": {
+      "type": "string",
+      "description": "The original claim statement being verified",
+      "minLength": 5,
+      "maxLength": 5000,
+      "examples": ["Python 3.11 is faster than Python 3.10 by up to 60% on certain benchmarks"]
+    },
+    "verdict": {
+      "type": "string",
+      "enum": [
+        "true",
+        "false",
+        "partially_true",
+        "misleading",
+        "unverifiable",
+        "insufficient_evidence",
+        "requires_context"
+      ],
+      "description": "The verification verdict for the claim",
+      "examples": ["true"]
+    },
+    "confidence": {
+      "type": "number",
+      "description": "Confidence in the verdict (0.0 to 1.0)",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "examples": [0.88]
+    },
+    "evidence_refs": {
+      "type": "array",
+      "description": "References to evidence artifacts supporting this verification",
+      "items": {
+        "type": "object",
+        "required": ["type", "ref"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["research_snippet", "document", "url", "data_query", "expert_opinion"],
+            "description": "Type of evidence"
+          },
+          "ref": {
+            "type": "string",
+            "description": "Reference to the evidence artifact or URL"
+          },
+          "relevance": {
+            "type": "number",
+            "description": "Relevance score of this evidence (0.0 to 1.0)",
+            "minimum": 0.0,
+            "maximum": 1.0
+          },
+          "supporting": {
+            "type": "boolean",
+            "description": "Whether this evidence supports (true) or refutes (false) the claim",
+            "default": true
+          },
+          "summary": {
+            "type": "string",
+            "description": "Brief summary of how this evidence relates to the claim",
+            "maxLength": 500
+          }
+        },
+        "additionalProperties": false
+      },
+      "default": [],
+      "examples": [
+        [
+          {
+            "type": "url",
+            "ref": "https://www.python.org/downloads/release/python-3110/",
+            "relevance": 0.95,
+            "supporting": true,
+            "summary": "Official Python release notes confirm performance improvements"
+          }
+        ]
+      ]
+    },
+    "disagreement_notes": {
+      "type": "string",
+      "description": "Notes on conflicting evidence, nuances, or areas of disagreement among sources",
+      "maxLength": 2000,
+      "examples": ["While benchmarks show up to 60% improvement, real-world performance varies by workload. Some applications see minimal gains."]
+    },
+    "method": {
+      "type": "string",
+      "enum": [
+        "multi_source_research",
+        "expert_consultation",
+        "data_analysis",
+        "logical_reasoning",
+        "cross_reference",
+        "hybrid"
+      ],
+      "description": "Verification method used",
+      "examples": ["multi_source_research"]
+    },
+    "verifier": {
+      "type": "string",
+      "description": "Identifier of the subagent or system that performed the verification",
+      "pattern": "^(subagent|system|human):[a-zA-Z0-9_-]+$",
+      "examples": ["subagent:verify-agent-002"]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when verification was completed",
+      "examples": ["2025-12-28T11:15:42Z"]
+    },
+    "provenance": {
+      "type": "string",
+      "description": "Reference to provenance record tracking the verification process",
+      "pattern": "^prov_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "examples": ["prov_650e8400-e29b-41d4-a716-446655440002"]
+    },
+    "action_suggestion": {
+      "type": "string",
+      "enum": [
+        "accept_as_is",
+        "add_context",
+        "flag_for_review",
+        "reject",
+        "request_human_review",
+        "update_with_caveats",
+        "mark_outdated"
+      ],
+      "description": "Recommended action based on verification results",
+      "examples": ["add_context"]
+    },
+    "context_notes": {
+      "type": "string",
+      "description": "Additional context needed to properly interpret the claim and verdict",
+      "maxLength": 2000,
+      "examples": ["Performance improvements vary significantly based on workload type, with pure Python code seeing the largest gains."]
+    },
+    "verification_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date when claim was verified (relevant for time-sensitive claims)",
+      "examples": ["2025-12-28"]
+    },
+    "expiry_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date after which verification should be considered stale and re-verified",
+      "examples": ["2026-12-28"]
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional metadata specific to the verification",
+      "properties": {
+        "sources_consulted": {
+          "type": "integer",
+          "description": "Number of sources consulted during verification",
+          "minimum": 0
+        },
+        "verification_duration_ms": {
+          "type": "integer",
+          "description": "Time taken for verification in milliseconds",
+          "minimum": 0
+        },
+        "automated": {
+          "type": "boolean",
+          "description": "Whether verification was fully automated or involved human input",
+          "default": true
+        },
+        "review_status": {
+          "type": "string",
+          "enum": ["pending", "approved", "rejected", "flagged"],
+          "description": "Human review status"
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "id": "650e8400-e29b-41d4-a716-446655440000",
+      "claim_text": "Python 3.11 is faster than Python 3.10 by up to 60% on certain benchmarks",
+      "verdict": "true",
+      "confidence": 0.88,
+      "evidence_refs": [
+        {
+          "type": "url",
+          "ref": "https://www.python.org/downloads/release/python-3110/",
+          "relevance": 0.95,
+          "supporting": true,
+          "summary": "Official Python release notes confirm 10-60% performance improvements"
+        },
+        {
+          "type": "research_snippet",
+          "ref": "550e8400-e29b-41d4-a716-446655440000",
+          "relevance": 0.90,
+          "supporting": true,
+          "summary": "Independent benchmarks validate the performance claims"
+        }
+      ],
+      "disagreement_notes": "While peak improvements reach 60%, average real-world gains are typically 10-25% depending on workload characteristics.",
+      "method": "multi_source_research",
+      "verifier": "subagent:verify-agent-002",
+      "created_at": "2025-12-28T11:15:42Z",
+      "provenance": "prov_650e8400-e29b-41d4-a716-446655440002",
+      "action_suggestion": "add_context",
+      "context_notes": "Performance improvements vary significantly by workload type. Pure Python code sees largest gains, while I/O-bound applications see minimal improvement.",
+      "verification_date": "2025-12-28",
+      "expiry_date": "2026-12-28",
+      "metadata": {
+        "sources_consulted": 5,
+        "verification_duration_ms": 3500,
+        "automated": true,
+        "review_status": "approved"
+      }
+    }
+  ]
+}

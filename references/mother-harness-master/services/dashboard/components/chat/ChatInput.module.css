@@ -1,0 +1,225 @@
+/* Chat Input Styles */
+
+.container {
+    display: flex;
+    flex-direction: column;
+    padding: var(--spacing-md);
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border-primary);
+}
+
+/* Attachments */
+.attachments {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-sm);
+}
+
+.attachment {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-md);
+}
+
+.attachmentName {
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.removeAttachment {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--text-tertiary);
+    cursor: pointer;
+}
+
+.removeAttachment:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+/* Toolbar */
+.toolbar {
+    display: flex;
+    gap: var(--spacing-xs);
+    padding-bottom: var(--spacing-sm);
+    margin-bottom: var(--spacing-sm);
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.toolbarButton {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-md);
+    color: var(--text-tertiary);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.toolbarButton:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+/* Input wrapper */
+.inputWrapper {
+    display: flex;
+    align-items: flex-end;
+    gap: var(--spacing-sm);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-sm);
+    transition: border-color var(--transition-fast);
+}
+
+.inputWrapper:focus-within {
+    border-color: var(--accent-primary);
+}
+
+.toggleToolbar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-md);
+    color: var(--text-tertiary);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    flex-shrink: 0;
+}
+
+.toggleToolbar:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.toggleToolbar.active {
+    color: var(--accent-primary);
+    transform: rotate(180deg);
+}
+
+.textarea {
+    flex: 1;
+    min-height: 24px;
+    max-height: 200px;
+    padding: 4px 0;
+    background: transparent;
+    border: none;
+    outline: none;
+    resize: none;
+    font-family: inherit;
+    font-size: var(--text-sm);
+    line-height: 1.5;
+    color: var(--text-primary);
+}
+
+.textarea::placeholder {
+    color: var(--text-tertiary);
+}
+
+.actions {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    flex-shrink: 0;
+}
+
+.enhanceButton {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-md);
+    color: var(--text-tertiary);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.enhanceButton:hover:not(:disabled) {
+    background: var(--bg-hover);
+    color: var(--accent-primary);
+}
+
+.enhanceButton:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.sendButton {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    background: var(--accent-primary);
+    border: none;
+    border-radius: var(--radius-md);
+    color: white;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.sendButton:hover:not(:disabled) {
+    filter: brightness(1.1);
+}
+
+.sendButton:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Hidden input */
+.hiddenInput {
+    display: none;
+}
+
+/* Hint */
+.hint {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: var(--spacing-sm);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+}
+
+.userName {
+    color: var(--text-tertiary);
+}
+
+.shortcut kbd {
+    padding: 1px 4px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: 10px;
+}

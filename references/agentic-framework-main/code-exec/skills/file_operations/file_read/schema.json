@@ -1,0 +1,59 @@
+{
+  "input": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "file_path": {
+        "type": "string",
+        "description": "Absolute path to the file to read",
+        "minLength": 1
+      },
+      "offset": {
+        "type": "integer",
+        "description": "Line number to start reading from (1-based)",
+        "minimum": 1
+      },
+      "limit": {
+        "type": "integer",
+        "description": "Maximum number of lines to read",
+        "minimum": 1,
+        "maximum": 10000,
+        "default": 2000
+      }
+    },
+    "required": ["file_path"],
+    "additionalProperties": false
+  },
+  "output": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "content": {
+        "type": "string",
+        "description": "File contents with line numbers"
+      },
+      "file_exists": {
+        "type": "boolean",
+        "description": "Whether the file exists"
+      },
+      "total_lines": {
+        "type": "integer",
+        "description": "Total number of lines in file"
+      },
+      "lines_read": {
+        "type": "integer",
+        "description": "Number of lines returned"
+      },
+      "file_size_bytes": {
+        "type": "integer",
+        "description": "Size of file in bytes"
+      },
+      "truncated": {
+        "type": "boolean",
+        "description": "Whether output was truncated"
+      }
+    },
+    "required": ["content", "file_exists"],
+    "additionalProperties": false
+  }
+}

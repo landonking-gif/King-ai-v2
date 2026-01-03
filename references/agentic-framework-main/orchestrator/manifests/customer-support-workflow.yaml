@@ -1,0 +1,128 @@
+# Customer Support Workflow Manifest
+# Demonstrates multi-step workflow with research, verification, and synthesis
+
+manifest_id: "550e8400-e29b-41d4-a716-446655440001"
+name: "customer-support-workflow"
+version: "1.0.0"
+description: "Multi-agent workflow for handling customer support tickets with automated research, verification, and response generation"
+
+steps:
+  # Step 1: Research - Gather information about the customer's issue
+  - id: "research-customer-issue"
+    role: "research"
+    capabilities:
+      - "ticket_read"
+      - "kb_search"
+      - "web_search"
+    inputs:
+      - name: "ticket_id"
+        source: "user_input"
+        required: true
+      - name: "customer_context"
+        source: "user_input"
+        required: false
+    outputs:
+      - name: "research_findings"
+        artifact_type: "research_snippet"
+    timeout: 300
+    retry_on_failure: true
+    max_retries: 3
+
+  # Step 2: Verify - Validate claims and check for known issues
+  - id: "verify-issue"
+    role: "verify"
+    capabilities:
+      - "claim_verification"
+      - "known_issues_check"
+      - "version_compatibility_check"
+    inputs:
+      - name: "research_findings"
+        source: "previous_step"
+        required: true
+    outputs:
+      - name: "verification_result"
+        artifact_type: "claim_verification"
+    timeout: 240
+    retry_on_failure: true
+    max_retries: 2
+
+  # Step 3: Code Review (if applicable) - Check if code changes are needed
+  - id: "review-code-fix"
+    role: "code"
+    capabilities:
+      - "code_review"
+      - "bug_analysis"
+      - "patch_generation"
+    inputs:
+      - name: "verification_result"
+        source: "previous_step"
+        required: true
+      - name: "repository"
+        source: "user_input"
+        required: false
+    outputs:
+      - name: "code_fix"
+        artifact_type: "code_patch"
+    timeout: 600
+    retry_on_failure: true
+    max_retries: 2
+
+  # Step 4: Synthesis - Generate final response
+  - id: "synthesize-response"
+    role: "synthesis"
+    capabilities:
+      - "response_generation"
+      - "tone_adjustment"
+      - "quality_check"
+    inputs:
+      - name: "research_findings"
+        source: "artifact:research-customer-issue"
+        required: true
+      - name: "verification_result"
+        source: "artifact:verify-issue"
+        required: true
+      - name: "code_fix"
+        source: "previous_step"
+        required: false
+    outputs:
+      - name: "final_response"
+        artifact_type: "synthesis_result"
+    timeout: 180
+    retry_on_failure: true
+    max_retries: 1
+
+# Memory configuration
+memory:
+  persist_on:
+    - "on_complete"
+    - "per_step"
+  compaction:
+    strategy: "summarize"
+    max_tokens: 8000
+
+# Tool catalog configuration
+tools:
+  catalog_ids:
+    - "filesystem"
+    - "github"
+    - "web_search"
+    - "knowledge_base"
+
+# Policy configuration
+policies:
+  requires_human_approval: false
+  allowed_tool_categories:
+    - "read_only"
+    - "search"
+    - "analysis"
+  max_tool_calls_per_step: 15
+
+# Metadata
+metadata:
+  created_by: "admin"
+  created_at: "2025-01-15T10:00:00Z"
+  tags:
+    - "customer-support"
+    - "automated-response"
+    - "multi-agent"
+  priority: "high"

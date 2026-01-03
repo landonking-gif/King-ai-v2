@@ -1,0 +1,59 @@
+name: file_write
+version: 1.0.0
+description: |
+  Write or create a file with given content. Supports creating new files,
+  overwriting existing files, and saving in various formats (text, markdown,
+  CSV, JSON, etc.).
+
+handler: handler.write_file
+
+# Tier 1: Lightweight metadata for fast pre-filtering
+tier1:
+  short_description: "Write/create files - text, markdown, CSV, JSON"
+  category: file_operations
+  file_types: ["*"]  # Can write any file type
+  intents: ["write", "save", "create", "export", "output", "generate file", "store"]
+  priority: 1
+
+# Tier 2: Rich metadata for LLM decision-making
+when_to_use: |
+  USE THIS SKILL WHEN:
+  - User asks to "save", "write", "create", or "export" content to a file
+  - Saving analysis results to CSV, JSON, or markdown
+  - Creating reports or documentation files
+  - Exporting extracted data to a file
+  - Generating output files from processing pipelines
+
+  COMMON OUTPUT FORMATS:
+  - CSV: For tabular data, KPIs, metrics (use proper CSV formatting)
+  - Markdown: For reports with tables, formatted text
+  - JSON: For structured data export
+  - TXT: For simple text output
+
+when_not_to_use: |
+  DO NOT USE FOR:
+  - Editing existing files with surgical changes - use file_edit instead
+  - Appending to logs - consider file_edit or specialized logging
+
+examples:
+  - "Save the results to output.csv"
+  - "Create a markdown report in reports/analysis.md"
+  - "Export the KPIs to data.json"
+  - "Write the summary to summary.txt"
+  - "Save the comparison table to reports/comparison.md"
+
+safety_flags:
+  - file_system
+  - side_effect
+
+requires_approval: true
+
+tags:
+  - file-operations
+  - write
+  - filesystem
+  - save
+  - export
+  - csv
+  - markdown
+  - output

@@ -1,0 +1,57 @@
+{
+  "input": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "text": {
+        "type": "string",
+        "description": "Text to summarize",
+        "minLength": 1,
+        "maxLength": 100000
+      },
+      "max_sentences": {
+        "type": "integer",
+        "description": "Maximum number of sentences in summary",
+        "minimum": 1,
+        "maximum": 20,
+        "default": 5
+      },
+      "style": {
+        "type": "string",
+        "description": "Summary style",
+        "enum": ["concise", "detailed", "bullet-points"],
+        "default": "concise"
+      }
+    },
+    "required": ["text"],
+    "additionalProperties": false
+  },
+  "output": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "summary": {
+        "type": "string",
+        "description": "Summarized text"
+      },
+      "original_length": {
+        "type": "integer",
+        "description": "Original text length in characters"
+      },
+      "summary_length": {
+        "type": "integer",
+        "description": "Summary length in characters"
+      },
+      "compression_ratio": {
+        "type": "number",
+        "description": "Compression ratio (summary_length / original_length)"
+      },
+      "sentences_extracted": {
+        "type": "integer",
+        "description": "Number of sentences in summary"
+      }
+    },
+    "required": ["summary", "original_length", "summary_length", "compression_ratio"],
+    "additionalProperties": false
+  }
+}

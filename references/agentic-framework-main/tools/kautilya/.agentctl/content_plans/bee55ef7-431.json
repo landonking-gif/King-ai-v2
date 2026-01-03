@@ -1,0 +1,54 @@
+{
+  "plan_id": "bee55ef7-431",
+  "description": "Simple test page",
+  "target_format": "html",
+  "output_file": "/tmp/test_final.html",
+  "estimated_size": "small",
+  "total_estimated_tokens": 850,
+  "strategy": "single_generation",
+  "strategy_description": "Content is small enough to generate in one shot",
+  "sections": [
+    {
+      "section_id": "html_structure",
+      "name": "HTML Structure",
+      "description": "DOCTYPE, html, head, meta tags, title, CSS links",
+      "order": 1,
+      "estimated_tokens": 150,
+      "dependencies": [],
+      "status": "completed",
+      "completed_at": "2025-12-30T20:59:17.720645",
+      "bytes_written": 34
+    },
+    {
+      "section_id": "css_styles",
+      "name": "CSS Styles",
+      "description": "Embedded or linked CSS for layout and styling",
+      "order": 2,
+      "estimated_tokens": 400,
+      "dependencies": [
+        "html_structure"
+      ]
+    },
+    {
+      "section_id": "html_body_structure",
+      "name": "Body Structure",
+      "description": "Main container, header, sidebar, content areas",
+      "order": 3,
+      "estimated_tokens": 250,
+      "dependencies": [
+        "html_structure"
+      ]
+    },
+    {
+      "section_id": "html_closing",
+      "name": "HTML Closing",
+      "description": "Closing tags and final scripts",
+      "order": 99,
+      "estimated_tokens": 50,
+      "dependencies": []
+    }
+  ],
+  "section_count": 4,
+  "created_at": "2025-12-30T20:59:17.717694",
+  "status": "in_progress"
+}

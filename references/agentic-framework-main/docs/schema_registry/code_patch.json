@@ -1,0 +1,463 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agent-framework.io/schemas/code_patch.json",
+  "title": "Code Patch",
+  "description": "A structured artifact representing a code change, including files modified, tests, validation results, and approval status",
+  "type": "object",
+  "required": [
+    "id",
+    "repo",
+    "base_commit",
+    "files_changed",
+    "patch_summary",
+    "confidence",
+    "authoring_subagent",
+    "provenance",
+    "created_at",
+    "merge_ready"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for the code patch (UUID v4 recommended)",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "examples": ["750e8400-e29b-41d4-a716-446655440000"]
+    },
+    "repo": {
+      "type": "string",
+      "description": "Repository identifier or URL",
+      "examples": ["github.com/company/agent-framework", "internal:agent-framework"]
+    },
+    "base_commit": {
+      "type": "string",
+      "description": "Git commit SHA that this patch is based on",
+      "pattern": "^[0-9a-f]{40}$",
+      "examples": ["1234567890abcdef1234567890abcdef12345678"]
+    },
+    "files_changed": {
+      "type": "array",
+      "description": "List of files modified by this patch",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["path", "change_type"],
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Relative path to the file from repo root",
+            "examples": ["orchestrator/service/workflow.py"]
+          },
+          "change_type": {
+            "type": "string",
+            "enum": ["added", "modified", "deleted", "renamed", "copied"],
+            "description": "Type of change made to the file"
+          },
+          "old_path": {
+            "type": "string",
+            "description": "Original path if file was renamed or copied",
+            "examples": ["orchestrator/service/old_workflow.py"]
+          },
+          "lines_added": {
+            "type": "integer",
+            "description": "Number of lines added",
+            "minimum": 0
+          },
+          "lines_removed": {
+            "type": "integer",
+            "description": "Number of lines removed",
+            "minimum": 0
+          },
+          "diff": {
+            "type": "string",
+            "description": "Unified diff format of changes",
+            "examples": ["@@ -10,3 +10,4 @@\n def foo():\n-    return 1\n+    return 2"]
+          },
+          "summary": {
+            "type": "string",
+            "description": "Brief summary of changes to this file",
+            "maxLength": 500,
+            "examples": ["Updated return value in foo() function"]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "patch_summary": {
+      "type": "string",
+      "description": "High-level summary of what this patch accomplishes",
+      "minLength": 10,
+      "maxLength": 2000,
+      "examples": ["Implement memory compaction strategy for artifact storage, reducing context size by 40%"]
+    },
+    "tests": {
+      "type": "array",
+      "description": "Test cases associated with this patch",
+      "items": {
+        "type": "object",
+        "required": ["name", "status"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Name or identifier of the test",
+            "examples": ["test_memory_compaction_summarize"]
+          },
+          "status": {
+            "type": "string",
+            "enum": ["passed", "failed", "skipped", "pending", "not_run"],
+            "description": "Test execution status"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["unit", "integration", "e2e", "performance", "security"],
+            "description": "Type of test",
+            "default": "unit"
+          },
+          "duration_ms": {
+            "type": "integer",
+            "description": "Test execution duration in milliseconds",
+            "minimum": 0
+          },
+          "error_message": {
+            "type": "string",
+            "description": "Error message if test failed",
+            "maxLength": 2000
+          },
+          "coverage_percent": {
+            "type": "number",
+            "description": "Code coverage percentage for this test",
+            "minimum": 0.0,
+            "maximum": 100.0
+          }
+        },
+        "additionalProperties": false
+      },
+      "default": []
+    },
+    "confidence": {
+      "type": "number",
+      "description": "Confidence in the correctness and safety of this patch (0.0 to 1.0)",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "examples": [0.92]
+    },
+    "risks": {
+      "type": "array",
+      "description": "Identified risks or potential issues with this patch",
+      "items": {
+        "type": "object",
+        "required": ["severity", "description"],
+        "properties": {
+          "severity": {
+            "type": "string",
+            "enum": ["critical", "high", "medium", "low", "info"],
+            "description": "Risk severity level"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "breaking_change",
+              "performance",
+              "security",
+              "data_loss",
+              "backwards_incompatible",
+              "dependency",
+              "concurrency",
+              "resource_usage"
+            ],
+            "description": "Risk category"
+          },
+          "description": {
+            "type": "string",
+            "description": "Detailed description of the risk",
+            "maxLength": 1000
+          },
+          "mitigation": {
+            "type": "string",
+            "description": "Suggested mitigation strategy",
+            "maxLength": 1000
+          },
+          "requires_review": {
+            "type": "boolean",
+            "description": "Whether this risk requires human review",
+            "default": false
+          }
+        },
+        "additionalProperties": false
+      },
+      "default": []
+    },
+    "authoring_subagent": {
+      "type": "string",
+      "description": "Identifier of the subagent that authored this patch",
+      "pattern": "^subagent:[a-zA-Z0-9_-]+$",
+      "examples": ["subagent:code-agent-003"]
+    },
+    "validation_results": {
+      "type": "object",
+      "description": "Results from automated validation checks",
+      "properties": {
+        "linting": {
+          "type": "object",
+          "properties": {
+            "passed": {
+              "type": "boolean",
+              "description": "Whether linting passed"
+            },
+            "tool": {
+              "type": "string",
+              "description": "Linting tool used",
+              "examples": ["black", "ruff", "mypy"]
+            },
+            "errors": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "List of linting errors"
+            }
+          }
+        },
+        "type_checking": {
+          "type": "object",
+          "properties": {
+            "passed": {
+              "type": "boolean",
+              "description": "Whether type checking passed"
+            },
+            "tool": {
+              "type": "string",
+              "examples": ["mypy"]
+            },
+            "errors": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "security_scan": {
+          "type": "object",
+          "properties": {
+            "passed": {
+              "type": "boolean",
+              "description": "Whether security scan passed"
+            },
+            "tool": {
+              "type": "string",
+              "examples": ["bandit", "safety"]
+            },
+            "vulnerabilities": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "severity": {
+                    "type": "string",
+                    "enum": ["critical", "high", "medium", "low"]
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "cve_id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "test_coverage": {
+          "type": "object",
+          "properties": {
+            "total_percent": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 100.0
+            },
+            "meets_threshold": {
+              "type": "boolean",
+              "description": "Whether coverage meets minimum threshold (e.g., 90%)"
+            },
+            "uncovered_lines": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "provenance": {
+      "type": "string",
+      "description": "Reference to provenance record tracking the patch creation",
+      "pattern": "^prov_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "examples": ["prov_750e8400-e29b-41d4-a716-446655440003"]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when patch was created",
+      "examples": ["2025-12-28T12:45:10Z"]
+    },
+    "approved_by": {
+      "type": "string",
+      "description": "Identifier of human or system that approved this patch",
+      "pattern": "^(human|system):[a-zA-Z0-9_@.-]+$",
+      "examples": ["human:developer@company.com", "system:lead-agent"]
+    },
+    "approved_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when patch was approved",
+      "examples": ["2025-12-28T13:00:00Z"]
+    },
+    "merge_ready": {
+      "type": "boolean",
+      "description": "Whether this patch is ready to be merged (all checks passed, approved if required)",
+      "examples": [true]
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional metadata for the patch",
+      "properties": {
+        "branch_name": {
+          "type": "string",
+          "description": "Git branch name for this patch",
+          "examples": ["feature/PROJ-123-memory-compaction"]
+        },
+        "pr_number": {
+          "type": "integer",
+          "description": "Pull request number if created",
+          "minimum": 1
+        },
+        "pr_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Pull request URL"
+        },
+        "related_issues": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Related issue or ticket identifiers",
+          "examples": [["PROJ-123", "PROJ-456"]]
+        },
+        "labels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Labels or tags for categorization",
+          "examples": [["feature", "memory", "performance"]]
+        },
+        "review_comments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "reviewer": {
+                "type": "string"
+              },
+              "comment": {
+                "type": "string"
+              },
+              "timestamp": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          },
+          "description": "Review comments from humans or automated reviewers"
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "id": "750e8400-e29b-41d4-a716-446655440000",
+      "repo": "github.com/company/agent-framework",
+      "base_commit": "1234567890abcdef1234567890abcdef12345678",
+      "files_changed": [
+        {
+          "path": "memory-service/service/compaction.py",
+          "change_type": "modified",
+          "lines_added": 45,
+          "lines_removed": 12,
+          "summary": "Implemented summarize compaction strategy"
+        },
+        {
+          "path": "memory-service/tests/test_compaction.py",
+          "change_type": "added",
+          "lines_added": 120,
+          "lines_removed": 0,
+          "summary": "Added comprehensive tests for compaction strategies"
+        }
+      ],
+      "patch_summary": "Implement memory compaction strategy for artifact storage, reducing context size by 40% through intelligent summarization",
+      "tests": [
+        {
+          "name": "test_memory_compaction_summarize",
+          "status": "passed",
+          "type": "unit",
+          "duration_ms": 250,
+          "coverage_percent": 95.5
+        },
+        {
+          "name": "test_compaction_performance",
+          "status": "passed",
+          "type": "performance",
+          "duration_ms": 1500
+        }
+      ],
+      "confidence": 0.92,
+      "risks": [
+        {
+          "severity": "medium",
+          "category": "data_loss",
+          "description": "Aggressive summarization may lose important details from original artifacts",
+          "mitigation": "Keep original artifacts in cold storage for 90 days; use configurable compression levels",
+          "requires_review": true
+        }
+      ],
+      "authoring_subagent": "subagent:code-agent-003",
+      "validation_results": {
+        "linting": {
+          "passed": true,
+          "tool": "black",
+          "errors": []
+        },
+        "type_checking": {
+          "passed": true,
+          "tool": "mypy",
+          "errors": []
+        },
+        "security_scan": {
+          "passed": true,
+          "tool": "bandit",
+          "vulnerabilities": []
+        },
+        "test_coverage": {
+          "total_percent": 93.2,
+          "meets_threshold": true,
+          "uncovered_lines": 8
+        }
+      },
+      "provenance": "prov_750e8400-e29b-41d4-a716-446655440003",
+      "created_at": "2025-12-28T12:45:10Z",
+      "approved_by": "human:developer@company.com",
+      "approved_at": "2025-12-28T13:00:00Z",
+      "merge_ready": true,
+      "metadata": {
+        "branch_name": "feature/PROJ-123-memory-compaction",
+        "pr_number": 456,
+        "pr_url": "https://github.com/company/agent-framework/pull/456",
+        "related_issues": ["PROJ-123"],
+        "labels": ["feature", "memory", "performance"]
+      }
+    }
+  ]
+}

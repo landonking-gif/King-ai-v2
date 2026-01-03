@@ -4,51 +4,78 @@
 
 King AI v2 is a sophisticated autonomous AI system that acts as an "AI CEO" to plan, launch, and manage digital businesses. It features a multi-brain architecture with specialized agents, self-evolution capabilities, and human oversight through an approval system.
 
-## 🚀 Quick Start
+## 🚀 Production Deployment
+
+### Current Live Deployment
+- **Domain**: https://king-ai-studio.me
+- **Status**: ✅ Operational (AWS EC2 + Load Balancer)
+- **SSL**: ✅ Enabled (AWS Load Balancer termination)
+- **Health**: ✅ Target group healthy
+
+### Access Points
+- **Dashboard**: https://king-ai-studio.me
+- **API Docs**: https://king-ai-studio.me/api/docs
+- **API Base**: https://king-ai-studio.me/api/
+
+### Infrastructure
+- **Load Balancer**: AWS ALB (handles SSL termination)
+- **Web Server**: Nginx (reverse proxy on port 80)
+- **API Server**: FastAPI (port 8000)
+- **Dashboard**: React/Vite (port 5173)
+- **Database**: PostgreSQL + Redis
+- **Monitoring**: Prometheus (dynamic port)
+
+## 🛠️ Development Setup
 
 ### Prerequisites
 - Python 3.10+
 - PostgreSQL 14+
 - Redis 6+
-- Node.js 18+
-- Docker (optional)
+- Node.js 20+
+- Git
+- AWS CLI (for deployment)
 
 ### Automated Setup (Recommended)
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/landonking-gif/King-ai-v2.git
 cd king-ai-v2
 
-# Run the automated setup
+# Run the automated deployment
 python scripts/control.py
 # Select [3] 🤖 Automated Empire Setup (AWS Infra + GitHub + Full Setup)
 ```
 
 This will automatically:
-- Install prerequisites
-- Configure AWS infrastructure (if needed)
+- Install system prerequisites
+- Configure AWS infrastructure
 - Set up databases and services
-- Deploy the application
+- Deploy to production server
+- Configure SSL and monitoring
 
-### Manual Setup
+### Local Development
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/landonking-gif/King-ai-v2.git
 cd king-ai-v2
 
 # Copy configuration
 cp .env.example .env
 # Edit .env with your API keys
 
-# Install dependencies
-pip install -r requirements.txt
-npm install
+# Install Python dependencies
+pip install -e .
 
-# Start services
-docker-compose up -d
-python -m uvicorn src.api.main:app --reload
+# Install Node.js dependencies
+cd dashboard && npm install
+
+# Start services (from project root)
+python scripts/control.py
+# Select [1] 🚀 Full Deployment (Code + Secrets + Restart)
 ```
 
-### Access Dashboard
-Open http://localhost:5173 in your browser.
+### Access Local Development
+- **Dashboard**: http://localhost:5173
+- **API Docs**: http://localhost:8000/docs
+- **API Base**: http://localhost:8000/api/
 
 ## 📚 Documentation
 

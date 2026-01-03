@@ -1,0 +1,20 @@
+name: sentiment_analyzer
+version: "1.0.0"
+description: Analyze sentiment of text and return polarity score
+author: Agentic Framework Examples
+category: nlp
+
+safety_flags:
+  - none  # This is a safe, read-only skill
+
+requires_approval: false
+
+handler: handler.analyze_sentiment
+
+inputs_schema: schema.json#/definitions/input
+outputs_schema: schema.json#/definitions/output
+
+tags:
+  - nlp
+  - sentiment
+  - analysis

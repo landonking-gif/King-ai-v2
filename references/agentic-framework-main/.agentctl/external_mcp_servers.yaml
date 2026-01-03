@@ -1,0 +1,142 @@
+servers:
+- auth_flow: api_key
+  classification:
+  - external_call
+  - safe
+  contact: platform@example.com
+  endpoint: https://mcp.firecrawl.dev
+  default_for: websearch
+  metadata:
+    api_key_env: FIRECRAWL_API_KEY
+    documentation: https://docs.firecrawl.dev/mcp-server
+    provider: firecrawl
+  name: Firecrawl MCP Server
+  owner: platform-team
+  rate_limits:
+    max_calls: 100
+    window_seconds: 60
+  tool_id: firecrawl_mcp
+  tools:
+  - description: Scrape a single URL and return clean markdown content
+    name: scrape
+    parameters:
+    - default: null
+      description: The URL to scrape
+      name: url
+      required: true
+      type: string
+    - default:
+      - markdown
+      description: Output formats (markdown, html, links, screenshot)
+      name: formats
+      required: false
+      type: array
+    - default: true
+      description: Only return the main content, excluding headers, navs, footers
+      name: onlyMainContent
+      required: false
+      type: boolean
+    - default: null
+      description: Only include tags/attributes with these values
+      name: includeTags
+      required: false
+      type: array
+    - default: null
+      description: Tags to exclude from the output
+      name: excludeTags
+      required: false
+      type: array
+    - default: 0
+      description: Wait time in milliseconds for the page to load
+      name: waitFor
+      required: false
+      type: number
+    returns: Scraped content in requested formats (markdown, HTML, links, screenshot)
+  - description: Crawl a website starting from a URL with smart link discovery
+    name: crawl
+    parameters:
+    - default: null
+      description: The starting URL to crawl
+      name: url
+      required: true
+      type: string
+    - default: 100
+      description: Maximum number of pages to crawl
+      name: limit
+      required: false
+      type: number
+    - default: 2
+      description: Maximum depth to crawl (how many links deep)
+      name: maxDepth
+      required: false
+      type: number
+    - default:
+      - markdown
+      description: Output formats for each page
+      name: formats
+      required: false
+      type: array
+    - default: null
+      description: URL patterns to exclude from crawl
+      name: excludePaths
+      required: false
+      type: array
+    - default: null
+      description: URL patterns to include in crawl (acts as allowlist)
+      name: includePaths
+      required: false
+      type: array
+    - default: false
+      description: Allow crawling links that go back to parent pages
+      name: allowBackwardLinks
+      required: false
+      type: boolean
+    - default: false
+      description: Ignore the website's sitemap.xml
+      name: ignoreSitemap
+      required: false
+      type: boolean
+    returns: Crawl job ID and status. Use get-crawl-status to check progress
+  - description: Generate a comprehensive map of a website's structure and links
+    name: map
+    parameters:
+    - default: null
+      description: The website URL to map
+      name: url
+      required: true
+      type: string
+    - default: null
+      description: Search term to filter links (optional)
+      name: search
+      required: false
+      type: string
+    - default: false
+      description: Ignore the website's sitemap.xml
+      name: ignoreSitemap
+      required: false
+      type: boolean
+    - default: 5000
+      description: Maximum number of links to return
+      name: limit
+      required: false
+      type: number
+    returns: Comprehensive list of all links found on the website
+  - description: Check the status of an ongoing crawl job
+    name: get-crawl-status
+    parameters:
+    - default: null
+      description: The crawl job ID returned from the crawl command
+      name: jobId
+      required: true
+      type: string
+    returns: Current status and results of the crawl job
+  - description: Cancel an ongoing crawl job
+    name: cancel-crawl
+    parameters:
+    - default: null
+      description: The crawl job ID to cancel
+      name: jobId
+      required: true
+      type: string
+    returns: Cancellation confirmation
+  version: 1.0.0

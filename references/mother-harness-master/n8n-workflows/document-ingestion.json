@@ -1,0 +1,204 @@
+{
+    "name": "document-ingestion",
+    "description": "n8n workflow for processing document ingestion jobs",
+    "nodes": [
+        {
+            "name": "Schedule Trigger",
+            "type": "n8n-nodes-base.scheduleTrigger",
+            "typeVersion": 1,
+            "position": [
+                100,
+                300
+            ],
+            "parameters": {
+                "rule": {
+                    "interval": [
+                        {
+                            "field": "minutes",
+                            "minutesInterval": 5
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "Read Stream",
+            "type": "n8n-nodes-base.redis",
+            "typeVersion": 1,
+            "position": [
+                300,
+                300
+            ],
+            "parameters": {
+                "operation": "xrange",
+                "key": "stream:docling",
+                "count": "10"
+            }
+        },
+        {
+            "name": "Process Each Job",
+            "type": "n8n-nodes-base.splitInBatches",
+            "typeVersion": 2,
+            "position": [
+                500,
+                300
+            ],
+            "parameters": {
+                "batchSize": 1
+            }
+        },
+        {
+            "name": "Parse Job Data",
+            "type": "n8n-nodes-base.set",
+            "typeVersion": 2,
+            "position": [
+                700,
+                300
+            ],
+            "parameters": {
+                "values": {
+                    "string": [
+                        {
+                            "name": "job_id",
+                            "value": "={{ JSON.parse($json.fields.job).id }}"
+                        },
+                        {
+                            "name": "file_path",
+                            "value": "={{ JSON.parse($json.fields.job).file_path }}"
+                        },
+                        {
+                            "name": "library_id",
+                            "value": "={{ JSON.parse($json.fields.job).library_id }}"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "Call Docling API",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4,
+            "position": [
+                900,
+                300
+            ],
+            "parameters": {
+                "method": "POST",
+                "url": "={{ $env.DOCLING_URL }}/process",
+                "sendBody": true,
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "name": "file_path",
+                            "value": "={{ $json.file_path }}"
+                        },
+                        {
+                            "name": "output_format",
+                            "value": "json"
+                        }
+                    ]
+                },
+                "options": {
+                    "timeout": 300000
+                }
+            }
+        },
+        {
+            "name": "Store Chunks",
+            "type": "n8n-nodes-base.redis",
+            "typeVersion": 1,
+            "position": [
+                1100,
+                300
+            ],
+            "parameters": {
+                "operation": "set",
+                "key": "={{ 'doc:' + $json.job_id }}",
+                "value": "={{ JSON.stringify($json) }}"
+            }
+        },
+        {
+            "name": "Acknowledge Job",
+            "type": "n8n-nodes-base.redis",
+            "typeVersion": 1,
+            "position": [
+                1300,
+                300
+            ],
+            "parameters": {
+                "operation": "xack",
+                "key": "stream:docling",
+                "group": "docling-processors",
+                "id": "={{ $json.id }}"
+            }
+        }
+    ],
+    "connections": {
+        "Schedule Trigger": {
+            "main": [
+                [
+                    {
+                        "node": "Read Stream",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Read Stream": {
+            "main": [
+                [
+                    {
+                        "node": "Process Each Job",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Process Each Job": {
+            "main": [
+                [
+                    {
+                        "node": "Parse Job Data",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Parse Job Data": {
+            "main": [
+                [
+                    {
+                        "node": "Call Docling API",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Call Docling API": {
+            "main": [
+                [
+                    {
+                        "node": "Store Chunks",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Store Chunks": {
+            "main": [
+                [
+                    {
+                        "node": "Acknowledge Job",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}

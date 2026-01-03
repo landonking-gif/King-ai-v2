@@ -1,0 +1,32 @@
+/* Mission Control Layout Styles */
+
+.container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+    background: var(--bg-primary);
+}
+
+.content {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1280px) {
+    /* Right panel becomes overlay at laptop size */
+}
+
+@media (max-width: 768px) {
+    /* Left sidebar becomes overlay at tablet size */
+}
+
+@media (max-width: 640px) {
+
+    /* Single column at mobile size */
+    .content {
+        flex-direction: column;
+    }
+}

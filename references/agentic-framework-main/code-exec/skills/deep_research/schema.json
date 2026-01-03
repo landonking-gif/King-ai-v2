@@ -1,0 +1,168 @@
+{
+  "input": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "The research question or topic to investigate",
+        "minLength": 5,
+        "maxLength": 500
+      },
+      "documents": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Optional local documents to include in research (PDF, DOCX, XLSX, PPTX). These are processed alongside web sources."
+      },
+      "min_sources": {
+        "type": "integer",
+        "description": "Minimum number of sources to fetch and analyze",
+        "minimum": 5,
+        "maximum": 20,
+        "default": 10
+      },
+      "max_sources": {
+        "type": "integer",
+        "description": "Maximum number of sources to fetch",
+        "minimum": 5,
+        "maximum": 25,
+        "default": 15
+      },
+      "output_format": {
+        "type": "string",
+        "description": "Format for the output data",
+        "enum": ["markdown", "json", "summary"],
+        "default": "markdown"
+      },
+      "search_depth": {
+        "type": "string",
+        "description": "Depth of search - affects number of search queries",
+        "enum": ["quick", "standard", "thorough"],
+        "default": "standard"
+      },
+      "include_raw_content": {
+        "type": "boolean",
+        "description": "Include raw fetched content in output",
+        "default": false
+      }
+    },
+    "required": ["query"],
+    "additionalProperties": false
+  },
+  "output": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "success": {
+        "type": "boolean",
+        "description": "Whether the research completed successfully"
+      },
+      "query": {
+        "type": "string",
+        "description": "Original research query"
+      },
+      "sources": {
+        "type": "array",
+        "description": "Array of fetched and processed sources",
+        "items": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "description": "Source URL"
+            },
+            "title": {
+              "type": "string",
+              "description": "Page title"
+            },
+            "domain": {
+              "type": "string",
+              "description": "Source domain"
+            },
+            "content_summary": {
+              "type": "string",
+              "description": "Summarized content from the page"
+            },
+            "extracted_data": {
+              "type": "object",
+              "description": "Structured data extracted from the page"
+            },
+            "relevance_score": {
+              "type": "number",
+              "description": "Relevance score (0-1)"
+            },
+            "fetch_status": {
+              "type": "string",
+              "description": "Status of content fetch",
+              "enum": ["success", "failed", "partial"]
+            }
+          }
+        }
+      },
+      "source_count": {
+        "type": "integer",
+        "description": "Number of sources successfully processed"
+      },
+      "failed_sources": {
+        "type": "integer",
+        "description": "Number of sources that failed to fetch"
+      },
+      "extracted_facts": {
+        "type": "array",
+        "description": "Key facts extracted across all sources",
+        "items": {
+          "type": "object",
+          "properties": {
+            "fact": {
+              "type": "string"
+            },
+            "source_index": {
+              "type": "integer"
+            },
+            "confidence": {
+              "type": "number"
+            }
+          }
+        }
+      },
+      "synthesis_context": {
+        "type": "object",
+        "description": "Context prepared for LLM synthesis",
+        "properties": {
+          "combined_content": {
+            "type": "string",
+            "description": "Combined and deduplicated content from all sources"
+          },
+          "source_citations": {
+            "type": "array",
+            "description": "Citation references for each source"
+          },
+          "synthesis_instructions": {
+            "type": "string",
+            "description": "Instructions for generating the final report"
+          }
+        }
+      },
+      "metadata": {
+        "type": "object",
+        "description": "Research metadata",
+        "properties": {
+          "search_queries_used": {
+            "type": "array",
+            "items": {"type": "string"}
+          },
+          "total_content_tokens": {
+            "type": "integer"
+          },
+          "execution_time_seconds": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "required": ["success", "query", "sources", "source_count"],
+    "additionalProperties": false
+  }
+}

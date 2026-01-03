@@ -1,0 +1,63 @@
+{
+  "input": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "command": {
+        "type": "string",
+        "description": "Bash command to execute",
+        "minLength": 1
+      },
+      "timeout_ms": {
+        "type": "integer",
+        "description": "Timeout in milliseconds (max 600000 = 10 minutes)",
+        "minimum": 1000,
+        "maximum": 600000,
+        "default": 120000
+      },
+      "working_directory": {
+        "type": "string",
+        "description": "Working directory for command execution"
+      },
+      "environment": {
+        "type": "object",
+        "additionalProperties": {"type": "string"},
+        "description": "Environment variables to set"
+      }
+    },
+    "required": ["command"],
+    "additionalProperties": false
+  },
+  "output": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "stdout": {
+        "type": "string",
+        "description": "Standard output from command"
+      },
+      "stderr": {
+        "type": "string",
+        "description": "Standard error from command"
+      },
+      "exit_code": {
+        "type": "integer",
+        "description": "Exit code (0 = success)"
+      },
+      "execution_time_ms": {
+        "type": "number",
+        "description": "Execution time in milliseconds"
+      },
+      "timed_out": {
+        "type": "boolean",
+        "description": "Whether the command timed out"
+      },
+      "truncated": {
+        "type": "boolean",
+        "description": "Whether output was truncated"
+      }
+    },
+    "required": ["exit_code"],
+    "additionalProperties": false
+  }
+}

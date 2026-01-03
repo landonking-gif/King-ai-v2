@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "input": {
+    "type": "object",
+    "properties": {
+      "input": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "input"
+    ]
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "result": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "result"
+    ]
+  }
+}

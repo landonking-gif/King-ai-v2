@@ -1,0 +1,193 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agent-framework.io/schemas/research_snippet.json",
+  "title": "Research Snippet",
+  "description": "A structured artifact representing research findings, text excerpts, or knowledge extracted by research subagents",
+  "type": "object",
+  "required": [
+    "id",
+    "source",
+    "text",
+    "summary",
+    "confidence",
+    "safety_class",
+    "created_by",
+    "created_at"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for the research snippet (UUID v4 recommended)",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "examples": ["550e8400-e29b-41d4-a716-446655440000"]
+    },
+    "source": {
+      "type": "object",
+      "description": "Origin of the research data",
+      "required": ["type"],
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Web URL if source is online",
+          "examples": ["https://arxiv.org/abs/2301.00001"]
+        },
+        "doc_id": {
+          "type": "string",
+          "description": "Document identifier if source is from internal corpus",
+          "examples": ["doc_12345", "internal://reports/q4-2024"]
+        },
+        "type": {
+          "type": "string",
+          "enum": ["web", "document", "database", "api", "knowledge_base"],
+          "description": "Type of source"
+        },
+        "title": {
+          "type": "string",
+          "description": "Title of the source document or page",
+          "examples": ["Attention Is All You Need"]
+        },
+        "author": {
+          "type": "string",
+          "description": "Author or creator of the source",
+          "examples": ["Vaswani et al."]
+        },
+        "retrieved_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when source was accessed",
+          "examples": ["2025-12-28T10:30:00Z"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "text": {
+      "type": "string",
+      "description": "The extracted text content or excerpt",
+      "minLength": 1,
+      "maxLength": 50000,
+      "examples": ["The transformer architecture uses self-attention mechanisms..."]
+    },
+    "summary": {
+      "type": "string",
+      "description": "Concise summary of the text content",
+      "minLength": 10,
+      "maxLength": 2000,
+      "examples": ["This paper introduces the Transformer, a novel architecture based solely on attention mechanisms."]
+    },
+    "tags": {
+      "type": "array",
+      "description": "Keywords or categories for classification and retrieval",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 50
+      },
+      "uniqueItems": true,
+      "maxItems": 20,
+      "default": [],
+      "examples": [["machine-learning", "nlp", "transformers", "attention"]]
+    },
+    "confidence": {
+      "type": "number",
+      "description": "Confidence score for the research quality and relevance (0.0 to 1.0)",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "examples": [0.95]
+    },
+    "provenance_refs": {
+      "type": "array",
+      "description": "References to provenance records tracking how this artifact was created",
+      "items": {
+        "type": "string",
+        "description": "Provenance record ID",
+        "pattern": "^prov_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+      },
+      "default": [],
+      "examples": [["prov_550e8400-e29b-41d4-a716-446655440001"]]
+    },
+    "embedding_ref": {
+      "type": "string",
+      "description": "Reference to the vector embedding stored in vector database (Milvus/Chroma)",
+      "pattern": "^emb_[0-9a-zA-Z_-]+$",
+      "examples": ["emb_milvus_550e8400"]
+    },
+    "safety_class": {
+      "type": "string",
+      "enum": ["public", "internal", "confidential", "restricted", "pii_risk", "requires_review"],
+      "description": "Safety classification for the content",
+      "examples": ["public"]
+    },
+    "created_by": {
+      "type": "string",
+      "description": "Identifier of the subagent or system that created this artifact",
+      "pattern": "^(subagent|system|user):[a-zA-Z0-9_-]+$",
+      "examples": ["subagent:research-agent-001", "system:orchestrator"]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when artifact was created",
+      "examples": ["2025-12-28T10:35:22Z"]
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional metadata specific to the research context",
+      "properties": {
+        "language": {
+          "type": "string",
+          "description": "Language code (ISO 639-1)",
+          "pattern": "^[a-z]{2}$",
+          "examples": ["en"]
+        },
+        "quality_score": {
+          "type": "number",
+          "description": "Quality assessment score (0.0 to 1.0)",
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "relevance_score": {
+          "type": "number",
+          "description": "Relevance to the original query (0.0 to 1.0)",
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "extraction_method": {
+          "type": "string",
+          "enum": ["manual", "llm", "rule_based", "hybrid"],
+          "description": "Method used to extract this snippet"
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "source": {
+        "type": "web",
+        "url": "https://arxiv.org/abs/1706.03762",
+        "doc_id": "arxiv:1706.03762",
+        "title": "Attention Is All You Need",
+        "author": "Vaswani et al.",
+        "retrieved_at": "2025-12-28T10:30:00Z"
+      },
+      "text": "The Transformer is the first transduction model relying entirely on self-attention to compute representations of its input and output without using sequence-aligned RNNs or convolution.",
+      "summary": "Introduces the Transformer architecture using only attention mechanisms, eliminating RNNs and convolutions.",
+      "tags": ["machine-learning", "nlp", "transformers", "attention", "deep-learning"],
+      "confidence": 0.95,
+      "provenance_refs": ["prov_550e8400-e29b-41d4-a716-446655440001"],
+      "embedding_ref": "emb_milvus_550e8400",
+      "safety_class": "public",
+      "created_by": "subagent:research-agent-001",
+      "created_at": "2025-12-28T10:35:22Z",
+      "metadata": {
+        "language": "en",
+        "quality_score": 0.98,
+        "relevance_score": 0.92,
+        "extraction_method": "llm"
+      }
+    }
+  ]
+}

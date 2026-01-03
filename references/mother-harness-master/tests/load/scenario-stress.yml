@@ -1,0 +1,45 @@
+config:
+  target: "http://localhost:8000"
+  phases:
+    # Gradually increase load to find breaking point
+    - duration: 60
+      arrivalRate: 5
+      name: "Phase 1: 5 users/sec"
+    - duration: 60
+      arrivalRate: 10
+      name: "Phase 2: 10 users/sec"
+    - duration: 60
+      arrivalRate: 20
+      name: "Phase 3: 20 users/sec"
+    - duration: 60
+      arrivalRate: 30
+      name: "Phase 4: 30 users/sec"
+    - duration: 60
+      arrivalRate: 50
+      name: "Phase 5: 50 users/sec (stress)"
+
+  plugins:
+    metrics-by-endpoint:
+      stripQueryString: true
+
+  http:
+    timeout: 30
+
+scenarios:
+  - name: "Stress Test - Task Creation"
+    flow:
+      - post:
+          url: "/api/tasks"
+          headers:
+            Authorization: "Bearer {{ $processEnvironment.TEST_JWT_TOKEN }}"
+          json:
+            query: "Stress test query {{ $randomNumber(1, 100000) }}"
+          expect:
+            - statusCode: [200, 429, 503]  # Accept rate limiting and service unavailable
+
+  - name: "Stress Test - Health Check"
+    flow:
+      - get:
+          url: "/health"
+          expect:
+            - statusCode: 200

@@ -1,0 +1,88 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: orchestrator
+  namespace: mother-harness
+spec:
+  selector:
+    app: orchestrator
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orchestrator
+  namespace: mother-harness
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: orchestrator
+  template:
+    metadata:
+      labels:
+        app: orchestrator
+    spec:
+      containers:
+        - name: orchestrator
+          image: mother-harness/orchestrator:latest
+          ports:
+            - containerPort: 8000
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: mother-harness-secrets
+                  key: REDIS_URL
+            - name: OLLAMA_LOCAL_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: mother-harness-config
+                  key: OLLAMA_LOCAL_URL
+            - name: OLLAMA_CLOUD_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: mother-harness-secrets
+                  key: OLLAMA_CLOUD_API_KEY
+            - name: N8N_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: mother-harness-config
+                  key: N8N_URL
+            - name: N8N_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: mother-harness-secrets
+                  key: N8N_API_KEY
+          resources:
+            requests:
+              cpu: "500m"
+              memory: 1Gi
+            limits:
+              cpu: "4"
+              memory: 8Gi
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: orchestrator
+  namespace: mother-harness
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: orchestrator
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70

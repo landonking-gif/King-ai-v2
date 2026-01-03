@@ -1,0 +1,64 @@
+{
+  "input": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "notebook_path": {
+        "type": "string",
+        "description": "Absolute path to the Jupyter notebook (.ipynb)",
+        "minLength": 1
+      },
+      "cell_index": {
+        "type": "integer",
+        "description": "Cell index (0-based) to edit",
+        "minimum": 0
+      },
+      "new_source": {
+        "type": "string",
+        "description": "New source content for the cell"
+      },
+      "cell_type": {
+        "type": "string",
+        "enum": ["code", "markdown"],
+        "description": "Type of cell (code or markdown)",
+        "default": "code"
+      },
+      "edit_mode": {
+        "type": "string",
+        "enum": ["replace", "insert", "delete"],
+        "description": "Edit mode: replace existing, insert new, or delete",
+        "default": "replace"
+      }
+    },
+    "required": ["notebook_path", "new_source"],
+    "additionalProperties": false
+  },
+  "output": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "success": {
+        "type": "boolean",
+        "description": "Whether the edit succeeded"
+      },
+      "notebook_path": {
+        "type": "string",
+        "description": "Path to the edited notebook"
+      },
+      "cell_index": {
+        "type": "integer",
+        "description": "Index of the affected cell"
+      },
+      "total_cells": {
+        "type": "integer",
+        "description": "Total number of cells after edit"
+      },
+      "error": {
+        "type": "string",
+        "description": "Error message if failed"
+      }
+    },
+    "required": ["success"],
+    "additionalProperties": false
+  }
+}

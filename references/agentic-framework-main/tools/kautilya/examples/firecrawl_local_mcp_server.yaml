@@ -1,0 +1,117 @@
+# Firecrawl MCP Server Configuration (Local/Stdio Transport)
+# Uses npx to run the official Firecrawl MCP server locally
+#
+# Prerequisites:
+#   1. Node.js installed (v18+)
+#   2. Set your Firecrawl API key: export FIRECRAWL_API_KEY=fc-your-api-key
+#
+# This transport is more reliable than remote SSE as it:
+#   - Runs the MCP server as a local subprocess
+#   - Communicates via stdin/stdout (faster, no network latency)
+#   - Handles the MCP protocol natively
+#
+# Import this server:
+#   kautilya mcp import tools/kautilya/examples/firecrawl_local_mcp_server.yaml
+
+tool_id: firecrawl_local
+name: Firecrawl (Local)
+description: Scrape websites, crawl pages, and extract structured content - runs locally via npx
+version: 1.0.0
+owner: platform-team
+contact: platform@example.com
+
+# Transport: stdio means we spawn a local subprocess
+transport: stdio
+
+# Command to start the MCP server
+# npx will download and run the official firecrawl-mcp package
+command:
+  - npx
+  - "-y"
+  - "firecrawl-mcp"
+
+auth_flow: api_key
+
+classification:
+  - external_call
+  - safe
+
+rate_limits:
+  max_calls: 100
+  window_seconds: 60
+
+metadata:
+  api_key_env: FIRECRAWL_API_KEY
+  provider: firecrawl
+  documentation: https://github.com/firecrawl/firecrawl-mcp-server
+
+tools:
+  - name: firecrawl_scrape
+    description: Scrape a single URL and return clean markdown content
+    parameters:
+      - name: url
+        type: string
+        description: The URL to scrape
+        required: true
+      - name: formats
+        type: array
+        description: Output formats (markdown, html, links, screenshot)
+        required: false
+        default: ["markdown"]
+      - name: onlyMainContent
+        type: boolean
+        description: Only return the main content, excluding headers, navs, footers
+        required: false
+        default: true
+    returns: Scraped content in requested formats
+
+  - name: firecrawl_crawl
+    description: Crawl a website starting from a URL
+    parameters:
+      - name: url
+        type: string
+        description: The starting URL to crawl
+        required: true
+      - name: maxDepth
+        type: number
+        description: Maximum depth to crawl
+        required: false
+        default: 2
+      - name: limit
+        type: number
+        description: Maximum number of pages to crawl
+        required: false
+        default: 100
+    returns: Crawl results with all discovered pages
+
+  - name: firecrawl_map
+    description: Generate a map of all links on a website
+    parameters:
+      - name: url
+        type: string
+        description: The website URL to map
+        required: true
+      - name: limit
+        type: number
+        description: Maximum number of links to return
+        required: false
+        default: 5000
+    returns: List of all links found on the website
+
+  - name: firecrawl_search
+    description: Search the web and optionally scrape results
+    parameters:
+      - name: query
+        type: string
+        description: Search query
+        required: true
+      - name: limit
+        type: number
+        description: Maximum number of results
+        required: false
+        default: 10
+      - name: scrapeOptions
+        type: object
+        description: Options for scraping search results
+        required: false
+    returns: Search results with optional scraped content

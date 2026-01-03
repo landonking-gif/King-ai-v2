@@ -1,0 +1,131 @@
+/* Skeleton Loading Styles */
+
+/* Base skeleton with shimmer */
+.skeleton {
+    background: linear-gradient(90deg,
+            var(--bg-tertiary) 25%,
+            var(--bg-hover) 50%,
+            var(--bg-tertiary) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: var(--radius-md);
+}
+
+@keyframes shimmer {
+    0% {
+        background-position: 200% 0;
+    }
+
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+/* Text skeleton */
+.textContainer {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.textLine {
+    height: 14px;
+    background: linear-gradient(90deg,
+            var(--bg-tertiary) 25%,
+            var(--bg-hover) 50%,
+            var(--bg-tertiary) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: var(--radius-sm);
+}
+
+/* Avatar skeleton */
+.avatar {
+    border-radius: var(--radius-full);
+    background: linear-gradient(90deg,
+            var(--bg-tertiary) 25%,
+            var(--bg-hover) 50%,
+            var(--bg-tertiary) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    flex-shrink: 0;
+}
+
+/* Message skeleton */
+.message {
+    display: flex;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+}
+
+.messageContent {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.messageHeader {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.messageName {
+    width: 120px;
+    height: 14px;
+    background: linear-gradient(90deg,
+            var(--bg-tertiary) 25%,
+            var(--bg-hover) 50%,
+            var(--bg-tertiary) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: var(--radius-sm);
+}
+
+.messageTime {
+    width: 50px;
+    height: 12px;
+    background: linear-gradient(90deg,
+            var(--bg-tertiary) 25%,
+            var(--bg-hover) 50%,
+            var(--bg-tertiary) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: var(--radius-sm);
+}
+
+/* Card skeleton */
+.card {
+    padding: var(--spacing-md);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-lg);
+}
+
+.cardHeader {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-sm);
+}
+
+/* Panel skeleton */
+.panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+}
+
+/* Button skeleton */
+.button {
+    height: 36px;
+    background: linear-gradient(90deg,
+            var(--bg-tertiary) 25%,
+            var(--bg-hover) 50%,
+            var(--bg-tertiary) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: var(--radius-md);
+}
