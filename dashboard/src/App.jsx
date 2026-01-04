@@ -5,7 +5,7 @@ import { PLDashboard } from './components/Charts/PLDashboard';
 import { CircuitBreakerDashboard } from './components/Monitoring/CircuitBreakerDashboard';
 
 // Dynamic API base to handle port 80 (proxy) or port 8000 (direct)
-const API_BASE = window.location.port === '5173'
+const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
   ? `http://${window.location.hostname}:8000/api`
   : `http://${window.location.hostname}/api`;
 
