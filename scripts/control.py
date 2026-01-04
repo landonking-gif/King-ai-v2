@@ -1291,7 +1291,8 @@ import os
 from dotenv import load_dotenv
 load_dotenv()
 async def test():
-    conn = await asyncpg.connect(os.getenv('DATABASE_URL'))
+    db_url = (os.getenv('DATABASE_URL') or '').replace('+asyncpg', '')
+    conn = await asyncpg.connect(db_url)
     await conn.close()
     print('Database OK')
 asyncio.run(test())
