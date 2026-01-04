@@ -52,6 +52,7 @@ class ContextManager:
         self._conversation_cache: List[Dict[str, str]] = []
         self._rolling_summary: str = ""
         self._last_summary_turn = 0
+        self._last_facts: Dict[str, Any] = {}  # Store extracted facts
         
         # Get context limit for current model
         model = settings.ollama_model
@@ -78,19 +79,25 @@ class ContextManager:
     async def build_context(
         self,
         query: str = None,
-        include_rag: bool = True
+        include_rag: bool = True,
+        focus_areas: List[str] = None
     ) -> str:
         """
         Constructs a comprehensive snapshot of the entire empire.
         
         Args:
-            query: Optional query for RAG-enhanced context
+            query: Optional query for RAG-enhanced context and focus
             include_rag: Whether to include semantic memory search
+            focus_areas: Optional list of areas to prioritize (e.g., ['finance', 'businesses'])
         
         Returns:
             Formatted context string optimized for token budget
         """
-        logger.debug("Building context", query_provided=query is not None)
+        logger.debug(
+            "Building context",
+            query_provided=query is not None,
+            focus_areas=focus_areas
+        )
         
         # Initialize budget
         budget = ContextBudget(total_tokens=self.available_tokens)
@@ -100,7 +107,7 @@ class ContextManager:
         budget.set_content(ContextSection.CURRENT_STATE, current_state)
         
         # Section 2: Business Data
-        business_data = await self._get_businesses_summary()
+        business_data = await self._get_businesses_summary(query=query)
         budget.set_content(
             ContextSection.BUSINESS_DATA,
             smart_truncate(business_data, budget.get_budget(ContextSection.BUSINESS_DATA).allocated)
@@ -137,10 +144,14 @@ class ContextManager:
         # Build final context
         full_context = budget.build_context()
         
+        # Extract and store facts for validation (optional metadata)
+        self._last_facts = self.extract_facts_from_context(full_context)
+        
         logger.info(
             "Context built",
             total_tokens=budget.get_total_used(),
-            sections_used=len([s for s in budget.sections.values() if s.content])
+            sections_used=len([s for s in budget.sections.values() if s.content]),
+            facts_extracted=len(self._last_facts["businesses"])
         )
         
         return full_context
@@ -170,9 +181,10 @@ class ContextManager:
         
         return "\n".join(sections)
 
-    async def _get_businesses_summary(self) -> str:
+    async def _get_businesses_summary(self, query: str = None) -> str:
         """
         Fetches all active business units and summarizes their financial performance.
+        Optionally filters or prioritizes based on query keywords.
         """
         async with get_db() as db:
             result = await db.execute(
@@ -183,6 +195,15 @@ class ContextManager:
             if not businesses:
                 return "BUSINESSES: None active. Ready to start new ventures."
             
+            # Extract query keywords for relevance scoring if provided
+            query_keywords = set()
+            if query:
+                query_lower = query.lower()
+                query_keywords = set([
+                    word for word in query_lower.split()
+                    if len(word) > 3 and word not in {'what', 'when', 'where', 'which', 'have', 'been', 'this', 'that', 'from'}
+                ])
+            
             lines = ["BUSINESSES:"]
             for b in businesses:
                 revenue = b.total_revenue or 0.0
@@ -190,10 +211,22 @@ class ContextManager:
                 profit = revenue - expenses
                 status = b.status.value if hasattr(b.status, 'value') else str(b.status)
                 
-                lines.append(
+                # Calculate relevance score if query provided
+                relevance = 0
+                if query_keywords:
+                    business_text = f"{b.name} {b.type} {b.description or ''}".lower()
+                    relevance = sum(1 for kw in query_keywords if kw in business_text)
+                
+                business_line = (
                     f"  - {b.name} ({b.type}): {status} | "
                     f"Revenue: ${revenue:,.2f} | Profit: ${profit:,.2f}"
                 )
+                
+                # Mark as relevant if query matches
+                if relevance > 0:
+                    business_line = "[RELEVANT] " + business_line
+                
+                lines.append(business_line)
                 
                 # Add KPIs if available
                 if b.kpis:
@@ -201,6 +234,46 @@ class ContextManager:
                     lines.append(f"    KPIs: {kpi_str}")
             
             return "\n".join(lines)
+    
+    def extract_facts_from_context(self, context: str) -> Dict[str, Any]:
+        """
+        Extract structured facts from context for validation.
+        
+        Args:
+            context: The context string
+            
+        Returns:
+            Dictionary of extractable facts (numbers, metrics, statuses)
+        """
+        import re
+        
+        facts = {
+            "numbers": set(),
+            "businesses": [],
+            "metrics": {},
+        }
+        
+        # Extract all numbers with context
+        number_patterns = re.findall(r'\$?[\d,]+\.?\d*%?', context)
+        facts["numbers"] = set(number_patterns)
+        
+        # Extract business names (after "- " in BUSINESSES section)
+        business_matches = re.findall(r'- ([^(]+) \(', context)
+        facts["businesses"] = [b.strip() for b in business_matches]
+        
+        # Extract key metrics
+        metric_patterns = [
+            (r'Active Businesses: (\d+)', 'active_businesses'),
+            (r'Total Revenue: \$([\d,.]+)', 'total_revenue'),
+            (r'Total Profit: \$([\d,.]+)', 'total_profit'),
+        ]
+        
+        for pattern, key in metric_patterns:
+            match = re.search(pattern, context)
+            if match:
+                facts["metrics"][key] = match.group(1)
+        
+        return facts
     
     async def _get_relevant_memories(
         self,

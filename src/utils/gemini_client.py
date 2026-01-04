@@ -16,14 +16,14 @@ class GeminiClient:
         self.url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
         self.client = httpx.AsyncClient(timeout=60.0)
 
-    async def complete(self, prompt: str, system: str | None = None) -> str:
+    async def complete(self, prompt: str, system: str | None = None, temperature: float = 0.7) -> str:
         """Generates a text completion using Gemini."""
         payload = {
             "contents": [{
                 "parts": [{"text": f"{system}\n\nUser: {prompt}" if system else prompt}]
             }],
             "generationConfig": {
-                "temperature": 0.5,
+                "temperature": temperature,
                 "topP": 0.8,
                 "topK": 40,
                 "maxOutputTokens": 2048,
