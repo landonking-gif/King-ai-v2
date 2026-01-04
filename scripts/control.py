@@ -951,6 +951,8 @@ log "Service installation completed successfully"
             log("✅ Services installed successfully", "SUCCESS")
             return True
         else:
+            if result:
+                log(f"Services Output:\n{result}", "ERROR")
             log("❌ Service installation failed", "ERROR")
             return False
 
@@ -1057,6 +1059,8 @@ log "Database setup completed successfully"
             log("✅ Databases setup successfully", "SUCCESS")
             return True
         else:
+            if result:
+                log(f"Databases Output:\n{result}", "ERROR")
             log("❌ Database setup failed", "ERROR")
             return False
 
@@ -1154,6 +1158,8 @@ log "Application deployment completed successfully"
             log("✅ Application deployed successfully", "SUCCESS")
             return True
         else:
+            if result:
+                log(f"Deploy Output:\n{result}", "ERROR")
             log("❌ Application deployment failed", "ERROR")
             return False
 
@@ -1232,6 +1238,8 @@ log "Monitoring setup completed"
             log("✅ Monitoring setup completed", "SUCCESS")
             return True
         else:
+            if result:
+                log(f"Monitoring Output:\n{result}", "ERROR")
             log("❌ Monitoring setup failed", "ERROR")
             return False
 
@@ -1296,6 +1304,8 @@ log "All services validated successfully"
             log("✅ Final validation passed", "SUCCESS")
             return True
         else:
+            if result:
+                log(f"Validation Output:\n{result}", "ERROR")
             log("❌ Final validation failed", "ERROR")
             return False
 
