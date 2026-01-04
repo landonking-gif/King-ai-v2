@@ -4,7 +4,10 @@ import './App.css';
 import { PLDashboard } from './components/Charts/PLDashboard';
 import { CircuitBreakerDashboard } from './components/Monitoring/CircuitBreakerDashboard';
 
-const API_BASE = `http://${window.location.hostname}:8000/api`;
+// Dynamic API base to handle port 80 (proxy) or port 8000 (direct)
+const API_BASE = window.location.port === '5173'
+  ? `http://${window.location.hostname}:8000/api`
+  : `http://${window.location.hostname}/api`;
 
 function App() {
   const [activeTab, setActiveTab] = useState('empire');
@@ -85,6 +88,22 @@ function App() {
     const interval = setInterval(fetchData, 10000); // Polling every 10s
     return () => clearInterval(interval);
   }, [plPeriod]);
+
+  // Fetch Chat History on mount
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/chat/history`);
+        if (res.ok) {
+          const history = await res.json();
+          setMessages(history);
+        }
+      } catch (err) {
+        console.error("Failed to fetch chat history:", err);
+      }
+    };
+    fetchHistory();
+  }, []);
 
   const handleSendMessage = async () => {
     if (!chatInput.trim()) return;
@@ -203,7 +222,7 @@ function App() {
             className={`btn-nav ${activeTab === 'evolution' ? 'active' : ''}`}
             onClick={() => setActiveTab('evolution')}
           >
-            🧬 Evolution {evolutions.filter(e => e.status === 'pending').length > 0 && 
+            🧬 Evolution {evolutions.filter(e => e.status === 'pending').length > 0 &&
               <span className="badge">{evolutions.filter(e => e.status === 'pending').length}</span>}
           </button>
           <button
@@ -287,7 +306,7 @@ function App() {
 
         {activeTab === 'pl' && (
           <div className="content-fade-in">
-            <PLDashboard 
+            <PLDashboard
               data={plData}
               period={plPeriod}
               onPeriodChange={setPlPeriod}
@@ -298,7 +317,7 @@ function App() {
 
         {activeTab === 'system' && (
           <div className="content-fade-in">
-            <CircuitBreakerDashboard 
+            <CircuitBreakerDashboard
               apiBaseUrl={`${API_BASE}/v1/system`}
               refreshInterval={5000}
             />
@@ -367,14 +386,14 @@ function App() {
                           <p style={{ marginTop: '8px', fontSize: '0.9rem' }}>{a.description}</p>
                         </div>
                         <div style={{ display: 'flex', gap: '8px' }}>
-                          <button 
+                          <button
                             className="btn-primary"
                             onClick={() => handleApprove(a.id)}
                             style={{ padding: '8px 16px', fontSize: '0.8rem' }}
                           >
                             ✓ Approve
                           </button>
-                          <button 
+                          <button
                             className="btn-secondary"
                             onClick={() => handleReject(a.id)}
                             style={{ padding: '8px 16px', fontSize: '0.8rem', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.5)' }}
@@ -408,15 +427,15 @@ function App() {
                         <div style={{ flex: 1 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <strong>{evo.description?.substring(0, 80) || 'System Improvement'}</strong>
-                            <span style={{ 
-                              padding: '2px 8px', 
-                              borderRadius: '12px', 
+                            <span style={{
+                              padding: '2px 8px',
+                              borderRadius: '12px',
                               fontSize: '0.7rem',
-                              background: evo.status === 'pending' ? 'rgba(251, 191, 36, 0.2)' : 
-                                         evo.status === 'approved' ? 'rgba(16, 185, 129, 0.2)' : 
-                                         'rgba(239, 68, 68, 0.2)',
-                              color: evo.status === 'pending' ? '#fbbf24' : 
-                                     evo.status === 'approved' ? '#10b981' : '#ef4444'
+                              background: evo.status === 'pending' ? 'rgba(251, 191, 36, 0.2)' :
+                                evo.status === 'approved' ? 'rgba(16, 185, 129, 0.2)' :
+                                  'rgba(239, 68, 68, 0.2)',
+                              color: evo.status === 'pending' ? '#fbbf24' :
+                                evo.status === 'approved' ? '#10b981' : '#ef4444'
                             }}>
                               {evo.status?.toUpperCase() || 'PENDING'}
                             </span>
@@ -431,14 +450,14 @@ function App() {
                         <div style={{ display: 'flex', gap: '8px', marginLeft: '16px' }}>
                           {(evo.status === 'pending' || evo.status === 'PENDING') && (
                             <>
-                              <button 
+                              <button
                                 className="btn-primary"
                                 onClick={() => handleApproveEvolution(evo.id)}
                                 style={{ padding: '8px 16px', fontSize: '0.8rem' }}
                               >
                                 ✓ Approve
                               </button>
-                              <button 
+                              <button
                                 className="btn-secondary"
                                 onClick={() => handleRejectEvolution(evo.id)}
                                 style={{ padding: '8px 16px', fontSize: '0.8rem', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.5)' }}
@@ -496,9 +515,9 @@ function App() {
                         )}
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <span style={{ 
-                          padding: '4px 12px', 
-                          borderRadius: '12px', 
+                        <span style={{
+                          padding: '4px 12px',
+                          borderRadius: '12px',
                           fontSize: '0.8rem',
                           background: task.enabled ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
                           color: task.enabled ? '#10b981' : '#ef4444'

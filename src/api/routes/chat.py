@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from typing import Any
 
 from src.database.connection import get_db
+from src.database.models import ConversationMessage
 from src.master_ai.brain import MasterAI
 
 # Dependency to get master_ai instance (circular import avoidance handled in main)
@@ -47,6 +48,19 @@ async def chat(
         actions_taken=result.get("actions_taken", []),
         pending_approvals=result.get("pending_approvals", [])
     )
+
+@router.get("/history")
+async def get_history(db = Depends(get_db)):
+    """Retrieve full conversation history."""
+    from sqlalchemy import select
+    result = await db.execute(
+        select(ConversationMessage).order_by(ConversationMessage.created_at.asc())
+    )
+    messages = result.scalars().all()
+    return [
+        {"role": m.role, "content": m.content, "timestamp": m.created_at}
+        for m in messages
+    ]
 
 @router.post("/autonomous/start")
 async def start_autonomous(master_ai: MasterAI = Depends(get_master_ai_dep)):
