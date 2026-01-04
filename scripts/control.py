@@ -766,13 +766,13 @@ log "Starting environment preparation..."
 # Update system with non-interactive flags
 export DEBIAN_FRONTEND=noninteractive
 log "Updating system packages..."
-apt-get update -y || error_exit "apt update failed"
-apt-get upgrade -y || error_exit "apt upgrade failed"
-apt-get autoremove -y || true
+sudo apt-get update -y || error_exit "apt update failed"
+sudo apt-get upgrade -y || error_exit "apt upgrade failed"
+sudo apt-get autoremove -y || true
 
 # Install essential tools
 log "Installing essential tools..."
-apt-get install -y --no-install-recommends \\
+sudo apt-get install -y --no-install-recommends \\
     curl \\
     wget \\
     git \\
@@ -784,7 +784,7 @@ apt-get install -y --no-install-recommends \\
 
 # Install Python and pip
 log "Installing Python environment..."
-apt-get install -y --no-install-recommends \\
+sudo apt-get install -y --no-install-recommends \\
     python3 \\
     python3-pip \\
     python3-venv \\
@@ -894,28 +894,28 @@ export DEBIAN_FRONTEND=noninteractive
 
 # Install Docker
 log "Installing Docker..."
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
-apt-get update -y
-apt-get install -y docker.io docker-compose || error_exit "Docker installation failed"
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt-get update -y
+sudo apt-get install -y docker.io docker-compose || error_exit "Docker installation failed"
 
 # Start and enable Docker
-systemctl enable docker || true
-systemctl start docker || error_exit "Docker service failed to start"
+sudo systemctl enable docker || true
+sudo systemctl start docker || error_exit "Docker service failed to start"
 
 # Install Node.js
 log "Installing Node.js..."
-curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-apt-get install -y nodejs || error_exit "Node.js installation failed"
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo bash -
+sudo apt-get install -y nodejs || error_exit "Node.js installation failed"
 
 # Install Nginx
 log "Installing Nginx..."
-apt-get install -y nginx || error_exit "Nginx installation failed"
+sudo apt-get install -y nginx || error_exit "Nginx installation failed"
 
 # Configure Docker daemon
 log "Configuring Docker daemon..."
-mkdir -p /etc/docker
-cat > /etc/docker/daemon.json << 'EOF'
+sudo mkdir -p /etc/docker
+cat << 'EOF' | sudo tee /etc/docker/daemon.json > /dev/null
 {
   "log-driver": "json-file",
   "log-opts": {
@@ -926,17 +926,17 @@ cat > /etc/docker/daemon.json << 'EOF'
 EOF
 
 # Restart Docker with new config
-systemctl restart docker || error_exit "Docker restart failed"
+sudo systemctl restart docker || error_exit "Docker restart failed"
 
 # Test Docker
-docker run --rm hello-world > /dev/null || error_exit "Docker test failed"
+sudo docker run --rm hello-world > /dev/null || error_exit "Docker test failed"
 
 log "Service installation completed successfully"
 '''
 
     try:
         # Upload and execute services script
-        with open("temp_services.sh", "w") as f:
+        with open("temp_services.sh", "w", newline='\n') as f:
             f.write(services_script)
         f.close()
 
@@ -1042,7 +1042,7 @@ log "Database setup completed successfully"
 '''
 
     try:
-        with open("temp_db.sh", "w") as f:
+        with open("temp_db.sh", "w", newline='\n') as f:
             f.write(db_script)
         f.close()
 
@@ -1139,7 +1139,7 @@ log "Application deployment completed successfully"
 '''
 
     try:
-        with open("temp_deploy.sh", "w") as f:
+        with open("temp_deploy.sh", "w", newline='\n') as f:
             f.write(deploy_script)
         f.close()
 
