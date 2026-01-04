@@ -1275,6 +1275,8 @@ error_exit() {
 }
 
 # Test services
+cd ~/king-ai-v2 || error_exit "Project directory not found"
+
 log "Testing API server..."
 curl -s --max-time 10 http://localhost:8000/health > /dev/null || error_exit "API server not responding"
 
@@ -1282,7 +1284,7 @@ log "Testing dashboard..."
 curl -s --max-time 10 http://localhost:5173 > /dev/null || error_exit "Dashboard not responding"
 
 log "Testing database..."
-python3 -c "
+~/venv/bin/python3 -c "
 import asyncpg
 import asyncio
 import os
