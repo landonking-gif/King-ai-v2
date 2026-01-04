@@ -99,35 +99,36 @@ class LLMRouter:
     def _get_temperature_for_task(self, context: TaskContext | None) -> float:
         """Determine appropriate temperature based on task context.
         
-        Lower temperature (0.1-0.3) = More factual, less hallucination
-        Higher temperature (0.7-1.0) = More creative, more variation
+        Using very low temperatures across the board to prevent hallucination.
+        Lower temperature = More deterministic, less fabrication
         """
         if not context:
-            return 0.3  # Conservative default
+            return 0.1  # Very conservative default
         
-        # Factual/accuracy-critical tasks need low temperature
+        # Factual/accuracy-critical tasks need near-zero temperature
         if context.requires_accuracy:
-            return 0.1
+            return 0.05
         
         # High-risk tasks need deterministic outputs
         if context.risk_level in ["high", "critical"]:
-            return 0.2
+            return 0.05
         
-        # Task-specific temperatures
+        # Task-specific temperatures - all kept very low to prevent hallucination
         task_temps = {
-            "research": 0.2,        # Factual research
-            "finance": 0.1,         # Financial calculations/analysis
-            "legal": 0.1,           # Legal analysis
-            "analytics": 0.2,       # Data analysis
-            "query": 0.2,           # Information retrieval
-            "summary": 0.3,         # Summarization
-            "conversation": 0.5,    # Natural conversation
-            "planning": 0.4,        # Strategic planning
-            "content": 0.6,         # Creative content
-            "code": 0.2,            # Code generation
+            "research": 0.1,        # Factual research
+            "finance": 0.05,        # Financial calculations/analysis
+            "legal": 0.05,          # Legal analysis
+            "analytics": 0.1,       # Data analysis
+            "query": 0.1,           # Information retrieval
+            "summary": 0.15,        # Summarization
+            "conversation": 0.2,    # Natural conversation - still low to prevent fabrication
+            "planning": 0.2,        # Strategic planning
+            "content": 0.3,         # Creative content - slightly higher but still conservative
+            "code": 0.1,            # Code generation
+            "classification": 0.1,  # Intent classification
         }
         
-        return task_temps.get(context.task_type, 0.3)
+        return task_temps.get(context.task_type, 0.1)
     
     async def complete(
         self,

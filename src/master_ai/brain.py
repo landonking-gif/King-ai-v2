@@ -74,6 +74,10 @@ class MasterAI:
         self._last_context: str = ""
         self._last_context_timestamp = datetime.now()
         
+        # In-memory conversation history for session context
+        self._conversation_history: list[dict] = []
+        self._max_history_length = 20  # Keep last 20 exchanges
+        
         risk_profile = getattr(settings, "risk_profile", "moderate")
         if not isinstance(risk_profile, str):
             risk_profile = "moderate"
@@ -162,6 +166,9 @@ class MasterAI:
             monitor.timing("master_ai.request_duration", duration_ms)
             monitor.increment("master_ai.requests_success")
             
+            # Log conversation for context
+            self._log_conversation(user_input, result.response)
+            
             logger.info(
                 "Request completed",
                 duration_ms=duration_ms,
@@ -223,33 +230,64 @@ class MasterAI:
             )
             return ClassifiedIntent(type=IntentType.CONVERSATION, confidence=0.3)
     
-    async def _handle_conversation(self, user_input: str, context: str) -> str:
-        """Handles chit-chat while maintaining awareness of the empire's state."""
+    def _log_conversation(self, user_input: str, response: str):
+        """Log conversation exchange to in-memory history."""
+        self._conversation_history.append({
+            "role": "user",
+            "content": user_input,
+            "timestamp": datetime.now().isoformat()
+        })
+        self._conversation_history.append({
+            "role": "assistant", 
+            "content": response,
+            "timestamp": datetime.now().isoformat()
+        })
         
-        # Determine if question asks about facts (requiring accuracy)
-        fact_keywords = ['how many', 'how much', 'what is', 'revenue', 'profit', 'cost', 
-                         'status', 'when', 'count', 'total', 'number of']
-        asks_about_facts = any(keyword in user_input.lower() for keyword in fact_keywords)
+        # Trim to max length
+        if len(self._conversation_history) > self._max_history_length * 2:
+            self._conversation_history = self._conversation_history[-self._max_history_length * 2:]
+    
+    def _format_conversation_history(self) -> str:
+        """Format conversation history for inclusion in prompts."""
+        if not self._conversation_history:
+            return "No previous conversation."
+        
+        lines = []
+        for msg in self._conversation_history[-10:]:  # Last 5 exchanges
+            role = "User" if msg["role"] == "user" else "Assistant"
+            content = msg["content"][:300]  # Truncate long messages
+            lines.append(f"{role}: {content}")
+        
+        return "\n".join(lines)
+    
+    async def _handle_conversation(self, user_input: str, context: str) -> str:
+        """Handles conversation while strictly limiting to provided context."""
+        
+        # Get conversation history
+        history = self._format_conversation_history()
         
         prompt = f"""{SYSTEM_PROMPT}
 
-CURRENT CONTEXT OF THE EMPIRE:
+=== CONTEXT (This is ALL the information you have access to) ===
 {context}
 
-USER MESSAGE:
+=== CONVERSATION HISTORY ===
+{history}
+
+=== CURRENT USER MESSAGE ===
 {user_input}
 
-RESPONSE GUIDELINES:
-- Base your response ONLY on the CURRENT CONTEXT provided above
-- If the user asks about something not in the context, say "I don't have that information in the current data"
-- Reference specific numbers, statuses, or metrics from the context when relevant
-- Be professional, data-aware, and concise
-- Respond naturally as King AI, the autonomous CEO
+=== INSTRUCTIONS ===
+Respond to the user's message. Remember:
+- You can ONLY use information from the CONTEXT section above
+- If asked about files, code, current events, external data, or anything not in context: say "I don't have that information"
+- Do NOT make up any facts, numbers, or information
+- Be honest about your limitations
 """
         task_context = TaskContext(
-            task_type="conversation" if not asks_about_facts else "query",
+            task_type="conversation",
             risk_level="low",
-            requires_accuracy=asks_about_facts,  # Enable fact-checking if asking about facts
+            requires_accuracy=True,  # Always check for accuracy now
             token_estimate=1000,
             priority="normal"
         )
@@ -376,29 +414,35 @@ Provide a concise confirmation message to the user. Be specific about what was d
         return await self._call_llm(prompt, task_context=task_context)
 
     async def _handle_query(self, user_input: str, context: str) -> str:
-        """Answers data queries by synthesizing context gathered from the database."""
+        """Answers data queries ONLY using context data - no fabrication."""
+        
+        # Get conversation history
+        history = self._format_conversation_history()
+        
         prompt = f"""{SYSTEM_PROMPT}
 
-SYSTEM STATE & FINANCIALS:
+=== CONTEXT (This is ALL the information you have access to) ===
 {context}
 
-USER DATA QUERY:
+=== CONVERSATION HISTORY ===
+{history}
+
+=== USER QUERY ===
 {user_input}
 
-CRITICAL INSTRUCTIONS:
-- Answer ONLY using data from the SYSTEM STATE & FINANCIALS section above
-- Quote specific numbers, metrics, and statuses from the context
-- If a metric or data point is NOT in the context, explicitly state: "I don't have data on [X]"
-- Do NOT estimate, approximate, or infer data not explicitly provided
-- When citing numbers, reference where they came from (e.g., "Based on the business summary above...")
-
-Provide a data-driven response.
+=== STRICT INSTRUCTIONS ===
+1. ONLY answer using information explicitly stated in the CONTEXT section above
+2. If the information is NOT in the context, respond: "I don't have that information in my current context."
+3. Do NOT make up statistics, metrics, numbers, or any other data
+4. Do NOT claim to access external files, databases, or systems
+5. Do NOT provide information about current events, news, or real-time data
+6. Be honest and direct about what you do and don't know
 """
         task_context = TaskContext(
             task_type="query",
-            risk_level="medium",  # Queries should be accurate
-            requires_accuracy=True,  # Always fact-check queries
-            token_estimate=1500,
+            risk_level="high",  # Queries need maximum accuracy
+            requires_accuracy=True,
+            token_estimate=1000,
             priority="high"
         )
         
