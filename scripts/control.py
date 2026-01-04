@@ -1149,6 +1149,65 @@ if ! ps -p $DASHBOARD_PID > /dev/null 2>&1; then
 fi
 
 cd ..
+
+# Configure Nginx as reverse proxy on port 80
+log "Configuring Nginx reverse proxy..."
+sudo tee /etc/nginx/sites-available/king-ai > /dev/null << 'NGINX_EOF'
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
+
+    # Health check endpoint for load balancer
+    location /health {
+        proxy_pass http://127.0.0.1:8000/health;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    # API endpoints
+    location /api {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # API docs
+    location /docs {
+        proxy_pass http://127.0.0.1:8000/docs;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+    }
+
+    location /openapi.json {
+        proxy_pass http://127.0.0.1:8000/openapi.json;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+    }
+
+    # Dashboard (default)
+    location / {
+        proxy_pass http://127.0.0.1:5173;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
+NGINX_EOF
+
+# Enable site and restart Nginx
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo ln -sf /etc/nginx/sites-available/king-ai /etc/nginx/sites-enabled/king-ai
+sudo nginx -t || error_exit "Nginx configuration test failed"
+sudo systemctl restart nginx || error_exit "Nginx restart failed"
+log "Nginx configured on port 80"
+
 log "Application deployment completed successfully"
 '''
 
@@ -3172,6 +3231,63 @@ echo "🗄️  Running Database Migrations..."
 echo "🔄 Restarting Services..."
 pkill -f uvicorn || true
 pkill -f "npm run dev" || true
+
+# Configure Nginx as reverse proxy on port 80
+echo "Configuring Nginx reverse proxy..."
+sudo tee /etc/nginx/sites-available/king-ai > /dev/null << 'NGINX_EOF'
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
+
+    # Health check endpoint for load balancer
+    location /health {
+        proxy_pass http://127.0.0.1:8000/health;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    # API endpoints
+    location /api {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # API docs
+    location /docs {
+        proxy_pass http://127.0.0.1:8000/docs;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+    }
+
+    location /openapi.json {
+        proxy_pass http://127.0.0.1:8000/openapi.json;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+    }
+
+    # Dashboard (default)
+    location / {
+        proxy_pass http://127.0.0.1:5173;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
+NGINX_EOF
+
+# Enable site and restart Nginx
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo ln -sf /etc/nginx/sites-available/king-ai /etc/nginx/sites-enabled/king-ai
+sudo nginx -t
+sudo systemctl restart nginx
 
 nohup ./venv/bin/uvicorn src.api.main:app --host 0.0.0.0 --port 8000 > backend.log 2>&1 &
 cd dashboard
