@@ -90,7 +90,7 @@ def run(cmd, check=True, capture=False, cwd=None, timeout=1200):
             check=check,
             cwd=cwd or ROOT_DIR,
             stdout=subprocess.PIPE if capture else None,
-            stderr=subprocess.PIPE if capture else None,
+            stderr=subprocess.STDOUT if capture else None,
             encoding='utf-8',
             errors='replace',
             env=env,
