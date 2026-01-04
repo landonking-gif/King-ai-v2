@@ -106,11 +106,12 @@ def run(cmd, check=True, capture=False, cwd=None, timeout=1200):
         return "" if capture else False
     except subprocess.CalledProcessError as e:
         error_msg = f"Command failed: {cmd}"
-        if e.stderr:
-            error_msg += f"\nError output: {e.stderr}"
+        output = (e.stdout or "").strip()
+        if output:
+            error_msg += f"\nPartial output: {output}"
         log(error_msg, "ERROR")
         if capture:
-            return ""
+            return output
         raise  # Re-raise to let caller handle
     except Exception as e:
         log(f"Unexpected error running command '{cmd}': {e}", "ERROR")
