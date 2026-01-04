@@ -25,13 +25,14 @@ class OllamaClient:
         # 5 minute timeout to accommodate large model cold starts or long outputs
         self.client = httpx.AsyncClient(timeout=300.0) 
     
-    async def complete(self, prompt: str, system: str | None = None) -> str:
+    async def complete(self, prompt: str, system: str | None = None, temperature: float = 0.7) -> str:
         """
         Generate a full completion for the given prompt.
         
         Args:
             prompt: The main user-provided instructions or query.
             system: Optional system prompt to override the default model behavior.
+            temperature: Sampling temperature (0.0-1.0). Lower = more deterministic.
             
         Returns:
             The raw text response from the model.
@@ -40,6 +41,9 @@ class OllamaClient:
             "model": self.model,
             "prompt": prompt,
             "stream": False, # Wait for the full response before returning
+            "options": {
+                "temperature": temperature
+            }
         }
         
         if system:

@@ -31,6 +31,7 @@ from src.utils.llm_router import LLMRouter, TaskContext
 from src.utils.structured_logging import get_logger, set_request_context
 from src.utils.retry import with_retry, LLM_RETRY_CONFIG, TransientError
 from src.utils.monitoring import monitor, trace_llm
+from src.utils.fact_checker import check_for_hallucination
 from config.settings import settings
 
 
@@ -68,6 +69,10 @@ class MasterAI:
         self._hour_start = datetime.now()
         self._total_tokens_today = 0
         self._token_budget_daily = 1_000_000  # 1M tokens per day
+        
+        # Store last built context for fact-checking
+        self._last_context: str = ""
+        self._last_context_timestamp = datetime.now()
         
         risk_profile = getattr(settings, "risk_profile", "moderate")
         if not isinstance(risk_profile, str):
@@ -112,7 +117,11 @@ class MasterAI:
         
         try:
             # 1. Gather all relevant data for the LLM to make informed decisions
-            context = await self.context.build_context()
+            context = await self.context.build_context(query=user_input)
+            
+            # Store context for fact-checking
+            self._last_context = context
+            self._last_context_timestamp = datetime.now()
             
             # 2. Classify the user's intent with structured output
             intent = await self._classify_intent(user_input, context)
@@ -216,6 +225,12 @@ class MasterAI:
     
     async def _handle_conversation(self, user_input: str, context: str) -> str:
         """Handles chit-chat while maintaining awareness of the empire's state."""
+        
+        # Determine if question asks about facts (requiring accuracy)
+        fact_keywords = ['how many', 'how much', 'what is', 'revenue', 'profit', 'cost', 
+                         'status', 'when', 'count', 'total', 'number of']
+        asks_about_facts = any(keyword in user_input.lower() for keyword in fact_keywords)
+        
         prompt = f"""{SYSTEM_PROMPT}
 
 CURRENT CONTEXT OF THE EMPIRE:
@@ -224,12 +239,17 @@ CURRENT CONTEXT OF THE EMPIRE:
 USER MESSAGE:
 {user_input}
 
-Respond naturally as King AI, the autonomous CEO. Be professional, data-aware, and concise.
+RESPONSE GUIDELINES:
+- Base your response ONLY on the CURRENT CONTEXT provided above
+- If the user asks about something not in the context, say "I don't have that information in the current data"
+- Reference specific numbers, statuses, or metrics from the context when relevant
+- Be professional, data-aware, and concise
+- Respond naturally as King AI, the autonomous CEO
 """
         task_context = TaskContext(
-            task_type="conversation",
+            task_type="conversation" if not asks_about_facts else "query",
             risk_level="low",
-            requires_accuracy=False,
+            requires_accuracy=asks_about_facts,  # Enable fact-checking if asking about facts
             token_estimate=1000,
             priority="normal"
         )
@@ -365,15 +385,21 @@ SYSTEM STATE & FINANCIALS:
 USER DATA QUERY:
 {user_input}
 
-Provide a data-driven response. Use specific numbers (revenue, costs, status) found in the context.
-If the data is not available, say so clearly.
+CRITICAL INSTRUCTIONS:
+- Answer ONLY using data from the SYSTEM STATE & FINANCIALS section above
+- Quote specific numbers, metrics, and statuses from the context
+- If a metric or data point is NOT in the context, explicitly state: "I don't have data on [X]"
+- Do NOT estimate, approximate, or infer data not explicitly provided
+- When citing numbers, reference where they came from (e.g., "Based on the business summary above...")
+
+Provide a data-driven response.
 """
         task_context = TaskContext(
             task_type="query",
-            risk_level="low",
-            requires_accuracy=True,
-            token_estimate=1000,
-            priority="normal"
+            risk_level="medium",  # Queries should be accurate
+            requires_accuracy=True,  # Always fact-check queries
+            token_estimate=1500,
+            priority="high"
         )
         
         return await self._call_llm(prompt, task_context=task_context)
@@ -584,6 +610,31 @@ If the data is not available, say so clearly.
             monitor.timing("llm.call_duration", duration_ms)
             monitor.increment("llm.calls_success")
             
+            # Fact-check the response for hallucinations
+            if task_context and task_context.requires_accuracy:
+                fact_check = check_for_hallucination(
+                    response=response,
+                    context=self._last_context  # Use the actual context, not the prompt
+                )
+                
+                if not fact_check.is_valid:
+                    logger.warning(
+                        "Potential hallucination detected in LLM response",
+                        confidence=fact_check.confidence,
+                        issues=fact_check.issues,
+                        warnings=fact_check.warnings,
+                        task_type=task_context.task_type
+                    )
+                    monitor.increment("llm.hallucination_detected")
+                    
+                    # For critical tasks, reject hallucinated responses
+                    if task_context.risk_level in ["high", "critical"]:
+                        if fact_check.confidence < 0.5:
+                            raise ValueError(
+                                f"LLM response failed fact-check with confidence {fact_check.confidence}. "
+                                f"Issues: {', '.join(fact_check.issues)}"
+                            )
+            
             logger.llm_call(
                 provider="router",
                 model=settings.ollama_model,
@@ -619,7 +670,19 @@ If the data is not available, say so clearly.
         elif "```" in response:
             response = response.split("```")[1].split("```")[0].strip()
         
-        return json.loads(response)
+        # Try to find JSON block if raw string still fails
+        try:
+            return json.loads(response)
+        except json.JSONDecodeError:
+            # Look for the first { and last }
+            start = response.find('{')
+            end = response.rfind('}')
+            if start != -1 and end != -1:
+                try:
+                    return json.loads(response[start:end+1])
+                except json.JSONDecodeError:
+                    pass
+            raise
     
     async def run_autonomous_loop(self):
         """

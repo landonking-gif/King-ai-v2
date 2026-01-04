@@ -96,11 +96,45 @@ class LLMRouter:
         self._failure_threshold = 3
         self._circuit_timeout = 60  # seconds
     
+    def _get_temperature_for_task(self, context: TaskContext | None) -> float:
+        """Determine appropriate temperature based on task context.
+        
+        Lower temperature (0.1-0.3) = More factual, less hallucination
+        Higher temperature (0.7-1.0) = More creative, more variation
+        """
+        if not context:
+            return 0.3  # Conservative default
+        
+        # Factual/accuracy-critical tasks need low temperature
+        if context.requires_accuracy:
+            return 0.1
+        
+        # High-risk tasks need deterministic outputs
+        if context.risk_level in ["high", "critical"]:
+            return 0.2
+        
+        # Task-specific temperatures
+        task_temps = {
+            "research": 0.2,        # Factual research
+            "finance": 0.1,         # Financial calculations/analysis
+            "legal": 0.1,           # Legal analysis
+            "analytics": 0.2,       # Data analysis
+            "query": 0.2,           # Information retrieval
+            "summary": 0.3,         # Summarization
+            "conversation": 0.5,    # Natural conversation
+            "planning": 0.4,        # Strategic planning
+            "content": 0.6,         # Creative content
+            "code": 0.2,            # Code generation
+        }
+        
+        return task_temps.get(context.task_type, 0.3)
+    
     async def complete(
         self,
         prompt: str,
         system: str | None = None,
-        context: TaskContext | None = None
+        context: TaskContext | None = None,
+        temperature: float | None = None
     ) -> str:
         """
         Route and execute an inference request.
@@ -109,12 +143,17 @@ class LLMRouter:
             prompt: The user prompt
             system: Optional system prompt
             context: Task context for routing decisions
+            temperature: Override temperature (if None, uses task-based default)
             
         Returns:
             Generated response from selected provider
         """
         # Determine routing
         decision = await self._route(context)
+        
+        # Determine temperature based on task context
+        if temperature is None:
+            temperature = self._get_temperature_for_task(context)
         
         # Execute with fallback chain
         providers = self._get_fallback_chain(decision.provider)
@@ -128,7 +167,7 @@ class LLMRouter:
                 
             try:
                 start = time.time()
-                result = await self._execute(provider, prompt, system)
+                result = await self._execute(provider, prompt, system, temperature)
                 latency = (time.time() - start) * 1000
                 
                 # Record success
@@ -213,17 +252,18 @@ class LLMRouter:
         self,
         provider: ProviderType,
         prompt: str,
-        system: str | None
+        system: str | None,
+        temperature: float = 0.3
     ) -> str:
         """Execute inference on specific provider."""
         if provider == ProviderType.VLLM and self.vllm:
-            return await self.vllm.complete(prompt, system)
+            return await self.vllm.complete(prompt, system, temperature=temperature)
         elif provider == ProviderType.OLLAMA:
-            return await self.ollama.complete(prompt, system)
+            return await self.ollama.complete(prompt, system, temperature=temperature)
         elif provider == ProviderType.GEMINI and self.gemini:
-            return await self.gemini.complete(prompt, system)
+            return await self.gemini.complete(prompt, system, temperature=temperature)
         elif provider == ProviderType.CLAUDE and self.claude:
-            return await self.claude.complete(prompt, system=system)
+            return await self.claude.complete(prompt, system=system, temperature=temperature)
         else:
             raise ValueError(f"Provider {provider} not available")
     
