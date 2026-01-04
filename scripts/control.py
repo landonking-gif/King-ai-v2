@@ -91,30 +91,31 @@ def run(cmd, check=True, capture=False, cwd=None, timeout=1200):
             cwd=cwd or ROOT_DIR,
             stdout=subprocess.PIPE if capture else None,
             stderr=subprocess.PIPE if capture else None,
-            text=True,
+            encoding='utf-8',
+            errors='replace',
             env=env,
             timeout=timeout
         )
         if capture:
-            output = result.stdout.strip()
+            output = (result.stdout or "").strip()
             log(f"Command output: {len(output)} characters", "INFO")
             return output
         return True
     except subprocess.TimeoutExpired:
         log(f"Command timed out after {timeout} seconds: {cmd}", "ERROR")
-        return None
+        return "" if capture else False
     except subprocess.CalledProcessError as e:
         error_msg = f"Command failed: {cmd}"
         if e.stderr:
             error_msg += f"\nError output: {e.stderr}"
         log(error_msg, "ERROR")
         if capture:
-            return None
+            return ""
         raise  # Re-raise to let caller handle
     except Exception as e:
         log(f"Unexpected error running command '{cmd}': {e}", "ERROR")
         if capture:
-            return None
+            return ""
         raise
 
 def get_user_confirmation(message, default=False):
@@ -803,7 +804,7 @@ log "Environment preparation completed successfully"
 
     try:
         # Upload and execute setup script
-        with open("temp_setup.sh", "w", newline='\n') as f:
+        with open("temp_setup.sh", "w", newline='\n', encoding='utf-8') as f:
             f.write(setup_script)
         f.close()
 
@@ -841,7 +842,7 @@ def validate_configuration(ip, key_path):
     # Upload .env file with validation
     try:
         # Check if .env has required fields
-        with open(env_path, 'r') as f:
+        with open(env_path, 'r', encoding='utf-8', errors='replace') as f:
             env_content = f.read()
 
         required_vars = ['DATABASE_URL', 'REDIS_URL']
@@ -936,7 +937,7 @@ log "Service installation completed successfully"
 
     try:
         # Upload and execute services script
-        with open("temp_services.sh", "w", newline='\n') as f:
+        with open("temp_services.sh", "w", newline='\n', encoding='utf-8') as f:
             f.write(services_script)
         f.close()
 
@@ -1042,7 +1043,7 @@ log "Database setup completed successfully"
 '''
 
     try:
-        with open("temp_db.sh", "w", newline='\n') as f:
+        with open("temp_db.sh", "w", newline='\n', encoding='utf-8') as f:
             f.write(db_script)
         f.close()
 
@@ -1139,7 +1140,7 @@ log "Application deployment completed successfully"
 '''
 
     try:
-        with open("temp_deploy.sh", "w", newline='\n') as f:
+        with open("temp_deploy.sh", "w", newline='\n', encoding='utf-8') as f:
             f.write(deploy_script)
         f.close()
 
@@ -1217,7 +1218,7 @@ log "Monitoring setup completed"
 '''
 
     try:
-        with open("temp_monitoring.sh", "w", newline='\n') as f:
+        with open("temp_monitoring.sh", "w", newline='\n', encoding='utf-8') as f:
             f.write(monitoring_script)
         f.close()
 
@@ -1281,7 +1282,7 @@ log "All services validated successfully"
 '''
 
     try:
-        with open("temp_validate.sh", "w", newline='\n') as f:
+        with open("temp_validate.sh", "w", newline='\n', encoding='utf-8') as f:
             f.write(validation_script)
         f.close()
 
@@ -1371,7 +1372,7 @@ DD_API_KEY=your_datadog_key_here
 ARIZE_API_KEY=your_arize_key_here
 LANGCHAIN_API_KEY=your_langchain_key_here
 """
-    with open(ROOT_DIR / ".env", "w") as f:
+    with open(ROOT_DIR / ".env", "w", encoding='utf-8') as f:
         f.write(env_content)
 
     ssh_opts = f"-o StrictHostKeyChecking=no -i \"{key_path}\""
