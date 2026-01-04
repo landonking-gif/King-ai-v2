@@ -818,6 +818,8 @@ log "Environment preparation completed successfully"
             log("✅ Environment preparation completed", "SUCCESS")
             return True
         else:
+            if result:
+                log(f"Setup Output:\n{result}", "ERROR")
             log("❌ Environment preparation failed", "ERROR")
             return False
 
