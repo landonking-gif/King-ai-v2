@@ -283,6 +283,7 @@ Respond to the user's message. Remember:
 - If asked about files, code, current events, external data, or anything not in context: say "I don't have that information"
 - Do NOT make up any facts, numbers, or information
 - Be honest about your limitations
+- If asked WHY you don't have access to something, explain that you're designed as a business-focused AI with limited access for security and focus reasons
 """
         task_context = TaskContext(
             task_type="conversation",

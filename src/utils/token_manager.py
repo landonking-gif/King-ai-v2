@@ -16,11 +16,12 @@ class ContextSection(Enum):
     """Sections of the context window with priority levels."""
     SYSTEM_PROMPT = "system_prompt"           # Priority 1 (always include)
     CURRENT_STATE = "current_state"           # Priority 2
-    RELEVANT_MEMORY = "relevant_memory"       # Priority 3
-    RECENT_CONVERSATION = "recent_conversation"  # Priority 4
-    BUSINESS_DATA = "business_data"           # Priority 5
-    TASK_HISTORY = "task_history"             # Priority 6
-    FULL_HISTORY = "full_history"             # Priority 7 (lowest)
+    SOURCE_CODE = "source_code"               # Priority 3 (for recursive development)
+    RELEVANT_MEMORY = "relevant_memory"       # Priority 4
+    RECENT_CONVERSATION = "recent_conversation"  # Priority 5
+    BUSINESS_DATA = "business_data"           # Priority 6
+    TASK_HISTORY = "task_history"             # Priority 7
+    FULL_HISTORY = "full_history"             # Priority 8 (lowest)
 
 
 @dataclass
@@ -57,11 +58,12 @@ class ContextBudget:
         allocations = {
             ContextSection.SYSTEM_PROMPT: (0.05, 1),       # 5% - always needed
             ContextSection.CURRENT_STATE: (0.15, 2),       # 15% - critical
-            ContextSection.RELEVANT_MEMORY: (0.20, 3),     # 20% - RAG context
-            ContextSection.RECENT_CONVERSATION: (0.15, 4), # 15% - recent turns
-            ContextSection.BUSINESS_DATA: (0.20, 5),       # 20% - business info
-            ContextSection.TASK_HISTORY: (0.15, 6),        # 15% - task context
-            ContextSection.FULL_HISTORY: (0.10, 7),        # 10% - historical
+            ContextSection.SOURCE_CODE: (0.20, 3),         # 20% - for recursive development
+            ContextSection.RELEVANT_MEMORY: (0.15, 4),     # 15% - RAG context
+            ContextSection.RECENT_CONVERSATION: (0.15, 5), # 15% - recent turns
+            ContextSection.BUSINESS_DATA: (0.15, 6),       # 15% - business info
+            ContextSection.TASK_HISTORY: (0.10, 7),        # 10% - task context
+            ContextSection.FULL_HISTORY: (0.05, 8),        # 5% - historical
         }
         
         for section, (percentage, priority) in allocations.items():
