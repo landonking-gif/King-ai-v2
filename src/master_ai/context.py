@@ -11,6 +11,7 @@ This module is responsible for:
 
 from datetime import datetime
 from typing import List, Dict, Any, Optional
+from pathlib import Path
 
 from src.database.connection import get_db
 from src.database.models import BusinessUnit, Task, ConversationMessage, Log
@@ -48,6 +49,7 @@ class ContextManager:
             llm_client: Optional LLM client for summarization
         """
         self.llm_client = llm_client
+        self.project_root = Path(__file__).parent.parent.parent  # Points to project root
         self._summarizer = None
         self._conversation_cache: List[Dict[str, str]] = []
         self._rolling_summary: str = ""
@@ -113,7 +115,16 @@ class ContextManager:
             smart_truncate(business_data, budget.get_budget(ContextSection.BUSINESS_DATA).allocated)
         )
         
-        # Section 3: RAG - Relevant Memory (if query provided)
+        # Section 3: Source Code (for recursive development)
+        source_code = ""
+        if query and self._is_self_improvement_query(query):
+            source_code = await self._get_relevant_source_code(query)
+            budget.set_content(
+                ContextSection.SOURCE_CODE,
+                smart_truncate(source_code, budget.get_budget(ContextSection.SOURCE_CODE).allocated)
+            )
+        
+        # Section 4: RAG - Relevant Memory (if query provided)
         if include_rag and query:
             relevant_memory = await self._get_relevant_memories(
                 query,
@@ -498,6 +509,97 @@ class ContextManager:
             memory_types=[MemoryType.DECISION],
             top_k=top_k
         )
+    
+    def _is_self_improvement_query(self, query: str) -> bool:
+        """Check if query is about self-improvement or code modification."""
+        improvement_keywords = [
+            'improve', 'enhance', 'optimize', 'fix', 'bug', 'error', 'modify', 'change',
+            'code', 'function', 'class', 'method', 'algorithm', 'logic', 'performance',
+            'evolve', 'recursive', 'development', 'self', 'my code', 'source'
+        ]
+        query_lower = query.lower()
+        return any(keyword in query_lower for keyword in improvement_keywords)
+    
+    async def _get_relevant_source_code(self, query: str, max_tokens: int = 2000) -> str:
+        """Get relevant source code for self-improvement queries."""
+        try:
+            # Read key source files that might be relevant for self-improvement
+            relevant_files = [
+                'src/master_ai/brain.py',      # Main brain logic
+                'src/master_ai/prompts.py',    # System prompts
+                'src/master_ai/evolution.py',  # Evolution system
+                'src/agents/code_generator.py', # Code generation
+                'src/utils/llm_router.py',    # LLM routing
+            ]
+            
+            code_sections = []
+            total_tokens = 0
+            
+            for file_path in relevant_files:
+                try:
+                    full_path = Path(self.project_root) / file_path
+                    if full_path.exists():
+                        with open(full_path, 'r', encoding='utf-8') as f:
+                            content = f.read()
+                        
+                        # Extract relevant sections based on query keywords
+                        relevant_sections = self._extract_relevant_sections(content, query, file_path)
+                        
+                        for section in relevant_sections:
+                            section_tokens = estimate_tokens(section)
+                            if total_tokens + section_tokens <= max_tokens:
+                                code_sections.append(section)
+                                total_tokens += section_tokens
+                            else:
+                                break
+                        
+                        if total_tokens >= max_tokens:
+                            break
+                            
+                except Exception as e:
+                    logger.warning(f"Failed to read {file_path}: {e}")
+            
+            if code_sections:
+                return "\n\n".join(code_sections)
+            else:
+                return "SOURCE CODE: No relevant code sections found for the query."
+                
+        except Exception as e:
+            logger.error(f"Error getting source code: {e}")
+            return f"SOURCE CODE ERROR: {str(e)}"
+    
+    def _extract_relevant_sections(self, content: str, query: str, file_path: str) -> List[str]:
+        """Extract relevant code sections based on query."""
+        sections = []
+        lines = content.split('\n')
+        
+        # Look for class and function definitions
+        for i, line in enumerate(lines):
+            if any(keyword in query.lower() for keyword in ['class', 'def ', 'function', 'method']):
+                if line.strip().startswith(('class ', 'def ', 'async def ')):
+                    # Extract the function/class and some context
+                    start = max(0, i - 2)
+                    end = min(len(lines), i + 20)  # Next 20 lines
+                    section = f"File: {file_path}\n" + '\n'.join(lines[start:end])
+                    sections.append(section)
+            
+            # Look for comments or docstrings related to query keywords
+            if any(keyword in line.lower() for keyword in query.lower().split()):
+                start = max(0, i - 5)
+                end = min(len(lines), i + 15)
+                section = f"File: {file_path}\n" + '\n'.join(lines[start:end])
+                sections.append(section)
+        
+        # If no specific sections found, return a summary of the file
+        if not sections:
+            summary = f"File: {file_path}\nSummary: {len(lines)} lines of code"
+            if 'class' in content:
+                summary += f", {content.count('class ')} classes"
+            if 'def ' in content:
+                summary += f", {content.count('def ')} functions"
+            sections.append(summary)
+        
+        return sections[:5]  # Limit to 5 sections
     
     def clear_conversation_cache(self):
         """Clear the in-memory conversation cache."""
