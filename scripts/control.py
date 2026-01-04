@@ -1092,9 +1092,12 @@ error_exit() {
 
 trap 'error_exit "Application deployment failed at line $LINENO"' ERR
 
+# Go to project directory
+cd ~/king-ai-v2 || error_exit "Project directory not found"
+
 # Install Python dependencies
 log "Installing Python dependencies..."
-source venv/bin/activate
+source ~/venv/bin/activate
 pip install -e . || error_exit "Python dependencies installation failed"
 
 # Run database migrations
