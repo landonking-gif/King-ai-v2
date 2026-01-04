@@ -988,12 +988,14 @@ trap 'error_exit "Database setup failed at line $LINENO"' ERR
 if systemctl is-active --quiet postgresql; then
     log "Using system PostgreSQL..."
     # Setup database and user
-    sudo -u postgres psql -c "CREATE USER king WITH PASSWORD 'LeiaPup21';" 2>/dev/null || log "User king already exists"
-    sudo -u postgres psql -c "CREATE DATABASE kingai OWNER king;" 2>/dev/null || log "Database kingai already exists"
-    sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE kingai TO king;" 2>/dev/null || true
+    sudo -u postgres psql -c "ALTER USER kingadmin WITH PASSWORD 'changeme';" || sudo -u postgres psql -c "CREATE USER kingadmin WITH PASSWORD 'changeme';"
+    sudo -u postgres psql -c "ALTER USER kingadmin WITH SUPERUSER;" || true
+    sudo -u postgres psql -c "CREATE DATABASE kingai OWNER kingadmin;" 2>/dev/null || log "Database kingai already exists"
+    sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE kingai TO kingadmin;" || true
+    sudo -u postgres psql -d kingai -c "GRANT ALL ON SCHEMA public TO kingadmin;" || true
 
     # Update .env
-    sed -i 's|DATABASE_URL=.*|DATABASE_URL=postgresql+asyncpg://king:LeiaPup21@localhost:5432/kingai|' .env
+    sed -i 's|DATABASE_URL=.*|DATABASE_URL=postgresql+asyncpg://kingadmin:changeme@localhost:5432/kingai|' ~/king-ai-v2/.env
 
     # Check if Redis is also system service
     if systemctl is-active --quiet redis-server; then
@@ -1013,18 +1015,18 @@ else
 
     # Start databases
     docker run -d --name kingai-postgres \\
-        -e POSTGRES_USER=king \\
-        -e POSTGRES_PASSWORD=LeiaPup21 \\
+        -e POSTGRES_USER=kingadmin \\
+        -e POSTGRES_PASSWORD=changeme \\
         -e POSTGRES_DB=kingai \\
         -p 5432:5432 \\
         postgres:15
 
-    docker run -d --name kingai-redis \\
-        -p 6379:6379 \\
+    docker run -d --name kingai-redis \
+        -p 6379:6379 \
         redis:7
 
     # Update .env
-    sed -i 's|DATABASE_URL=.*|DATABASE_URL=postgresql+asyncpg://king:LeiaPup21@localhost:5432/kingai|' .env
+    sed -i 's|DATABASE_URL=.*|DATABASE_URL=postgresql+asyncpg://kingadmin:changeme@localhost:5432/kingai|' ~/king-ai-v2/.env
     sed -i 's|REDIS_URL=.*|REDIS_URL=redis://localhost:6379|' .env
 
     USE_SYSTEM_SERVICES=false
