@@ -1114,7 +1114,7 @@ if ! pgrep -f "ollama serve" > /dev/null; then
 fi
 
 # Pull default model
-timeout 300 ollama pull llama3.1:8b || log "Model download timed out"
+timeout 300 ollama pull llama3.2:1b || log "Model download timed out"
 
 # Start API server
 log "Starting API server..."
@@ -1693,7 +1693,7 @@ if ! pgrep -f "ollama serve" > /dev/null; then
 else
     echo "Ollama already running"
 fi
-timeout 600 ollama pull llama3.1:8b || echo "Model download timed out or already downloaded"
+timeout 600 ollama pull llama3.2:1b || echo "Model download timed out or already downloaded"
 
 # 10. Configure and test all integrations using available API keys
 echo "🔗 Configuring and testing integrations..."
