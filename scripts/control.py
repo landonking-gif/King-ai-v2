@@ -558,7 +558,7 @@ echo "Dependencies check complete!"
         if dep_script_path.exists():
             os.remove(dep_script_path)
 
-def pull_from_github(ip, key_path):
+def pull_from_github(ip, key_path, branch=None):
     """Pull latest code from GitHub on remote server with improved error handling."""
     log("Pulling latest code from GitHub...", "ACTION")
 
@@ -567,6 +567,19 @@ def pull_from_github(ip, key_path):
         return False
 
     ssh_opts = f"-o StrictHostKeyChecking=no -i \"{key_path}\""
+
+    # Detect current branch if not specified
+    if not branch:
+        try:
+            current_branch = run("git branch --show-current", capture=True)
+            if current_branch:
+                branch = current_branch.strip()
+            else:
+                branch = "main"  # fallback
+        except:
+            branch = "main"  # fallback
+    
+    log(f"Deploying branch: {branch}", "INFO")
 
     # Detect remote name and URL from local git config
     remote_name = "origin"  # Default fallback
@@ -624,20 +637,10 @@ fi
 log "Fetching latest changes..."
 git fetch {remote_name}
 
-# Try to pull from main branch first, then master
-log "Pulling latest changes..."
-if git ls-remote --heads {remote_name} main | grep -q main; then
-    log "Using main branch..."
-    git checkout main 2>/dev/null || git checkout -b main {remote_name}/main
-    git pull {remote_name} main
-elif git ls-remote --heads {remote_name} master | grep -q master; then
-    log "Using master branch..."
-    git checkout master 2>/dev/null || git checkout -b master {remote_name}/master
-    git pull {remote_name} master
-else
-    log "No main or master branch found, using current branch..."
-    git pull {remote_name} HEAD || log "Pull failed, but continuing..."
-fi
+# Checkout and pull specific branch
+log "Using branch {branch}..."
+git checkout {branch} 2>/dev/null || git checkout -b {branch} {remote_name}/{branch}
+git pull {remote_name} {branch}
 
 log "Git pull completed successfully!"
 '''
@@ -3852,11 +3855,20 @@ def main():
                         continue
                     if not sync_secrets(target_ip, key_file):
                         continue
-                    if not sync_to_github():
+                    # Get current branch to ensure consistency
+                    current_branch = "main"
+                    try:
+                        res = run("git branch --show-current", capture=True)
+                        if res:
+                            current_branch = res.strip()
+                    except:
+                        pass
+                        
+                    if not sync_to_github(branch=current_branch):
                         continue
                     if not check_server_dependencies(target_ip, key_file):
                         continue
-                    if not pull_from_github(target_ip, key_file):
+                    if not pull_from_github(target_ip, key_file, branch=current_branch):
                         continue
 
                     # Reload config in case it was updated
