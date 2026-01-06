@@ -19,6 +19,25 @@ from src.approvals.risk_profile import get_risk_manager
 from src.utils.structured_logging import get_logger
 from config.settings import settings
 
+# Import mock database classes for fallback mode
+try:
+    from test_cli import MockDB, MockResult
+except ImportError:
+    # Define mock classes inline if test_cli is not available
+    class MockResult:
+        def __init__(self, data=None):
+            self.data = data or []
+        def scalars(self): return self
+        def all(self): return self.data
+        def first(self): return self.data[0] if self.data else None
+
+    class MockDB:
+        async def __aenter__(self): return self
+        async def __aexit__(self, exc_type, exc_val, exc_tb): pass
+        async def execute(self, query): return MockResult()
+        async def commit(self): pass
+        async def refresh(self, obj): pass
+
 logger = get_logger("api")
 
 # Global MasterAI instance - initialized during startup
@@ -29,17 +48,43 @@ async def lifespan(app: FastAPI):
     """
     Handles application startup and shutdown events.
     Initializes the database schema, the Master AI brain, and the scheduler.
+    Falls back to mock mode if database is unavailable.
     """
     global master_ai
     
     # --- Startup ---
     logger.info("Starting King AI v2...")
     
-    # Create database tables if they don't exist
-    await init_db()
+    # Try to initialize database, fall back to mock mode if it fails
+    db_available = True
+    try:
+        await init_db()
+        logger.info("Database initialized successfully")
+    except Exception as e:
+        logger.warning(f"Database initialization failed: {e}")
+        logger.warning("Falling back to mock database mode for dashboard")
+        db_available = False
+        
+        # Monkey patch database functions to use mock data
+        import src.database.connection
+        from test_cli import MockDB, MockResult
+        
+        async def mock_get_db():
+            return MockDB()
+        
+        async def mock_init_db():
+            pass
+            
+        src.database.connection.get_db = mock_get_db
+        src.database.connection.init_db = mock_init_db
     
     # Initialize the central brain
-    master_ai = MasterAI()
+    try:
+        master_ai = MasterAI()
+        logger.info("Master AI initialized successfully")
+    except Exception as e:
+        logger.error(f"Master AI initialization failed: {e}")
+        raise
     
     # Initialize risk profile manager
     risk_manager = get_risk_manager()
@@ -49,6 +94,7 @@ async def lifespan(app: FastAPI):
     # Store in app state for access in routes
     app.state.master_ai = master_ai
     app.state.risk_manager = risk_manager
+    app.state.db_available = db_available
     
     # Register and start scheduled tasks
     if settings.enable_scheduler:
