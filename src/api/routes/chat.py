@@ -43,10 +43,10 @@ async def chat(
     """
     result = await master_ai.process_input(request.message)
     return ChatResponse(
-        type=result.type or "conversation",
-        response=result.response or "",
-        actions_taken=result.actions_taken or [],
-        pending_approvals=result.pending_approvals or []
+        type=result.type,
+        response=result.response,
+        actions_taken=[action.dict() for action in result.actions_taken],
+        pending_approvals=result.pending_approvals
     )
 
 @router.get("/history")
