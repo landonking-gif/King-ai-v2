@@ -768,13 +768,14 @@ log "Starting environment preparation..."
 # Update system with non-interactive flags
 export DEBIAN_FRONTEND=noninteractive
 log "Updating system packages..."
-sudo apt-get update -y || error_exit "apt update failed"
-sudo apt-get upgrade -y || error_exit "apt upgrade failed"
+sudo apt-get update -y || sudo apt-get update -y --fix-missing || true
+# Try upgrade but allow it to fail as long as we can install packages later
+sudo apt-get upgrade -y --fix-missing || echo "WARNING: apt-get upgrade encountered errors, continuing to package installation..."
 sudo apt-get autoremove -y || true
 
 # Install essential tools
 log "Installing essential tools..."
-sudo apt-get install -y --no-install-recommends \\
+sudo apt-get install -y --fix-missing --no-install-recommends \\
     curl \\
     wget \\
     git \\
@@ -786,7 +787,7 @@ sudo apt-get install -y --no-install-recommends \\
 
 # Install Python and pip
 log "Installing Python environment..."
-sudo apt-get install -y --no-install-recommends \\
+sudo apt-get install -y --fix-missing --no-install-recommends \\
     python3 \\
     python3-pip \\
     python3-venv \\
@@ -901,8 +902,8 @@ log "Installing Docker..."
 sudo mkdir -p /usr/share/keyrings
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --batch --yes --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-sudo apt-get update -y
-sudo apt-get install -y docker.io docker-compose || error_exit "Docker installation failed"
+sudo apt-get update -y || sudo apt-get update -y --fix-missing || true
+sudo apt-get install -y --fix-missing docker.io docker-compose || error_exit "Docker installation failed"
 
 # Start and enable Docker
 sudo systemctl enable docker || true
@@ -911,11 +912,11 @@ sudo systemctl start docker || error_exit "Docker service failed to start"
 # Install Node.js
 log "Installing Node.js..."
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo bash -
-sudo apt-get install -y nodejs || error_exit "Node.js installation failed"
+sudo apt-get install -y --fix-missing nodejs || error_exit "Node.js installation failed"
 
 # Install Nginx
 log "Installing Nginx..."
-sudo apt-get install -y nginx || error_exit "Nginx installation failed"
+sudo apt-get install -y --fix-missing nginx || error_exit "Nginx installation failed"
 
 # Configure Docker daemon
 log "Configuring Docker daemon..."
