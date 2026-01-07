@@ -68,3 +68,9 @@ Thumbs.db
 .terraform.lock.hcl
 *.tfvars
 !example.tfvars
+
+# Archives
+*.tar.gz
+*.zip
+*.rar
+*.7z
