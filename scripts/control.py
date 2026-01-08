@@ -1121,6 +1121,10 @@ fi
 timeout 300 ollama pull llama3.2:1b || log "Model download timed out"
 
 # Start API server
+log "Cleaning up old API processes..."
+pkill -f uvicorn || true
+fuser -k 8000/tcp || true
+
 log "Starting API server..."
 nohup uvicorn src.api.main:app --host 0.0.0.0 --port 8000 > api.log 2>&1 &
 API_PID=$!
@@ -1139,7 +1143,10 @@ if ! curl -s --max-time 5 http://localhost:8000/health > /dev/null 2>&1; then
     error_exit "API server failed to start"
 fi
 
-# Start dashboard
+log "Cleaning up old dashboard processes..."
+pkill -f "npm run dev" || true
+fuser -k 5173/tcp || true
+
 log "Starting dashboard..."
 cd dashboard
 npm install --silent || error_exit "npm install failed"
