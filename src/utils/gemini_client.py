@@ -60,3 +60,7 @@ class GeminiClient:
             return "ok" in res.lower()
         except:
             return False
+
+    async def aclose(self):
+        """Closes the underlying HTTP client."""
+        await self.client.aclose()

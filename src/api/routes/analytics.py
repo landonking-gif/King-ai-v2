@@ -2,6 +2,7 @@
 Analytics API Routes.
 """
 from typing import Optional
+from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Query, Depends
 from pydantic import BaseModel, Field
 from src.agents.analytics import AnalyticsAgent

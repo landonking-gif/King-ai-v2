@@ -35,6 +35,7 @@ class ClassifiedIntent(BaseModel):
     action: Optional[ActionType] = None
     parameters: Dict[str, Any] = Field(default_factory=dict)
     confidence: float = Field(ge=0.0, le=1.0, default=0.5)
+    requires_planning: bool = False
     reasoning: Optional[str] = None
     
     @validator('action', pre=True, always=True)

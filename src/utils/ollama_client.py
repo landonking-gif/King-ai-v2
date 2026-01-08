@@ -102,3 +102,7 @@ class OllamaClient:
             return True
         except Exception:
             return False
+
+    async def aclose(self):
+        """Closes the underlying HTTP client."""
+        await self.client.aclose()

@@ -69,9 +69,21 @@ class LLMRouter:
         )
         
         # Tertiary: Gemini for cloud fallback
-        self.gemini: Optional[GeminiClient] = None
+        self.gemini_clients: list[GeminiClient] = []
+        self._gemini_idx = 0
+        
+        # Load single key
         if settings.gemini_api_key and not self._is_placeholder(settings.gemini_api_key):
-            self.gemini = GeminiClient(api_key=settings.gemini_api_key)
+            self.gemini_clients.append(GeminiClient(api_key=settings.gemini_api_key))
+            
+        # Load multiple keys
+        if hasattr(settings, 'gemini_api_keys') and settings.gemini_api_keys:
+            keys = [k.strip() for k in settings.gemini_api_keys.split(",") if k.strip()]
+            for key in keys:
+                if not self._is_placeholder(key) and key != settings.gemini_api_key:
+                    self.gemini_clients.append(GeminiClient(api_key=key))
+                    
+        self.gemini = self.gemini_clients[0] if self.gemini_clients else None
 
         # High-stakes fallback: Claude
         self.claude: Optional[ClaudeClient] = None
@@ -96,16 +108,30 @@ class LLMRouter:
         self._failure_threshold = 3
         self._circuit_timeout = 60  # seconds
 
+    async def close(self):
+        """Release all resources."""
+        if self.vllm:
+            await self.vllm.aclose()
+        if self.ollama:
+            await self.ollama.aclose()
+        for client in self.gemini_clients:
+            await client.aclose()
+        if self.claude:
+            await self.claude.aclose()
+
     def _is_placeholder(self, value: str | None) -> bool:
         """Check if a string represents a placeholder API key or URL."""
         if not value:
             return True
-        v_lower = value.lower()
+        v_lower = str(value).lower()
         # Project template style: "your_..._here"
         if "your_" in v_lower and "_here" in v_lower:
             return True
         # Common empty-ish placeholders
-        if v_lower in ["", "none", "null", "false", "undefined"]:
+        if v_lower in ["", "none", "null", "false", "undefined", "placeholder"]:
+            return True
+        # Match "sk-..." or similar early if it's just dots
+        if all(c in " .-_" for c in v_lower):
             return True
         return False
     
@@ -190,6 +216,20 @@ class LLMRouter:
                 return result
                 
             except Exception as e:
+                # If Gemini fails, try to rotate to next key if available
+                if provider == ProviderType.GEMINI and len(self.gemini_clients) > 1:
+                    self._gemini_idx = (self._gemini_idx + 1) % len(self.gemini_clients)
+                    self.gemini = self.gemini_clients[self._gemini_idx]
+                    logger.info("Rotating to next Gemini API key", index=self._gemini_idx)
+                    # Stay on GEMINI but retry with new client in next loop iteration? 
+                    # No, actually it's easier to just retry the current provider once if it's Gemini with multiple keys.
+                    try:
+                        result = await self._execute(provider, prompt, system, temperature)
+                        self._record_success(provider)
+                        return result
+                    except Exception as inner_e:
+                        e = inner_e
+                
                 last_error = e
                 self._record_failure(provider)
                 continue
