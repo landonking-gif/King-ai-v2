@@ -169,6 +169,10 @@ class VLLMClient:
             return response.status_code == 200
         except Exception:
             return False
+
+    async def aclose(self):
+        """Closes the underlying HTTP client."""
+        await self.client.aclose()
     
     async def get_model_info(self) -> Dict[str, Any]:
         """Get information about loaded models."""

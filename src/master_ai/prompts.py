@@ -43,19 +43,18 @@ You must respond with ONLY a valid JSON object. Do not include any reasoning tex
 
 Response Format:
 {{
-    "intent": "query" | "command" | "planning" | "analysis" | "modification" | "conversation",
+    "type": "conversation" | "command" | "query",
+    "action": "start_business" | "stop_business" | "analyze_business" | "optimize_business" | "create_content" | "research_market" | "generate_report" | "propose_evolution" | null,
+    "parameters": {{}},
     "confidence": 0.0-1.0,
     "requires_planning": true/false,
-    "suggested_agent": "agent_name" | null
+    "reasoning": "Brief explanation"
 }}
 
 Intent types:
-- query: User asking for specific business data
-- command: User requesting an action
-- planning: User wants to create/execute a plan
-- analysis: User wants data analysis
-- modification: User wants to change the system
 - conversation: General chat, math, or questions not requiring specific data retrieval
+- command: User requesting an action or complex goal (requires planning)
+- query: User asking for specific business data or status
 """
 
 PLANNING_PROMPT = """Break down this goal into concrete, actionable steps.

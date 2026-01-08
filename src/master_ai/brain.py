@@ -216,11 +216,11 @@ class MasterAI:
             context=context[:2000]  # Limit context for classification
         )
         
-        # Use low-risk task context for classification
+        # Use high-accuracy context for classification as it's critical for routing
         task_context = TaskContext(
             task_type="classification",
             risk_level="low",
-            requires_accuracy=False,
+            requires_accuracy=True,
             token_estimate=500,
             priority="normal"
         )
@@ -236,6 +236,7 @@ class MasterAI:
                 action=ActionType(parsed.get("action")) if parsed.get("action") else None,
                 parameters=parsed.get("parameters", {}),
                 confidence=parsed.get("confidence", 0.5),
+                requires_planning=parsed.get("requires_planning", False),
                 reasoning=parsed.get("reasoning")
             )
         except Exception as e:
