@@ -123,16 +123,27 @@ class LLMRouter:
         """Check if a string represents a placeholder API key or URL."""
         if not value:
             return True
-        v_lower = str(value).lower()
-        # Project template style: "your_..._here"
-        if "your_" in v_lower and "_here" in v_lower:
+        v_str = str(value).strip()
+        v_lower = v_str.lower()
+        
+        # Project template style: "your_..._here" or "{...}"
+        if ("your_" in v_lower and "_here" in v_lower) or (v_str.startswith("{") and v_str.endswith("}")):
             return True
+            
         # Common empty-ish placeholders
-        if v_lower in ["", "none", "null", "false", "undefined", "placeholder"]:
+        placeholders = ["", "none", "null", "false", "undefined", "placeholder", "invalid", "todo", "insert_key"]
+        if v_lower in placeholders:
             return True
-        # Match "sk-..." or similar early if it's just dots
-        if all(c in " .-_" for c in v_lower):
+            
+        # Match "sk-..." or similar early if it's just dots or generic template
+        if all(c in " .-_" for c in v_str):
             return True
+            
+        # Typical length check for API keys (e.g., Gemini/OpenAI are usually > 20 chars)
+        # If it's very short, it's likely a placeholder
+        if len(v_str) < 8 and not v_str.startswith("http"):
+             return True
+             
         return False
     
     def _get_temperature_for_task(self, context: TaskContext | None) -> float:

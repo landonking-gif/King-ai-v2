@@ -240,6 +240,26 @@ class MasterAI:
                 reasoning=parsed.get("reasoning")
             )
         except Exception as e:
+            # Check if this looks like a refusal
+            refusal_keywords = ["foster", "illegal", "fraudulent", "refuse", "assist with", "can't help", "unable to"]
+            is_refusal = any(kw in response.lower() for kw in refusal_keywords)
+            
+            if is_refusal:
+                logger.warning(
+                    "LLM refused to classify intent. High-accuracy model might be needed.",
+                    refusal=response[:200]
+                )
+                # If we're in a situation where we can't classify, maybe just force it to research
+                # if the user input looks like research
+                if "research" in user_input.lower() or "analyze" in user_input.lower():
+                    return ClassifiedIntent(
+                        type=IntentType.COMMAND,
+                        action=ActionType.RESEARCH_MARKET,
+                        confidence=0.4,
+                        requires_planning=True,
+                        reasoning="Detected likely research intent despite LLM refusal/parse error."
+                    )
+
             logger.warning(
                 "Failed to parse intent, defaulting to conversation",
                 error=str(e),
