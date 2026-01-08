@@ -32,6 +32,7 @@ from src.utils.structured_logging import get_logger, set_request_context
 from src.utils.retry import with_retry, LLM_RETRY_CONFIG, TransientError
 from src.utils.monitoring import monitor, trace_llm
 from src.utils.fact_checker import check_for_hallucination
+from src.utils.web_tools import get_web_tools, evaluate_simple_math
 from config.settings import settings
 
 
@@ -62,6 +63,11 @@ class MasterAI:
         # EvolutionEngine expects the router interface (not a raw provider client)
         self.evolution = EvolutionEngine(self.llm_router)
         self.agent_router = AgentRouter()    # Dispatches tasks to sub-agents
+        self.web_tools = get_web_tools()      # Real-time web access and utilities
+        
+        # Performance/State tracking for conversational continuity
+        self.last_subject: str | None = None
+        self.last_research_query: str | None = None
         
         # State and rate limiting for autonomous features
         self.autonomous_mode = getattr(settings, 'enable_autonomous_mode', False)
@@ -120,6 +126,16 @@ class MasterAI:
         monitor.increment("master_ai.requests")
         
         try:
+            # Check for simple queries we can handle directly without LLM
+            direct_response = await self._try_direct_response(user_input)
+            if direct_response:
+                self._log_conversation(user_input, direct_response)
+                return MasterAIResponse(
+                    type="conversation",
+                    response=direct_response,
+                    metadata={"handled_directly": True}
+                )
+            
             # 1. Gather all relevant data for the LLM to make informed decisions
             context = await self.context.build_context(query=user_input)
             
@@ -230,6 +246,311 @@ class MasterAI:
             )
             return ClassifiedIntent(type=IntentType.CONVERSATION, confidence=0.3)
     
+    async def _try_direct_response(self, user_input: str) -> str | None:
+        """
+        Try to handle queries directly without LLM for speed and accuracy.
+        
+        Handles:
+        - Date/time questions
+        - Simple math
+        - Greetings and identity
+        - Crypto prices
+        - Weather
+        - Wikipedia lookups
+        - Unit conversions
+        - Agent capabilities
+        
+        Returns:
+            Response string if handled directly, None otherwise
+        """
+        from src.utils.web_tools import (
+            get_crypto_price, get_weather, get_wikipedia_summary,
+            convert_units, parse_unit_conversion_query
+        )
+        import re
+        
+        user_lower = user_input.lower().strip()
+        
+        # === DATE/TIME QUERIES ===
+        datetime_keywords = ["what time", "what date", "what day", "current time", 
+                            "current date", "date and time", "time and date", "what's the time",
+                            "what is the time", "what is the date", "today's date", "what year"]
+        
+        if any(kw in user_lower for kw in datetime_keywords):
+            dt_info = self.web_tools.get_current_datetime()
+            return f"The current date is {dt_info['day_of_week']}, {dt_info['date']} and the time is {dt_info['time']}."
+        
+        # === SIMPLE MATH ===
+        math_result = evaluate_simple_math(user_input)
+        if math_result is not None:
+            return f"The answer is {math_result}."
+        
+        # === UNIT CONVERSIONS ===
+        conversion = parse_unit_conversion_query(user_input)
+        if conversion:
+            result = convert_units(conversion["value"], conversion["from_unit"], conversion["to_unit"])
+            if result is not None:
+                if result == int(result):
+                    result = int(result)
+                return f"{conversion['value']} {conversion['from_unit']} = {result:.2f if isinstance(result, float) else result} {conversion['to_unit']}"
+        
+        # === CRYPTO PRICES (General) ===
+        # bitcoin, eth, solana price, value of bitcoin
+        crypto_match = re.search(r"(?:price|value) of (bitcoin|ethereum|litecoin|cardano|solana|polkadot|dogecoin|btc|eth|sol|doge|crypto)", user_lower)
+        if crypto_match or any(kw in user_lower for kw in ["bitcoin", "ethereum", "btc price", "eth price"]):
+            symbol = "bitcoin" if "bitcoin" in user_lower or "btc" in user_lower else \
+                     "ethereum" if "ethereum" in user_lower or "eth" in user_lower else \
+                     "solana" if "solana" in user_lower or "sol" in user_lower else \
+                     "dogecoin" if "dogecoin" in user_lower or "doge" in user_lower else None
+            
+            if crypto_match and not symbol:
+                symbol = crypto_match.group(1).strip()
+                shortcuts = {"btc": "bitcoin", "eth": "ethereum", "sol": "solana", "doge": "dogecoin"}
+                symbol = shortcuts.get(symbol, symbol)
+
+            if symbol and symbol != "crypto":
+                try:
+                    crypto_data = await get_crypto_price(symbol)
+                    if crypto_data:
+                        direction = "▲" if crypto_data["change_24h"] >= 0 else "▼"
+                        return f"{crypto_data['symbol']}: ${crypto_data['price_usd']:,.2f} ({direction} {abs(crypto_data['change_24h']):.2f}% 24h)"
+                except Exception:
+                    pass
+
+        # === STOCK PRICES (General) ===
+        # "price of AAPL", "price of tesla", "stock price of google", "what about walmart"
+        # Match "what about X" ONLY if the last subject was a stock/crypto
+        stock_patterns = [
+            r"(?:price|stock|value|shares) (?:of|for|on) ([a-zA-Z0-9\.\^' ]{2,20})",
+            r"([a-zA-Z0-9\.\^' ]{2,20})'s (?:stock |)(?:price|shares|value|stock)",
+            r"what about ([a-zA-Z0-9\.\^' ]{2,20})"
+        ]
+        
+        target_symbol = None
+        for pattern in stock_patterns:
+            match = re.search(pattern, user_lower)
+            if match:
+                candidate = match.group(1).strip().rstrip("?.")
+                # If "what about X", we check if we have a previous subject or if it looks like a name
+                if "what about" in pattern and not self.last_subject and len(candidate) > 6:
+                    continue
+                target_symbol = candidate
+                break
+
+        if target_symbol:
+            # Filter out common non-stock words
+            if target_symbol not in ["bitcoin", "ethereum", "crypto", "it", "this", "that", "weather", "today", "tomorrow"]:
+                try:
+                    target_symbol = target_symbol.rstrip("'s").rstrip("'")
+                    # Expanded map for "Limitless" feel
+                    common_map = {
+                        "tesla": "TSLA", "apple": "AAPL", "google": "GOOGL", "microsoft": "MSFT", 
+                        "amazon": "AMZN", "nvidia": "NVDA", "meta": "META", "facebook": "META",
+                        "walmart": "WMT", "wallmart": "WMT", "target": "TGT", "disney": "DIS",
+                        "netflix": "NFLX", "spotify": "SPOT", "uber": "UBER", "lyft": "LYFT",
+                        "airbnb": "ABNB", "twitter": "X", "openai": "MSFT", "spacex": "TSLA",
+                        "amd": "AMD", "intel": "INTC", "tsmc": "TSM", "arm": "ARM"
+                    }
+                    ticker = common_map.get(target_symbol, target_symbol)
+                    stock_data = await self.web_tools.get_stock_price(ticker)
+                    if stock_data:
+                        self.last_subject = ticker
+                        direction = "▲" if stock_data.change >= 0 else "▼"
+                        return f"{stock_data.symbol}: ${stock_data.price:,.2f} ({direction} {stock_data.change_percent:.2f}%)"
+                except Exception:
+                    pass
+
+        # === RESEARCH / SEARCH COMMANDS ===
+        # "research the market", "analyze the data", "analyze"
+        if user_lower.startswith(("research ", "search for ", "find info on ", "analyze ")) or user_lower == "analyze":
+            query = user_lower.replace("research ", "").replace("search for ", "").replace("find info on ", "").strip()
+            
+            # Carry over last query for "analyze"
+            if user_lower == "analyze" or query == "analyze":
+                if self.last_research_query:
+                    query = self.last_research_query
+                else:
+                    return "What would you like me to analyze? (e.g., 'research the AI market' then 'analyze')"
+            
+            if len(query) > 2:
+                self.last_research_query = query
+                # Delegate directly to research agent via web search tool
+                try:
+                    results = await self.web_tools.search_formatted(query, max_results=3)
+                    return f"Here is what I found for '{query}':\n\n{results}\n\n(type 'analyze' for deep synthesis of this topic)"
+                except Exception:
+                    pass
+        
+        # === WEATHER ===
+        weather_patterns = ["weather in", "weather for", "what's the weather", "how's the weather", "temperature in"]
+        for pattern in weather_patterns:
+            if pattern in user_lower:
+                try:
+                    # Extract city name
+                    city = "New York"  # default
+                    if "weather in " in user_lower:
+                        city = user_input.split("weather in ")[-1].strip().rstrip("?.")
+                    elif "weather for " in user_lower:
+                        city = user_input.split("weather for ")[-1].strip().rstrip("?.")
+                    elif "temperature in " in user_lower:
+                        city = user_input.split("temperature in ")[-1].strip().rstrip("?.")
+                    
+                    weather_data = await get_weather(city)
+                    if weather_data:
+                        return f"Weather in {weather_data['city']}: {weather_data['condition']}, {weather_data['temperature_f']}°F ({weather_data['temperature_c']}°C), Humidity: {weather_data['humidity']}%, Wind: {weather_data['wind_mph']} mph"
+                except Exception:
+                    pass
+                break
+        
+        # === WIKIPEDIA LOOKUPS ===
+        wiki_patterns = ["what is a ", "what is an ", "what is the ", "define ", "explain ", "tell me about "]
+        for pattern in wiki_patterns:
+            if user_lower.startswith(pattern):
+                topic = user_input[len(pattern):].strip().rstrip("?.!")
+                if len(topic) > 2:
+                    try:
+                        summary = await get_wikipedia_summary(topic)
+                        if summary:
+                            # Truncate if too long
+                            if len(summary) > 500:
+                                summary = summary[:500] + "..."
+                            return summary
+                    except Exception:
+                        pass
+                break
+        
+        # === GREETINGS ===
+        greetings = ["hello", "hi", "hey", "good morning", "good afternoon", "good evening"]
+        if user_lower in greetings or user_lower.rstrip("!?.") in greetings:
+            dt_info = self.web_tools.get_current_datetime()
+            hour = int(dt_info['time'].split(":")[0])
+            is_pm = "PM" in dt_info['time']
+            if is_pm and hour != 12:
+                hour += 12
+            if not is_pm and hour == 12:
+                hour = 0
+            time_of_day = "morning" if hour < 12 else "afternoon" if hour < 17 else "evening"
+            return f"Good {time_of_day}! I'm King AI. How can I help you today?"
+        
+        # === NEWS HEADLINES ===
+        if user_lower.startswith(("news on ", "latest news", "top stories")):
+            topic = user_lower.replace("news on ", "").replace("latest news", "business").replace("top stories", "general").strip()
+            try:
+                news_text = await self.web_tools.get_news_formatted(topic)
+                return f"Here are the latest headlines for '{topic}':\n\n{news_text}"
+            except Exception:
+                pass
+
+        # === IDENTITY ===
+        if "who are you" in user_lower or "what are you" in user_lower:
+            return "I'm King AI, an autonomous business management AI. I can help you with business strategy, market research, financial analysis, content creation, web search, stock prices, crypto prices, weather, and much more. What would you like to know or do?"
+        
+        # === CAPABILITIES ===
+        if "what can you do" in user_lower or "help" == user_lower or "capabilities" in user_lower:
+            return """I'm King AI and I can help you with:
+
+📊 **Real-time Data**: Stock prices, crypto prices, market trends, weather
+🔍 **Research**: Web search, Wikipedia lookups, market research
+📝 **Business**: Strategy planning, financial analysis, content creation
+🧮 **Calculations**: Math, unit conversions, currency exchange
+🤖 **Agent Tasks**: Research, analytics, content, commerce, finance, legal
+
+Just ask me anything! For example:
+- "What's the weather in Chicago?"
+- "What is Bitcoin's price?"
+- "Convert 100 miles to km"
+- "What is machine learning?"
+- "Research the AI industry"
+"""
+        
+        # === LIST AGENTS ===
+        if "list agents" in user_lower or "what agents" in user_lower or "available agents" in user_lower:
+            agents = self.agent_router.list_agents()
+            response = "**Available Agents:**\n\n"
+            for agent in agents:
+                response += f"• **{agent['name']}** ({agent['risk_level']} risk)\n"
+            return response
+        
+        # Not a simple query - let the normal flow handle it
+        return None
+
+    async def _delegate_to_agent(self, agent_name: str, task_description: str, parameters: dict = None) -> dict:
+        """
+        Delegate a task to a specialized agent.
+        
+        Args:
+            agent_name: Name of the agent (research, analytics, content, etc.)
+            task_description: Description of what to do
+            parameters: Additional task parameters
+            
+        Returns:
+            Agent result dict
+        """
+        task = {
+            "agent": agent_name,
+            "description": task_description,
+            "action": task_description,
+            **(parameters or {})
+        }
+        
+        try:
+            result = await self.agent_router.execute(task)
+            logger.info(
+                "Agent task completed",
+                agent=agent_name,
+                success=result.get("success", False)
+            )
+            return result
+        except Exception as e:
+            logger.error(f"Agent delegation failed: {e}", agent=agent_name)
+            return {"success": False, "error": str(e)}
+    
+    async def execute_research(self, query: str) -> str:
+        """
+        Execute a research query using the research agent.
+        
+        Args:
+            query: Research topic or question
+            
+        Returns:
+            Research results formatted as string
+        """
+        result = await self._delegate_to_agent("research", query, {
+            "query": query,
+            "research_type": "general"
+        })
+        
+        if result.get("success"):
+            output = result.get("output", {})
+            if isinstance(output, dict):
+                summary = output.get("summary", str(output))
+                findings = output.get("key_findings", [])
+                if findings:
+                    summary += "\n\nKey Findings:\n" + "\n".join(f"• {f}" for f in findings)
+                return summary
+            return str(output)
+        return f"Research failed: {result.get('error', 'Unknown error')}"
+    
+    async def execute_analytics(self, query: str) -> str:
+        """
+        Execute an analytics query using the analytics agent.
+        
+        Args:
+            query: Analytics query
+            
+        Returns:
+            Analytics results formatted as string
+        """
+        result = await self._delegate_to_agent("analytics", query, {
+            "query": query,
+            "analysis_type": "general"
+        })
+        
+        if result.get("success"):
+            return str(result.get("output", "Analysis complete"))
+        return f"Analytics failed: {result.get('error', 'Unknown error')}"
+
+    
     def _log_conversation(self, user_input: str, response: str):
         """Log conversation exchange to in-memory history."""
         self._conversation_history.append({
@@ -261,14 +582,37 @@ class MasterAI:
         return "\n".join(lines)
     
     async def _handle_conversation(self, user_input: str, context: str) -> str:
-        """Handles conversation while strictly limiting to provided context."""
+        """Handles conversation with real-time context integration."""
         
         # Get conversation history
         history = self._format_conversation_history()
         
+        # Build real-time context section
+        realtime_context = self.web_tools.get_datetime_context()
+        
+        # Check if query needs web data
+        needs = self.web_tools.detect_realtime_query(user_input)
+        
+        if needs["needs_web_search"] or needs["needs_market_trends"]:
+            try:
+                web_results = await self.web_tools.search_formatted(user_input, max_results=3)
+                realtime_context += f"\n\n{web_results}"
+            except Exception as e:
+                logger.warning(f"Web search failed: {e}")
+        
+        if needs["needs_stock_data"] or needs["needs_market_trends"]:
+            try:
+                market_summary = await self.web_tools.get_market_summary()
+                realtime_context += f"\n\n{market_summary}"
+            except Exception as e:
+                logger.warning(f"Market data fetch failed: {e}")
+        
         prompt = f"""{SYSTEM_PROMPT}
 
-=== CONTEXT (This is ALL the information you have access to) ===
+=== REAL-TIME INFORMATION ===
+{realtime_context}
+
+=== BUSINESS CONTEXT ===
 {context}
 
 === CONVERSATION HISTORY ===
@@ -278,17 +622,23 @@ class MasterAI:
 {user_input}
 
 === INSTRUCTIONS ===
-Respond to the user's message. Remember:
-- You can ONLY use information from the CONTEXT section above
-- If asked about files, code, current events, external data, or anything not in context: say "I don't have that information"
-- Do NOT make up any facts, numbers, or information
-- Be honest about your limitations
-- If asked WHY you don't have access to something, explain that you're designed as a business-focused AI with limited access for security and focus reasons
+Respond helpfully to the user's message. You have access to:
+1. Current date/time from REAL-TIME INFORMATION
+2. Business data from BUSINESS CONTEXT
+3. Web search results (if provided above)
+4. Market data (if provided above)
+
+Guidelines:
+- Use the real-time information when relevant
+- For business questions, use the BUSINESS CONTEXT
+- If information is not available in any section, say so honestly
+- Do NOT make up facts, numbers, or information
+- Be conversational and helpful
 """
         task_context = TaskContext(
             task_type="conversation",
             risk_level="low",
-            requires_accuracy=True,  # Always check for accuracy now
+            requires_accuracy=True,
             token_estimate=1000,
             priority="normal"
         )
