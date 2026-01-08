@@ -270,14 +270,10 @@ class VectorStore:
             min_score=0.6
         )
         
-        return [
-            {
-                "id": match.id,
-                "score": match.score,
-                "text": match.metadata.get("text", "")
-            }
-            for match in results.matches
-        ]
+        return "\n\n".join([
+            f"[Memory {m['type']}]: {m['text']}"
+            for m in memories
+        ])
     
     async def upsert(self, id: str, text: str, metadata: Dict[str, Any], embedding: List[float] = None):
         """

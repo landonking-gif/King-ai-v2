@@ -13,6 +13,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from src.master_ai.brain import MasterAI
 from src.database.connection import init_db
+from config.settings import settings
+import traceback
 
 async def main():
     print("\n🤴 King AI v2 - Autonomous Business Empire")
@@ -25,14 +27,16 @@ async def main():
         print("✓ Database initialized")
     except Exception as e:
         print(f"✗ Database initialization failed: {e}")
+        # traceback.print_exc() # detailed logging if needed
         return
 
     # Initialize Master AI
     try:
         ai = MasterAI()
-        print(f"✓ Master AI instantiated (Risk Profile: {ai.context.settings.risk_profile})")
+        print(f"✓ Master AI instantiated (Risk Profile: {settings.risk_profile})")
     except Exception as e:
         print(f"✗ Master AI initialization failed: {e}")
+        traceback.print_exc()
         return
     
     print("\nCommands:")
@@ -75,19 +79,24 @@ async def main():
             print(" " * 20, end="\r", flush=True)
             
             # Print response
-            print(f"👑 King AI: {result['response']}")
+            # Print response
+            print(f"👑 King AI: {result.response}")
             
             # Display actions if any
-            if result.get('actions_taken'):
+            if result.actions_taken:
                 print("\n[Actions Taken]:")
-                for action in result['actions_taken']:
-                    print(f"  - {action['step']} ({action['agent']}) -> {action.get('result', {}).get('success', False)}")
+                for action in result.actions_taken:
+                    print(f"  - {action.step_name} ({action.agent}) -> {action.success}")
             
             # Display pending approvals if any
-            if result.get('pending_approvals'):
+            if result.pending_approvals:
                 print("\n[⚠️ Pending Approvals]:")
-                for task in result['pending_approvals']:
-                    print(f"  - {task['name']}: {task['description']}")
+                for task in result.pending_approvals:
+                    # task might be a dict or object depending on how it's populated
+                    # In brain.py schema pending_approvals is List[Dict]
+                    name = task.get('name', 'Unknown') if isinstance(task, dict) else getattr(task, 'name', 'Unknown')
+                    desc = task.get('description', 'No description') if isinstance(task, dict) else getattr(task, 'description', 'No description')
+                    print(f"  - {name}: {desc}")
 
         except KeyboardInterrupt:
             print("\nExiting...")
