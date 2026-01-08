@@ -11,7 +11,7 @@ from src.integrations.supplier_client import (
     SupplierProduct, SupplierOrder
 )
 from src.integrations.shopify_client import ShopifyClient
-from src.database.connection import get_db_session
+from src.database.connection import get_db_session, get_db_ctx
 from src.database.models import BusinessUnit
 from src.utils.logging import get_logger
 
@@ -433,7 +433,7 @@ class SupplierAgent(SubAgent):
 
     async def _get_shopify_client(self, business_id: str) -> Optional[ShopifyClient]:
         """Get Shopify client for business."""
-        async with get_db_session() as session:
+        async with get_db_ctx() as session:
             business = await session.get(BusinessUnit, business_id)
             if not business or not business.config:
                 return None

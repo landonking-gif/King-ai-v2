@@ -8,7 +8,7 @@ from src.agents.finance import FinanceAgent
 from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
-router = APIRouter(prefix="/finance", tags=["finance"])
+router = APIRouter(tags=["finance"])
 
 _agent: Optional[FinanceAgent] = None
 

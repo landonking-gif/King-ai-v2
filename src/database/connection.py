@@ -32,14 +32,10 @@ async def init_db():
         # Tables are created based on the schema in Base.metadata
         await conn.run_sync(Base.metadata.create_all)
 
-@asynccontextmanager
 async def get_db():
     """
-    Provides a transactional scope around a series of operations.
-    Usage:
-        async with get_db() as db:
-            result = await db.execute(...)
-    Ensures sessions are closed properly even if exceptions occur.
+    Standard FastAPI dependency for database sessions.
+    Returns an async generator.
     """
     session = AsyncSessionLocal()
     try:
@@ -47,6 +43,20 @@ async def get_db():
     finally:
         await session.close()
 
+@asynccontextmanager
+async def get_db_ctx():
+    """
+    Asynchronous context manager for internal database usage.
+    Usage:
+        async with get_db_ctx() as db:
+            ...
+    """
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+        finally:
+            await session.close()
 
-# Alias for backward compatibility with code using get_db_session
+# Aliases for backward compatibility
+get_db_yield = get_db
 get_db_session = get_db

@@ -68,9 +68,9 @@ class PortfolioManager:
         try:
             from sqlalchemy import select, func
             from src.database.models import BusinessUnit
-            from src.database.connection import get_db
+            from src.database.connection import get_db_ctx
 
-            async with get_db() as db:
+            async with get_db_ctx() as db:
                 result = await db.execute(
                     select(
                         func.sum(BusinessUnit.total_revenue).label("total_revenue"),

@@ -9,7 +9,7 @@ from src.business.lifecycle_models import LifecycleStage, MilestoneType, Transit
 from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
-router = APIRouter(prefix="/lifecycle", tags=["lifecycle"])
+router = APIRouter(tags=["lifecycle"])
 
 _engine: Optional[EnhancedLifecycleEngine] = None
 

@@ -9,7 +9,7 @@ from src.integrations.supplier_client import SupplierType
 from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
-router = APIRouter(prefix="/supplier", tags=["supplier"])
+router = APIRouter(tags=["supplier"])
 
 # Shared agent instance
 # Note: This is a stateful singleton. In production, consider using proper

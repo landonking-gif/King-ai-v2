@@ -3,7 +3,7 @@ Evolution Routes - Management of self-modification proposals.
 """
 
 from fastapi import APIRouter, HTTPException
-from src.database.connection import get_db
+from src.database.connection import get_db, get_db_ctx
 from src.database.models import EvolutionProposal, EvolutionStatus
 from src.master_ai.brain import MasterAI
 from sqlalchemy import select
@@ -13,7 +13,7 @@ router = APIRouter()
 @router.get("/proposals")
 async def list_proposals():
     """Returns all system evolution proposals."""
-    async with get_db() as db:
+    async with get_db_ctx() as db:
         result = await db.execute(
             select(EvolutionProposal).order_by(EvolutionProposal.created_at.desc())
         )
@@ -22,7 +22,7 @@ async def list_proposals():
 @router.get("/proposals/{proposal_id}")
 async def get_proposal(proposal_id: str):
     """Returns details for a specific evolution proposal."""
-    async with get_db() as db:
+    async with get_db_ctx() as db:
         prop = await db.get(EvolutionProposal, proposal_id)
         if not prop:
             raise HTTPException(status_code=404, detail="Proposal not found")
@@ -30,7 +30,7 @@ async def get_proposal(proposal_id: str):
 @router.post("/approve/{proposal_id}")
 async def approve_proposal(proposal_id: str):
     """Executes an approved evolution proposal."""
-    async with get_db() as db:
+    async with get_db_ctx() as db:
         prop = await db.get(EvolutionProposal, proposal_id)
         if not prop:
             raise HTTPException(status_code=404, detail="Proposal not found")
@@ -70,7 +70,7 @@ async def approve_proposal(proposal_id: str):
 @router.post("/reject/{proposal_id}")
 async def reject_proposal(proposal_id: str):
     """Rejects an evolution proposal."""
-    async with get_db() as db:
+    async with get_db_ctx() as db:
         prop = await db.get(EvolutionProposal, proposal_id)
         if not prop:
             raise HTTPException(status_code=404, detail="Proposal not found")

@@ -198,8 +198,20 @@ class LLMRouter:
     
     async def _route(self, context: TaskContext | None) -> RoutingDecision:
         """Determine the best provider for this request."""
+        
+        # 1. Respect Primary Model from Settings if configured and healthy
+        primary = settings.primary_model.lower() if hasattr(settings, 'primary_model') else None
+        
+        if primary == "vllm" and self.vllm and self._provider_health[ProviderType.VLLM]:
+            return RoutingDecision(provider=ProviderType.VLLM, reason="User-configured primary model")
+        elif primary == "ollama" and self._provider_health[ProviderType.OLLAMA]:
+            return RoutingDecision(provider=ProviderType.OLLAMA, reason="User-configured primary model")
+        elif primary == "gemini" and self.gemini and self._provider_health[ProviderType.GEMINI]:
+            return RoutingDecision(provider=ProviderType.GEMINI, reason="User-configured primary model")
+        elif primary == "claude" and self.claude and self._provider_health[ProviderType.CLAUDE]:
+            return RoutingDecision(provider=ProviderType.CLAUDE, reason="User-configured primary model")
 
-        # High-stakes: prefer Claude (then Gemini) when configured
+        # 2. High-stakes: prefer Claude (then Gemini) when configured
         if context and context.risk_level == "high" and context.requires_accuracy:
             if self.claude and self._provider_health[ProviderType.CLAUDE] and self.claude.is_available():
                 return RoutingDecision(
@@ -212,28 +224,27 @@ class LLMRouter:
                     reason="High-stakes task routed to Gemini for accuracy"
                 )
         
-        # Default to vLLM if available and healthy
+        # 3. Default to vLLM if available and healthy
         if self.vllm and self._provider_health[ProviderType.VLLM]:
             return RoutingDecision(
                 provider=ProviderType.VLLM,
                 reason="Primary production provider"
             )
         
-        # Fallback to Ollama
+        # 4. Fallback to Ollama
         if self._provider_health[ProviderType.OLLAMA]:
             return RoutingDecision(
                 provider=ProviderType.OLLAMA,
                 reason="Fallback to Ollama (vLLM unavailable)"
             )
         
-        # Last resort: Gemini
+        # 5. Last resort: Cloud providers
         if self.gemini and self._provider_health[ProviderType.GEMINI]:
             return RoutingDecision(
                 provider=ProviderType.GEMINI,
                 reason="Cloud fallback (all local providers down)"
             )
 
-        # Last resort: Claude (only if configured)
         if self.claude and self._provider_health[ProviderType.CLAUDE] and self.claude.is_available():
             return RoutingDecision(
                 provider=ProviderType.CLAUDE,

@@ -17,7 +17,7 @@ from src.utils.structured_logging import get_logger
 from config.settings import settings
 
 logger = get_logger("commerce_api")
-router = APIRouter(prefix="/commerce", tags=["commerce"])
+router = APIRouter(tags=["commerce"])
 
 
 class StoreConfigRequest(BaseModel):

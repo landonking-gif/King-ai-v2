@@ -13,7 +13,7 @@ from datetime import datetime
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 
-from src.database.connection import get_db
+from src.database.connection import get_db, get_db_ctx
 from src.database.models import BusinessUnit, Task, ConversationMessage, Log
 from src.database.vector_store import vector_store, MemoryType
 from src.utils.token_manager import (
@@ -176,7 +176,7 @@ class ContextManager:
         ]
         
         # Add quick stats
-        async with get_db() as db:
+        async with get_db_ctx() as db:
             result = await db.execute(select(BusinessUnit))
             businesses = result.scalars().all()
             
@@ -197,7 +197,7 @@ class ContextManager:
         Fetches all active business units and summarizes their financial performance.
         Optionally filters or prioritizes based on query keywords.
         """
-        async with get_db() as db:
+        async with get_db_ctx() as db:
             result = await db.execute(
                 select(BusinessUnit).order_by(BusinessUnit.created_at.desc())
             )
@@ -315,7 +315,7 @@ class ContextManager:
         """
         Get conversation history with intelligent summarization.
         """
-        async with get_db() as db:
+        async with get_db_ctx() as db:
             result = await db.execute(
                 select(ConversationMessage)
                 .order_by(ConversationMessage.created_at.desc())
@@ -380,7 +380,7 @@ class ContextManager:
         """
         Retrieves recent tasks to show what the system has been doing.
         """
-        async with get_db() as db:
+        async with get_db_ctx() as db:
             result = await db.execute(
                 select(Task).order_by(Task.created_at.desc()).limit(20)
             )
@@ -398,7 +398,7 @@ class ContextManager:
     
     async def _get_pending_approvals(self) -> str:
         """Get pending items requiring human approval."""
-        async with get_db() as db:
+        async with get_db_ctx() as db:
             result = await db.execute(
                 select(Task)
                 .where(Task.status == "pending_approval")
@@ -438,7 +438,7 @@ class ContextManager:
         
         # Persist to database
         if persist:
-            async with get_db() as db:
+            async with get_db_ctx() as db:
                 from uuid import uuid4
                 msg = ConversationMessage(
                     id=str(uuid4()),

@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 from src.utils.logging import get_logger
-from src.database.connection import get_db
+from src.database.connection import get_db, get_db_ctx
 from src.database.models import BusinessUnit, Task, Log
 from config.settings import settings
 
@@ -115,7 +115,7 @@ class MLRetrainingPipeline:
         
         samples = []
         
-        async with get_db() as db:
+        async with get_db_ctx() as db:
             if data_type == "successful_tasks":
                 # Get successful tasks with good outcomes
                 from sqlalchemy import select

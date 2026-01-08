@@ -19,7 +19,7 @@ from src.utils.llm_router import LLMRouter, TaskContext
 from src.utils.structured_logging import get_logger
 from src.utils.retry import with_retry, LLM_RETRY_CONFIG
 from src.utils.sandbox import Sandbox
-from src.database.connection import get_db
+from src.database.connection import get_db, get_db_ctx
 from src.database.models import EvolutionProposal as DBEvolutionProposal
 from config.settings import settings
 
@@ -1226,7 +1226,7 @@ resource "{resource_type}" "{resource_name}" {{
             
             # Load full proposals from database
             similar_proposals = []
-            async with get_db() as db:
+            async with get_db_ctx() as db:
                 for result in similar:
                     proposal_id = result.get("metadata", {}).get("proposal_id")
                     if proposal_id and proposal_id != proposal.id:
@@ -1279,7 +1279,7 @@ resource "{resource_type}" "{resource_name}" {{
     async def _persist_proposal(self, proposal: EvolutionProposal):
         """Persist proposal to database."""
         try:
-            async with get_db() as db:
+            async with get_db_ctx() as db:
                 db_proposal = DBEvolutionProposal(
                     id=proposal.id,
                     type=proposal.proposal_type.value,
@@ -1301,7 +1301,7 @@ resource "{resource_type}" "{resource_name}" {{
     async def _update_proposal(self, proposal: EvolutionProposal):
         """Update proposal in database."""
         try:
-            async with get_db() as db:
+            async with get_db_ctx() as db:
                 db_proposal = await db.get(DBEvolutionProposal, proposal.id)
                 if db_proposal:
                     db_proposal.status = proposal.status.value if hasattr(proposal.status, 'value') else str(proposal.status)
@@ -1313,7 +1313,7 @@ resource "{resource_type}" "{resource_name}" {{
     async def _load_proposal(self, proposal_id: str) -> Optional[EvolutionProposal]:
         """Load proposal from database."""
         try:
-            async with get_db() as db:
+            async with get_db_ctx() as db:
                 db_proposal = await db.get(DBEvolutionProposal, proposal_id)
                 if db_proposal:
                     return EvolutionProposal(
@@ -1332,10 +1332,6 @@ resource "{resource_type}" "{resource_name}" {{
         Record evolution event in history for audit and analysis.
         Stores events to database and maintains in-memory recent history.
         """
-        from src.database.connection import get_db_session
-        from datetime import datetime
-        import json
-        
         try:
             event_record = {
                 "proposal_id": proposal.id,
@@ -1356,7 +1352,8 @@ resource "{resource_type}" "{resource_name}" {{
                 self.metrics.rejected_proposals += 1
             
             # Store in database
-            async with get_db_session() as session:
+            from src.database.connection import get_db_ctx
+            async with get_db_ctx() as session:
                 from sqlalchemy import text
                 
                 await session.execute(

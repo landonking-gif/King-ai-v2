@@ -229,10 +229,10 @@ app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
 app.include_router(businesses.router, prefix="/api/businesses", tags=["businesses"])
 app.include_router(approvals.router, prefix="/api/approvals", tags=["approvals"])
 app.include_router(evolution.router, prefix="/api/evolution", tags=["evolution"])
-app.include_router(playbook.router, prefix="/api", tags=["playbooks"])
-app.include_router(portfolio.router, prefix="/api", tags=["portfolios"])
+app.include_router(playbook.router, prefix="/api/playbook", tags=["playbooks"])
+app.include_router(portfolio.router, prefix="/api/portfolio", tags=["portfolios"])
 app.include_router(scheduler_routes.router, prefix="/api/scheduler", tags=["scheduler"])
-app.include_router(system.router, tags=["system"])
+app.include_router(system.router, prefix="/api/system", tags=["system"])
 
 # Additional feature routes
 app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"])

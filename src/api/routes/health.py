@@ -10,7 +10,7 @@ import asyncio
 
 from config.settings import settings
 from src.utils.llm_router import LLMRouter, ProviderType
-from src.database.connection import get_db
+from src.database.connection import get_db, get_db_ctx
 from sqlalchemy import text
 
 router = APIRouter()
@@ -57,7 +57,7 @@ async def full_health_check():
     # Check Database
     try:
         start = time.time()
-        async with get_db() as db:
+        async with get_db_ctx() as db:
             await db.execute(text("SELECT 1"))
         latency = (time.time() - start) * 1000
         components["database"] = ComponentHealth(
@@ -160,7 +160,7 @@ async def readiness_check():
     Returns 200 if the service can accept traffic.
     """
     try:
-        async with get_db() as db:
+        async with get_db_ctx() as db:
             await db.execute(text("SELECT 1"))
         return {"ready": True}
     except:

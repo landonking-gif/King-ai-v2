@@ -8,7 +8,7 @@ from src.agents.banking import BankingAgent
 from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
-router = APIRouter(prefix="/banking", tags=["banking"])
+router = APIRouter(tags=["banking"])
 
 _agent: Optional[BankingAgent] = None
 

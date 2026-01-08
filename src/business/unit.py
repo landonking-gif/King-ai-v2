@@ -6,7 +6,7 @@ Handles creation, cloning, and metadata updates for empire ventures.
 from typing import Optional
 from uuid import uuid4
 from src.database.models import BusinessUnit, BusinessStatus
-from src.database.connection import get_db
+from src.database.connection import get_db, get_db_ctx
 from src.utils.metrics import ACTIVE_BUSINESSES
 from src.utils.logging import get_logger
 
@@ -22,7 +22,7 @@ class BusinessManager:
         """
         Registers a new venture in the empire.
         """
-        async with get_db() as db:
+        async with get_db_ctx() as db:
             unit = BusinessUnit(
                 id=str(uuid4()),
                 name=name,
@@ -46,7 +46,7 @@ class BusinessManager:
         """
         Retrieve a business unit by ID.
         """
-        async with get_db() as db:
+        async with get_db_ctx() as db:
             return await db.get(BusinessUnit, business_id)
 
     async def clone_business(
@@ -71,7 +71,7 @@ class BusinessManager:
         Returns:
             The newly created cloned BusinessUnit, or None if source not found
         """
-        async with get_db() as db:
+        async with get_db_ctx() as db:
             source = await db.get(BusinessUnit, source_id)
             if not source:
                 logger.error(f"Cannot clone: source business {source_id} not found")
@@ -119,7 +119,7 @@ class BusinessManager:
         """
         Updates the financial health of a business unit.
         """
-        async with get_db() as db:
+        async with get_db_ctx() as db:
             unit = await db.get(BusinessUnit, business_id)
             if unit:
                 unit.total_revenue += revenue_delta

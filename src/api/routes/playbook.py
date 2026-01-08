@@ -10,7 +10,7 @@ from src.business.playbook_executor import PlaybookExecutor
 from src.utils.structured_logging import get_logger
 
 logger = get_logger(__name__)
-router = APIRouter(prefix="/playbooks", tags=["playbooks"])
+router = APIRouter(tags=["playbooks"])
 
 _loader: Optional[PlaybookLoader] = None
 _executor: Optional[PlaybookExecutor] = None
