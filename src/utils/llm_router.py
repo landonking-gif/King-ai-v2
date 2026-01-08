@@ -56,7 +56,7 @@ class LLMRouter:
         """Initialize all available providers."""
         # Primary: vLLM for production throughput
         self.vllm: Optional[VLLMClient] = None
-        if hasattr(settings, 'vllm_url') and settings.vllm_url:
+        if hasattr(settings, 'vllm_url') and settings.vllm_url and not self._is_placeholder(settings.vllm_url):
             self.vllm = VLLMClient(
                 base_url=settings.vllm_url,
                 model=settings.vllm_model if hasattr(settings, 'vllm_model') else "meta-llama/Llama-3.1-70B-Instruct"
@@ -70,12 +70,12 @@ class LLMRouter:
         
         # Tertiary: Gemini for cloud fallback
         self.gemini: Optional[GeminiClient] = None
-        if settings.gemini_api_key:
+        if settings.gemini_api_key and not self._is_placeholder(settings.gemini_api_key):
             self.gemini = GeminiClient(api_key=settings.gemini_api_key)
 
         # High-stakes fallback: Claude
         self.claude: Optional[ClaudeClient] = None
-        if settings.anthropic_api_key:
+        if settings.anthropic_api_key and not self._is_placeholder(settings.anthropic_api_key):
             self.claude = ClaudeClient(
                 api_key=settings.anthropic_api_key,
                 model=settings.claude_model or "claude-3-5-sonnet-20241022",
@@ -95,6 +95,19 @@ class LLMRouter:
         self._circuit_open_until = {p: 0 for p in ProviderType}
         self._failure_threshold = 3
         self._circuit_timeout = 60  # seconds
+
+    def _is_placeholder(self, value: str | None) -> bool:
+        """Check if a string represents a placeholder API key or URL."""
+        if not value:
+            return True
+        v_lower = value.lower()
+        # Project template style: "your_..._here"
+        if "your_" in v_lower and "_here" in v_lower:
+            return True
+        # Common empty-ish placeholders
+        if v_lower in ["", "none", "null", "false", "undefined"]:
+            return True
+        return False
     
     def _get_temperature_for_task(self, context: TaskContext | None) -> float:
         """Determine appropriate temperature based on task context.

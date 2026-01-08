@@ -34,9 +34,24 @@ class GeminiClient:
             response = await self.client.post(self.url, json=payload)
             response.raise_for_status()
             data = response.json()
+            
+            if 'candidates' not in data or not data['candidates']:
+                if 'error' in data:
+                    error_msg = data['error'].get('message', 'Unknown Gemini error')
+                    raise RuntimeError(f"Gemini API error: {error_msg}")
+                raise RuntimeError(f"Invalid Gemini response format: {json.dumps(data)}")
+                
             return data['candidates'][0]['content']['parts'][0]['text']
         except Exception as e:
-            return f"Error connecting to Gemini: {str(e)}"
+            # Re-raise so LLMRouter can handle fallback
+            if isinstance(e, httpx.HTTPStatusError):
+                try:
+                    error_data = e.response.json()
+                    error_msg = error_data.get('error', {}).get('message', str(e))
+                except:
+                    error_msg = str(e)
+                raise RuntimeError(f"Gemini API error ({e.response.status_code}): {error_msg}")
+            raise
 
     async def health_check(self) -> bool:
         """Checks if the Gemini API key is valid by sending a tiny prompt."""
