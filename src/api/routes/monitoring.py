@@ -7,7 +7,7 @@ from src.monitoring.monitor import monitor
 from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
-router = APIRouter(prefix="/monitoring", tags=["monitoring"])
+router = APIRouter(tags=["monitoring"])
 
 
 @router.websocket("/ws")

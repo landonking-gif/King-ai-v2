@@ -14,7 +14,7 @@ from enum import Enum
 from typing import Any, Optional, List, Dict
 from uuid import uuid4
 
-from src.database.connection import get_db_session
+from src.database.connection import get_db_session, get_db_ctx
 from src.utils.structured_logging import get_logger
 
 logger = get_logger("audit_trail")
@@ -228,7 +228,7 @@ class AuditTrailManager:
         self._buffer.clear()
         
         try:
-            async with get_db_session() as session:
+            async with get_db_ctx() as session:
                 from sqlalchemy import text
                 
                 for event in events:
@@ -283,7 +283,7 @@ class AuditTrailManager:
             List of matching audit events
         """
         try:
-            async with get_db_session() as session:
+            async with get_db_ctx() as session:
                 from sqlalchemy import text
                 
                 # Build query with filters

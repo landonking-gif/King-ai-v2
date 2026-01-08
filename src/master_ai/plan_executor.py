@@ -13,7 +13,7 @@ from src.master_ai.planning_models import (
 )
 from src.master_ai.react_planner import ReActPlanner
 from src.agents.router import AgentRouter
-from src.database.connection import get_db
+from src.database.connection import get_db, get_db_ctx
 from src.database.models import Task as DBTask
 from src.utils.structured_logging import get_logger
 from src.utils.monitoring import monitor
@@ -228,7 +228,7 @@ class PlanExecutor:
         )
         
         # Persist to database for dashboard
-        async with get_db() as db:
+        async with get_db_ctx() as db:
             db_task = DBTask(
                 id=task.id,
                 name=task.name,
@@ -263,7 +263,7 @@ class PlanExecutor:
         logger.info("Task approved", task_id=task_id, approver=approver)
         
         # Update database
-        async with get_db() as db:
+        async with get_db_ctx() as db:
             db_task = await db.get(DBTask, task_id)
             if db_task:
                 db_task.status = "approved"
@@ -316,7 +316,7 @@ class PlanExecutor:
     
     async def _persist_task_result(self, task: PlanTask):
         """Save task result to database."""
-        async with get_db() as db:
+        async with get_db_ctx() as db:
             db_task = await db.get(DBTask, task.id)
             if db_task:
                 db_task.status = task.status.value

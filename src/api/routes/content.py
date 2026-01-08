@@ -15,7 +15,7 @@ from src.agents.content import (
 from src.utils.seo_utils import SEOAnalyzer
 from src.utils.logging import logger
 
-router = APIRouter(prefix="/content", tags=["content"])
+router = APIRouter(tags=["content"])
 
 
 class GenerateContentRequest(BaseModel):

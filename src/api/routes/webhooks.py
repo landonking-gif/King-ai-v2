@@ -31,7 +31,7 @@ from src.utils.audit_trail import audit_manager, AuditEventType, AuditSeverity
 
 logger = get_logger("webhooks")
 
-router = APIRouter(prefix="/api/v1/webhooks", tags=["webhooks"])
+router = APIRouter(tags=["webhooks"])
 
 
 class WebhookSource(str, Enum):
@@ -431,12 +431,12 @@ async def handle_stripe_payment_succeeded(event: WebhookEvent):
     
     # Update business revenue if business_id is present
     if event.business_id:
-        from src.database.connection import get_db_session
+        from src.database.connection import get_db_ctx
         from src.database.models import BusinessUnit
         from sqlalchemy import select
         
         try:
-            async with get_db_session() as session:
+            async with get_db_ctx() as session:
                 result = await session.execute(
                     select(BusinessUnit).where(BusinessUnit.id == event.business_id)
                 )

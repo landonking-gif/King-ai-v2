@@ -23,7 +23,7 @@ from src.utils.structured_logging import get_logger
 
 logger = get_logger("system_routes")
 
-router = APIRouter(prefix="/api/v1/system", tags=["system"])
+router = APIRouter(tags=["system"])
 
 
 # Request/Response Models
@@ -84,8 +84,8 @@ async def health_check():
     
     # Check database
     try:
-        from src.database.connection import get_db_session
-        async with get_db_session() as session:
+        from src.database.connection import get_db_ctx
+        async with get_db_ctx() as session:
             from sqlalchemy import text
             await session.execute(text("SELECT 1"))
         checks["database"] = {"status": "healthy"}

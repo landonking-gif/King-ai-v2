@@ -25,7 +25,7 @@ from src.agents.router import AgentRouter
 from src.business.playbook_executor import PlaybookExecutor
 from src.business.playbook_loader import PlaybookLoader
 from src.business.playbook_models import TriggerType
-from src.database.connection import get_db
+from src.database.connection import get_db, get_db_ctx
 from src.database.models import Task, EvolutionProposal
 from src.utils.llm_router import LLMRouter, TaskContext
 from src.utils.structured_logging import get_logger, set_request_context
@@ -1111,13 +1111,13 @@ Provide a concise confirmation message to the user. Be specific about what was d
         Checks health metrics across all active businesses and triggers
         automated responses for underperforming units.
         """
-        from src.database.connection import get_db_session
+        from src.database.connection import get_db_ctx
         from src.database.models import BusinessUnit
         from src.business.lifecycle import LifecycleEngine
         from datetime import datetime, timedelta
         
         try:
-            async with get_db_session() as session:
+            async with get_db_ctx() as session:
                 # Get all active businesses
                 from sqlalchemy import select
                 from src.database.models import BusinessStatus
@@ -1317,7 +1317,7 @@ Provide a concise confirmation message to the user. Be specific about what was d
     
     async def _create_approval_task(self, step: PlanStep) -> dict:
         """Persists a high-risk task that requires human intervention."""
-        async with get_db() as db:
+        async with get_db_ctx() as db:
             task = Task(
                 id=str(uuid4()),
                 name=step.name,
@@ -1342,7 +1342,7 @@ Provide a concise confirmation message to the user. Be specific about what was d
     
     async def _save_evolution_proposal(self, proposal: dict):
         """Saves a self-modification proposal for user approval."""
-        async with get_db() as db:
+        async with get_db_ctx() as db:
             prop = EvolutionProposal(
                 id=str(uuid4()),
                 type=proposal["type"],

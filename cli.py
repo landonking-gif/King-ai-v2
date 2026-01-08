@@ -17,25 +17,25 @@ from config.settings import settings
 import traceback
 
 async def main():
-    print("\n🤴 King AI v2 - Autonomous Business Empire")
+    print("\n[KING] King AI v2 - Autonomous Business Empire")
     print("=" * 50)
     print("Initializing system...")
     
     # Initialize database tables
     try:
         await init_db()
-        print("✓ Database initialized")
+        print("[OK] Database initialized")
     except Exception as e:
-        print(f"✗ Database initialization failed: {e}")
+        print(f"[FAIL] Database initialization failed: {e}")
         # traceback.print_exc() # detailed logging if needed
         return
 
     # Initialize Master AI
     try:
         ai = MasterAI()
-        print(f"✓ Master AI instantiated (Risk Profile: {settings.risk_profile})")
+        print(f"[OK] Master AI instantiated (Risk Profile: {settings.risk_profile})")
     except Exception as e:
-        print(f"✗ Master AI initialization failed: {e}")
+        print(f"[FAIL] Master AI initialization failed: {e}")
         traceback.print_exc()
         return
     
@@ -64,13 +64,13 @@ async def main():
             if user_input.lower() == 'auto':
                 ai.autonomous_mode = not ai.autonomous_mode
                 status = "ON" if ai.autonomous_mode else "OFF"
-                print(f"⚙️ Autonomous mode set to: {status}")
+                print(f"[CONFIG] Autonomous mode set to: {status}")
                 if ai.autonomous_mode:
                      print("   (Note: The autonomous loop runs in the background in the API, not strictly here in the CLI unless threaded. For CLI, this mostly sets the flag.)")
                 continue
             
             # Show processing indicator
-            print("⏳ Thinking...", end="\r", flush=True)
+            print("[WAIT] Thinking...", end="\r", flush=True)
             
             # Process input
             result = await ai.process_input(user_input)
@@ -80,7 +80,7 @@ async def main():
             
             # Print response
             # Print response
-            print(f"👑 King AI: {result.response}")
+            print(f"[KING AI]: {result.response}")
             
             # Display actions if any
             if result.actions_taken:
@@ -90,7 +90,7 @@ async def main():
             
             # Display pending approvals if any
             if result.pending_approvals:
-                print("\n[⚠️ Pending Approvals]:")
+                print("\n[ALERT] Pending Approvals:")
                 for task in result.pending_approvals:
                     # task might be a dict or object depending on how it's populated
                     # In brain.py schema pending_approvals is List[Dict]
@@ -102,7 +102,7 @@ async def main():
             print("\nExiting...")
             break
         except Exception as e:
-            print(f"\n❌ Error: {e}")
+            print(f"\n[ERROR] Error: {e}")
 
     print("\nGoodbye!")
 

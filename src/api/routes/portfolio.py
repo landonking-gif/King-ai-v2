@@ -9,7 +9,7 @@ from src.business.portfolio import PortfolioManager
 from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
-router = APIRouter(prefix="/portfolios", tags=["portfolios"])
+router = APIRouter(tags=["portfolios"])
 
 _manager: Optional[PortfolioManager] = None
 

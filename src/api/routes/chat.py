@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Any
 
-from src.database.connection import get_db
+from src.database.connection import get_db_yield
 from src.database.models import ConversationMessage
 from src.master_ai.brain import MasterAI
 
@@ -50,7 +50,7 @@ async def chat(
     )
 
 @router.get("/history")
-async def get_history(db = Depends(get_db)):
+async def get_history(db = Depends(get_db_yield)):
     """Retrieve full conversation history."""
     from sqlalchemy import select
     result = await db.execute(

@@ -10,7 +10,7 @@ from src.legal.templates import DocumentType, ComplianceFramework, VALID_CONTRAC
 from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
-router = APIRouter(prefix="/legal", tags=["legal"])
+router = APIRouter(tags=["legal"])
 
 _agent: Optional[LegalAgent] = None
 

@@ -17,7 +17,7 @@ from src.database.vector_store import VectorStore
 from src.utils.structured_logging import get_logger
 
 logger = get_logger("research_api")
-router = APIRouter(prefix="/research", tags=["research"])
+router = APIRouter(tags=["research"])
 
 
 class ResearchRequest(BaseModel):

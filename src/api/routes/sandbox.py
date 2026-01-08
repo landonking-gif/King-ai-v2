@@ -10,7 +10,7 @@ from src.utils.sandbox import SandboxManager, SandboxConfig, SandboxResult
 from src.utils.logging import get_logger
 
 logger = get_logger("sandbox_api")
-router = APIRouter(prefix="/sandbox", tags=["sandbox"])
+router = APIRouter(tags=["sandbox"])
 
 # Global sandbox manager instance
 _sandbox_manager: Optional[SandboxManager] = None

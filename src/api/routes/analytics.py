@@ -9,7 +9,7 @@ from src.utils.logging import get_logger
 from threading import Lock
 
 logger = get_logger(__name__)
-router = APIRouter(prefix="/analytics", tags=["analytics"])
+router = APIRouter(tags=["analytics"])
 
 _agent: Optional[AnalyticsAgent] = None
 _agent_lock = Lock()
@@ -114,6 +114,51 @@ async def generate_report(
         raise HTTPException(400, result.get("error", "Unknown error"))
     return result.get("data")
 
+
+@router.get("/pl")
+async def get_pl_report(period: str = "30d", agent: AnalyticsAgent = Depends(get_agent)):
+    """
+    Get Profit & Loss report across the entire empire.
+    Aggregates revenue and expenses from all business units.
+    """
+    from src.database.connection import get_db_yield
+    from src.database.models import BusinessUnit
+    from sqlalchemy import select, func
+    
+    # We'll use get_db_yield manually here if not using Depends in the route signature
+    # But since we're in a route, we can just add db: AsyncSession = Depends(get_db_yield)
+    # I'll update the signature to be cleaner.
+    return await _get_pl_data()
+
+async def _get_pl_data():
+    from src.database.connection import get_db_ctx
+    from src.database.models import BusinessUnit
+    from sqlalchemy import select, func
+    
+    async with get_db_ctx() as db:
+        result = await db.execute(
+            select(
+                func.sum(BusinessUnit.total_revenue).label("revenue"),
+                func.sum(BusinessUnit.total_expenses).label("expenses")
+            )
+        )
+        row = result.first()
+        
+        revenue = (row.revenue or 0.0) if row else 0.0
+        expenses = (row.expenses or 0.0) if row else 0.0
+        profit = revenue - expenses
+        
+        return {
+            "success": True,
+            "data": {
+                "revenue": revenue,
+                "expenses": expenses,
+                "profit": profit,
+                "margin": (profit / revenue * 100) if revenue > 0 else 0,
+                "period": "30d", # Placeholder for now as per dashboard request
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }
+        }
 
 @router.post("/metrics")
 async def record_metric(req: RecordMetricRequest, agent: AnalyticsAgent = Depends(get_agent)):
