@@ -35,6 +35,7 @@ from src.utils.fact_checker import check_for_hallucination
 from src.utils.web_tools import get_web_tools, evaluate_simple_math
 from src.services.execution_engine import get_execution_engine, ExecutionEngine
 from src.services.business_creation import get_business_engine, BusinessCreationEngine, BusinessType
+from src.services.dropshipping_creator import get_dropshipping_creator, DropshippingCreator
 from config.settings import settings
 
 
@@ -103,6 +104,9 @@ class MasterAI:
         
         # Business creation engine for autonomous business setup
         self.business_engine: BusinessCreationEngine = get_business_engine()
+        
+        # Dropshipping creator for complete dropshipping businesses
+        self.dropshipping_creator: DropshippingCreator = get_dropshipping_creator()
         
         # Track verified vs unverified actions for anti-hallucination
         self._verified_actions: list[dict] = []
@@ -877,6 +881,156 @@ Guidelines:
                 }
             )
     
+    def _is_dropshipping_request(self, user_input: str) -> bool:
+        """Check if the user is requesting a dropshipping business."""
+        dropship_keywords = [
+            "dropship", "drop ship", "dropshipping", "drop shipping",
+            "ecommerce dropship", "e-commerce dropship"
+        ]
+        business_keywords = ["business", "store", "shop", "venture", "company"]
+        create_keywords = ["create", "start", "build", "make", "launch", "set up", "setup"]
+        
+        has_dropship = any(kw in user_input for kw in dropship_keywords)
+        has_business = any(kw in user_input for kw in business_keywords)
+        has_create = any(kw in user_input for kw in create_keywords)
+        
+        return has_dropship and (has_business or has_create)
+    
+    def _is_business_creation_request(self, user_input: str) -> bool:
+        """Check if the user is requesting any type of business creation."""
+        business_keywords = ["business", "store", "shop", "venture", "company", "startup"]
+        create_keywords = ["create", "start", "build", "make", "launch", "set up", "setup"]
+        
+        has_business = any(kw in user_input for kw in business_keywords)
+        has_create = any(kw in user_input for kw in create_keywords)
+        
+        return has_business and has_create
+    
+    async def _create_dropshipping_business(
+        self,
+        user_input: str,
+        parameters: dict = None
+    ) -> MasterAIResponse:
+        """
+        Create a complete dropshipping business.
+        
+        This uses the DropshippingCreator to generate a fully functional
+        dropshipping business with website, marketing, products, etc.
+        """
+        logger.info("Creating dropshipping business", user_input=user_input)
+        
+        # Extract parameters from user input
+        params = parameters or {}
+        
+        # Try to extract niche from user input
+        niche = None
+        user_lower = user_input.lower()
+        
+        # Common niche patterns
+        niche_patterns = [
+            "selling ", "for ", "in the ", "about ", "focused on ",
+            "niche ", "targeting ", "specializing in "
+        ]
+        
+        for pattern in niche_patterns:
+            if pattern in user_lower:
+                after_pattern = user_lower.split(pattern)[-1]
+                # Extract first few words as potential niche
+                words = after_pattern.split()[:3]
+                potential_niche = " ".join(words).strip(".,!?")
+                if len(potential_niche) > 2 and potential_niche not in ["a", "an", "the"]:
+                    niche = potential_niche.title()
+                    break
+        
+        # Check for "high ROI" in request
+        target_roi = "high" if "high roi" in user_lower or "profitable" in user_lower else "moderate"
+        
+        # Extract budget if mentioned
+        budget = 1000.0
+        if "$" in user_input:
+            import re
+            budget_match = re.search(r'\$(\d+(?:,\d+)?(?:\.\d+)?)', user_input)
+            if budget_match:
+                budget = float(budget_match.group(1).replace(",", ""))
+        
+        try:
+            # Create the business
+            business = await self.dropshipping_creator.create_business(
+                name=params.get("name"),
+                niche=niche,
+                budget=budget,
+                target_roi=target_roi
+            )
+            
+            # Get summary
+            summary = self.dropshipping_creator.get_business_summary(business)
+            
+            # Log verified action
+            self._verified_actions.append({
+                "action": "create_dropshipping_business",
+                "business_id": business.business_id,
+                "verified_files": len(business.verified_files),
+                "timestamp": datetime.now().isoformat()
+            })
+            
+            return MasterAIResponse(
+                type="action",
+                response=summary,
+                actions_taken=[],
+                metadata={
+                    "business_id": business.business_id,
+                    "business_name": business.name,
+                    "niche": business.niche,
+                    "products": len(business.products),
+                    "verified_files": len(business.verified_files),
+                    "website_path": business.website_path,
+                    "business_plan_path": business.business_plan_path,
+                    "marketing_plan_path": business.marketing_plan_path
+                }
+            )
+            
+        except Exception as e:
+            logger.error(f"Dropshipping business creation failed: {e}", exc_info=True)
+            return MasterAIResponse(
+                type="error",
+                response=f"Failed to create dropshipping business: {str(e)}",
+                metadata={"error": str(e)}
+            )
+    
+    async def _handle_business_creation(
+        self,
+        user_input: str,
+        parameters: dict = None
+    ) -> MasterAIResponse:
+        """
+        Handle general business creation requests.
+        Routes to appropriate creator based on business type.
+        """
+        user_lower = user_input.lower()
+        
+        # Determine business type
+        if "saas" in user_lower or "software" in user_lower:
+            business_type = "saas"
+        elif "ecommerce" in user_lower or "e-commerce" in user_lower or "online store" in user_lower:
+            business_type = "ecommerce"
+        elif "consulting" in user_lower or "agency" in user_lower:
+            business_type = "consulting"
+        elif "content" in user_lower or "blog" in user_lower or "media" in user_lower:
+            business_type = "content"
+        else:
+            business_type = "ecommerce"  # Default to ecommerce
+        
+        # Extract name if provided
+        name = parameters.get("name") if parameters else None
+        
+        # Use the general business engine
+        return await self.create_business(
+            business_type=business_type,
+            name=name or f"My {business_type.title()} Business",
+            description=user_input,
+            budget=1000.0
+        )
+    
     async def _handle_command(
         self,
         user_input: str,
@@ -885,15 +1039,26 @@ Guidelines:
     ) -> MasterAIResponse:
         """
         Orchestrates complex actions:
-        1. Breaks goal into steps via the Planner.
-        2. Checks for approval requirements based on Risk Profile.
-        3. Executes immediate tasks or queues for user review.
+        1. Detects specialized business creation requests
+        2. Breaks goal into steps via the Planner.
+        3. Checks for approval requirements based on Risk Profile.
+        4. Executes immediate tasks or queues for user review.
         """
         logger.info(
             "Handling command",
             action=intent.action.value if intent.action else "unknown",
             parameters=intent.parameters
         )
+        
+        user_lower = user_input.lower()
+        
+        # Check for dropshipping business creation request
+        if self._is_dropshipping_request(user_lower):
+            return await self._create_dropshipping_business(user_input, intent.parameters)
+        
+        # Check for general business creation request
+        if self._is_business_creation_request(user_lower):
+            return await self._handle_business_creation(user_input, intent.parameters)
         
         # Create a detailed multi-step plan
         plan = await self.planner.create_plan(
