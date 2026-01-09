@@ -137,7 +137,7 @@ def run(cmd, check=True, capture=False, cwd=None, timeout=1200):
             error_msg += f"\nPartial output: {output}"
         log(error_msg, "ERROR")
         if capture:
-            return output
+            return ""  # Return empty string instead of error output to avoid pollution
         raise  # Re-raise to let caller handle
     except Exception as e:
         log(f"Unexpected error running command '{cmd}': {e}", "ERROR")
@@ -621,7 +621,7 @@ def pull_from_github(ip, key_path, branch=None):
             remotes = run(f"{GIT_CMD} remote", capture=True)
             if remotes:
                 remote_name = remotes.strip().split('\n')[0]
-                repo_url = run(f"git config --get remote.{remote_name}.url", capture=True)
+                repo_url = run(f"{GIT_CMD} config --get remote.{remote_name}.url", capture=True)
         
         if not repo_url:
             log("No git remote configured locally. Using default.", "WARN")
@@ -3891,7 +3891,7 @@ def main():
                     # Get current branch to ensure consistency
                     current_branch = "main"
                     try:
-                        res = run("git branch --show-current", capture=True)
+                        res = run(f"{GIT_CMD} branch --show-current", capture=True)
                         if res:
                             current_branch = res.strip()
                     except:
