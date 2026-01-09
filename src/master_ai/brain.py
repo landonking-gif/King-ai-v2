@@ -754,12 +754,14 @@ Guidelines:
                 )
                 actions_taken.append(action_result)
                 
-                logger.agent_execution(
+                logger.info(
+                    "Agent execution completed",
                     agent=step_model.agent,
                     task=step_model.name,
                     duration_ms=duration_ms,
                     success=result.get("success", False)
                 )
+
         
         # Generate a final confirmation or status report for the user
         response = await self._generate_action_summary(
@@ -788,23 +790,105 @@ Guidelines:
         approvals: list,
         context: str
     ) -> str:
-        """Uses LLM to summarize what was just done and what is pending."""
-        prompt = f"""Summarize the actions taken and items pending approval in response to: "{user_input}"
+        """Uses LLM to summarize what was just done and what is pending, with output refinement."""
         
-Actions Completed: {json.dumps(actions, default=str)}
-Pending Review: {json.dumps(approvals, default=str)}
+        # Build a clear summary of what actually happened
+        actions_summary = ""
+        if actions:
+            actions_summary = "\\n".join([
+                f"- {a.get('step_name', 'Task')}: {'✓ Completed' if a.get('success') else '✗ Failed'}"
+                + (f" - {a.get('output', '')[:100]}" if a.get('output') else "")
+                + (f" (Error: {a.get('error', '')})" if a.get('error') else "")
+                for a in actions
+            ])
+        else:
+            actions_summary = "No immediate actions were executed."
+        
+        approvals_summary = ""
+        if approvals:
+            approvals_summary = "\\n".join([
+                f"- {a.get('name', 'Task')}: Awaiting your approval (Risk: {a.get('risk_level', 'unknown')})"
+                for a in approvals
+            ])
+        else:
+            approvals_summary = "No items pending approval."
+        
+        prompt = f"""You are King AI, an autonomous business management assistant. Generate a clear, professional response to summarize the work done.
 
-Provide a concise confirmation message to the user. Be specific about what was done and what needs approval.
-"""
+USER REQUEST: "{user_input}"
+
+ACTIONS COMPLETED:
+{actions_summary}
+
+ITEMS PENDING APPROVAL:
+{approvals_summary}
+
+INSTRUCTIONS:
+1. Start with a brief confirmation of what the user asked for
+2. Clearly list what was accomplished (be specific, not vague)
+3. If there were failures, explain what went wrong and suggest next steps
+4. If items need approval, explain what they are and why they need approval
+5. End with a clear next step or question if needed
+6. Be concise but complete - avoid generic filler phrases
+7. Do NOT make up actions that weren't performed
+8. Do NOT claim to have created things that weren't actually created
+
+Write your response now:"""
+
         task_context = TaskContext(
             task_type="summary",
             risk_level="low",
-            requires_accuracy=False,
+            requires_accuracy=True,
             token_estimate=500,
             priority="normal"
         )
         
-        return await self._call_llm(prompt, task_context=task_context)
+        response = await self._call_llm(prompt, task_context=task_context)
+        
+        # Refinement pass to ensure quality
+        refined_response = await self._refine_output(response, user_input)
+        
+        return refined_response
+    
+    async def _refine_output(self, response: str, original_request: str) -> str:
+        """
+        Refines the LLM output to ensure quality and accuracy.
+        This is a second-pass that cleans up the response.
+        """
+        # Skip refinement for very short responses
+        if len(response) < 50:
+            return response
+        
+        refinement_prompt = f"""Review and improve this AI-generated response. Fix any issues with:
+- Vague or unclear statements
+- Unprofessional tone
+- Grammar or formatting problems
+- Claims that seem unsubstantiated
+
+Original user request: "{original_request}"
+
+Response to refine:
+{response}
+
+Output ONLY the refined response (no explanations, no meta-commentary). If the response is already good, return it unchanged:"""
+        
+        task_context = TaskContext(
+            task_type="refinement",
+            risk_level="low",
+            requires_accuracy=False,
+            token_estimate=300,
+            priority="low"
+        )
+        
+        try:
+            refined = await self._call_llm(refinement_prompt, task_context=task_context)
+            # Only use refined version if it's reasonable length
+            if len(refined) > 20 and len(refined) < len(response) * 3:
+                return refined
+            return response
+        except Exception as e:
+            logger.warning(f"Output refinement failed: {e}")
+            return response
 
     async def _handle_query(self, user_input: str, context: str) -> str:
         """Answers data queries ONLY using context data - no fabrication."""

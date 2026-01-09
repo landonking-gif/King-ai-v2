@@ -214,9 +214,33 @@ class ResearchAgent(BaseAgent):
     async def execute(self, task: Dict[str, Any]) -> dict:
         """Execute a research task."""
         try:
+            # Get the research type, defaulting to general_search if invalid
+            task_type = task.get("type", "general_search")
+            
+            # Map common task type names to valid ResearchTypes
+            type_mapping = {
+                "research": ResearchType.GENERAL_SEARCH,
+                "web_search": ResearchType.WEB_SEARCH,
+                "market_research": ResearchType.MARKET_RESEARCH,
+                "competitor_analysis": ResearchType.COMPETITOR_ANALYSIS,
+                "trend_analysis": ResearchType.TREND_ANALYSIS,
+                "product_research": ResearchType.PRODUCT_RESEARCH,
+                "general_search": ResearchType.GENERAL_SEARCH,
+            }
+            
+            # Try to map the type, fallback to general_search
+            if task_type in type_mapping:
+                research_type = type_mapping[task_type]
+            else:
+                try:
+                    research_type = ResearchType(task_type)
+                except ValueError:
+                    logger.warning(f"Unknown research type '{task_type}', defaulting to general_search")
+                    research_type = ResearchType.GENERAL_SEARCH
+            
             query = ResearchQuery(
-                query=task.get("query", ""),
-                research_type=ResearchType(task.get("type", "general_search")),
+                query=task.get("query", task.get("description", task.get("name", ""))),
+                research_type=research_type,
                 depth=task.get("depth", 1),
                 max_sources=task.get("max_sources", 10)
             )
