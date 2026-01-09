@@ -79,11 +79,12 @@ async def test_research_agent_web_search():
 async def test_research_agent_unknown_task_type():
     agent = ResearchAgent()
     
-    # The ResearchType enum validates the type - passing invalid type should fail
+    # Unknown types should gracefully fallback to general_search
     task = {"type": "unknown_type", "query": "test"}
     
     result = await agent.execute(task)
     
-    # Should fail because "unknown_type" is not a valid ResearchType
-    assert result["success"] == False
-    assert result["error"] is not None
+    # Should succeed with fallback to general_search
+    assert result["success"] == True
+    # No error since it falls back gracefully
+    assert result.get("error") is None

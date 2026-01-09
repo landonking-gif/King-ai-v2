@@ -476,14 +476,76 @@ Respond with JSON:
         return data.get("action", "execute"), data.get("input", {})
     
     def _parse_json_response(self, response: str) -> dict:
-        """Parse JSON from LLM response."""
+        """Parse JSON from LLM response with robust fallback extraction."""
+        import re
+        
+        # Try to extract JSON from code blocks first
         if "```json" in response:
             response = response.split("```json")[1].split("```")[0].strip()
         elif "```" in response:
-            response = response.split("```")[1].split("```")[0].strip()
+            parts = response.split("```")
+            if len(parts) > 1:
+                response = parts[1].split("```")[0].strip()
         
         try:
             return json.loads(response)
         except json.JSONDecodeError:
-            logger.warning("Failed to parse JSON response", response=response[:200])
-            return {"tasks": []}
+            pass
+        
+        # Try to find JSON object in response
+        json_match = re.search(r'\{[\s\S]*\}', response)
+        if json_match:
+            try:
+                return json.loads(json_match.group())
+            except json.JSONDecodeError:
+                pass
+        
+        # Try to extract task names from markdown-style lists
+        tasks = []
+        task_patterns = [
+            r'\*\*(?:Task\s*\d*:?\s*)?([^*]+)\*\*[:\s]*([^\n*]+)?',  # **Task: Name**: description
+            r'(?:^|\n)\d+\.\s*\*\*([^*]+)\*\*[:\s]*([^\n]+)?',  # 1. **Name**: description
+            r'(?:^|\n)-\s*\*\*([^*]+)\*\*[:\s]*([^\n]+)?',  # - **Name**: description
+        ]
+        
+        for pattern in task_patterns:
+            matches = re.findall(pattern, response)
+            for match in matches:
+                name = match[0].strip() if isinstance(match, tuple) else match.strip()
+                description = match[1].strip() if isinstance(match, tuple) and len(match) > 1 and match[1] else ""
+                if name and len(name) > 2:
+                    tasks.append({
+                        "name": name[:100],
+                        "description": description[:500] if description else f"Execute: {name}",
+                        "agent": self._infer_agent_from_text(name + " " + description),
+                        "risk_level": "low",
+                        "duration_minutes": 5
+                    })
+        
+        if tasks:
+            logger.info(f"Extracted {len(tasks)} tasks from non-JSON response")
+            return {"tasks": tasks}
+        
+        logger.warning("Failed to parse JSON response", response=response[:200])
+        return {"tasks": []}
+    
+    def _infer_agent_from_text(self, text: str) -> str:
+        """Infer the appropriate agent based on task text."""
+        text_lower = text.lower()
+        
+        agent_keywords = {
+            "research": ["research", "search", "find", "look up", "investigate", "analyze market", "competitor"],
+            "code_generator": ["code", "implement", "develop", "program", "script", "api", "integrate"],
+            "content": ["write", "create content", "blog", "article", "copy", "marketing material"],
+            "commerce": ["shopify", "store", "e-commerce", "product", "catalog", "shop"],
+            "finance": ["payment", "stripe", "invoice", "financial", "revenue", "cost"],
+            "analytics": ["analytics", "metrics", "report", "dashboard", "data", "statistics"],
+            "legal": ["contract", "legal", "terms", "policy", "compliance", "agreement"],
+        }
+        
+        for agent, keywords in agent_keywords.items():
+            if any(keyword in text_lower for keyword in keywords):
+                return agent
+        
+        return "research"  # Default to research agent
+

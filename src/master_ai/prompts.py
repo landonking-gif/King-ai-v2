@@ -152,7 +152,7 @@ If no improvement is needed, respond with:
 """
 
 
-TASK_DECOMPOSITION_PROMPT = """Decompose this goal into concrete, executable tasks.
+TASK_DECOMPOSITION_PROMPT = """You are a task planning AI. Your job is to decompose goals into executable tasks.
 
 GOAL: {goal}
 
@@ -163,47 +163,42 @@ RISK PROFILE: {risk_profile}
 AVAILABLE AGENTS: {available_agents}
 EXTRACTED PARAMETERS: {parameters}
 
-CRITICAL - GROUNDING REQUIREMENTS:
-- All tasks must be based on the current empire state provided above
-- Do NOT assume resources, integrations, or capabilities not listed
-- Reference specific data from the context to justify each task
-- If information is missing to properly plan, state what's needed
+IMPORTANT RULES:
+1. All tasks must be based on information in the CURRENT EMPIRE STATE above
+2. Do NOT assume resources or capabilities not listed
+3. If information is missing, create a research task to gather it first
+4. Be realistic about what can be automated vs. what needs human input
 
-Create a plan with specific tasks. For each task specify:
-- name: Clear, action-oriented name
-- description: What exactly needs to be done
-- agent: Which agent handles it ({available_agents})
-- priority: 1-10 (1 = highest priority)
-- duration_minutes: Estimated time
-- risk_level: low, medium, high, or critical
-- input: Parameters needed for the task
-- justification: Reference to context data supporting this task
+Available agent types and their capabilities:
+- research: Web search, market research, competitor analysis, data gathering
+- code_generator: Writing code, API integrations, automation scripts
+- content: Blog posts, marketing copy, product descriptions, emails
+- commerce: Shopify store setup, product catalog, inventory management
+- finance: Payment processing, invoicing, financial tracking (Stripe)
+- analytics: Metrics tracking, reporting, data analysis
+- legal: Contracts, terms of service, compliance reviews
 
-Consider:
-1. What research is needed first?
-2. What setup/infrastructure is required?
-3. What content or assets need creation?
-4. What financial/legal review is needed?
-5. How should tasks be ordered for efficiency?
-
-Respond with JSON:
+RESPOND ONLY WITH VALID JSON - no explanations, no markdown, just the JSON object:
+```json
 {{
-    "goal_summary": "Brief summary of the goal",
+    "goal_summary": "Brief 1-sentence summary of the goal",
     "tasks": [
         {{
-            "name": "Task name",
-            "description": "Detailed description",
-            "agent": "agent_name",
-            "priority": 1-10,
-            "duration_minutes": 5-60,
-            "risk_level": "low|medium|high|critical",
-            "input": {{...task parameters...}}
+            "name": "Research Market Opportunity",
+            "description": "Conduct market research to identify target audience and competition",
+            "agent": "research",
+            "priority": 1,
+            "duration_minutes": 15,
+            "risk_level": "low",
+            "input": {{"query": "market analysis for the specified niche"}}
         }}
     ],
     "total_estimated_minutes": 60,
-    "risk_assessment": "Overall risk assessment"
+    "risk_assessment": "Overall risk level with brief justification"
 }}
-"""
+```
+
+Your JSON response (starting with {{):"""
 
 
 REACT_PLANNING_PROMPT = """You are using the ReAct (Reason-Act-Think) pattern to plan.

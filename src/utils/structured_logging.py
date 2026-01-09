@@ -67,6 +67,43 @@ class EnhancedLogger:
         else:
             self._logger.error("LLM call failed", **event_data)
 
+    def agent_execution(
+        self,
+        agent: str,
+        task: str,
+        duration_ms: float,
+        success: bool,
+        output: str = None,
+        error: str = None
+    ):
+        """
+        Log an agent execution with structured data.
+        
+        Args:
+            agent: The agent that executed the task
+            task: The task that was executed
+            duration_ms: Execution duration in milliseconds
+            success: Whether the execution succeeded
+            output: Output from the agent if successful
+            error: Error message if failed
+        """
+        event_data = {
+            "event_type": "agent_execution",
+            "agent": agent,
+            "task": task,
+            "duration_ms": round(duration_ms, 2),
+            "success": success
+        }
+        if output:
+            event_data["output"] = output[:500] if len(str(output)) > 500 else output
+        if error:
+            event_data["error"] = error
+        
+        if success:
+            self._logger.info("Agent execution completed", **event_data)
+        else:
+            self._logger.error("Agent execution failed", **event_data)
+
 
 def get_logger(name: str = None):
     """
