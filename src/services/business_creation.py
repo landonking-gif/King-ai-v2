@@ -502,8 +502,11 @@ Last Updated: {datetime.now().isoformat()}
         if handler:
             try:
                 result = await handler(business_id)
-                business.tasks_pending.remove(task_name)
-                business.tasks_completed.append(task_name)
+                # Only remove if not already removed by handler
+                if task_name in business.tasks_pending:
+                    business.tasks_pending.remove(task_name)
+                if task_name not in business.tasks_completed:
+                    business.tasks_completed.append(task_name)
                 
                 return {
                     "success": True,
