@@ -1152,8 +1152,9 @@ pkill -f uvicorn || true
 fuser -k 8000/tcp || true
 
 log "Starting API server..."
-nohup uvicorn src.api.main:app --host 0.0.0.0 --port 8000 > api.log 2>&1 &
+nohup ~/venv/bin/uvicorn src.api.main:app --host 0.0.0.0 --port 8000 > api.log 2>&1 &
 API_PID=$!
+
 
 # Wait for API to be ready
 log "Waiting for API server..."
