@@ -62,6 +62,32 @@ def validate_key_path(key_path):
     except:
         return False
 
+def find_git_executable():
+    """Find the git executable in common Windows paths if not in PATH."""
+    # Check if 'git' is already in PATH
+    git_cmd = shutil.which("git")
+    if git_cmd:
+        return "git"
+
+    if sys.platform == 'win32':
+        # Common installation paths for Git on Windows
+        common_paths = [
+            Path(os.environ.get("ProgramFiles", "C:\\Program Files")) / "Git" / "bin" / "git.exe",
+            Path(os.environ.get("ProgramFiles(x86)", "C:\\Program Files (x86)")) / "Git" / "bin" / "git.exe",
+            Path(os.environ.get("ProgramFiles", "C:\\Program Files")) / "Git" / "cmd" / "git.exe",
+            Path(os.environ.get("LocalAppData", "")) / "Programs" / "Git" / "bin" / "git.exe",
+        ]
+
+        for path in common_paths:
+            if path.exists():
+                # Return quoted path to handle spaces
+                return f'"{path}"'
+
+    return "git"  # Fallback to default
+
+# Global Git command to use throughout the script
+GIT_CMD = find_git_executable()
+
 def run(cmd, check=True, capture=False, cwd=None, timeout=1200):
     """Execute shell command with robust error handling and optional output capture."""
     if not cmd or not isinstance(cmd, str):
@@ -400,7 +426,7 @@ def sync_to_github(repo_url=None, branch=None, commit_msg=None):
     # Detect current branch if not specified
     if not branch:
         try:
-            current_branch = run("git branch --show-current", capture=True)
+            current_branch = run(f"{GIT_CMD} branch --show-current", capture=True)
             if current_branch:
                 branch = current_branch.strip()
             else:
@@ -416,15 +442,15 @@ def sync_to_github(repo_url=None, branch=None, commit_msg=None):
         # Try to get repo URL from git config - check for any remote, not just origin
         try:
             # First try origin
-            repo_url = run("git config --get remote.origin.url", capture=True)
+            repo_url = run(f"{GIT_CMD} config --get remote.origin.url", capture=True)
             if repo_url:
                 remote_name = "origin"
             else:
                 # If no origin, try to get any remote
-                remotes = run("git remote", capture=True)
+                remotes = run(f"{GIT_CMD} remote", capture=True)
                 if remotes:
                     remote_name = remotes.strip().split('\n')[0]
-                    repo_url = run(f"git config --get remote.{remote_name}.url", capture=True)
+                    repo_url = run(f"{GIT_CMD} config --get remote.{remote_name}.url", capture=True)
             
             if not repo_url:
                 log("No git remote configured. Skipping GitHub sync - deployment will continue.", "WARN")
@@ -436,7 +462,7 @@ def sync_to_github(repo_url=None, branch=None, commit_msg=None):
 
     # Validate we're in a git repository
     try:
-        git_status = run("git status --porcelain", capture=True)
+        git_status = run(f"{GIT_CMD} status --porcelain", capture=True)
         if git_status is None:
             log("Not in a git repository or git command failed", "ERROR")
             return False
@@ -450,7 +476,7 @@ def sync_to_github(repo_url=None, branch=None, commit_msg=None):
             log("Found uncommitted changes", "INFO")
 
             # Add all changes
-            run("git add .")
+            run(f"{GIT_CMD} add .")
             log("Changes staged", "SUCCESS")
 
             # Generate commit message
@@ -459,20 +485,20 @@ def sync_to_github(repo_url=None, branch=None, commit_msg=None):
                 commit_msg = f"Auto-deploy: {timestamp}"
 
             # Commit changes
-            run(f'git commit -m "{commit_msg}"')
+            run(f'{GIT_CMD} commit -m "{commit_msg}"')
             log(f"Changes committed: {commit_msg}", "SUCCESS")
         else:
             log("No changes to commit", "INFO")
 
         # Check if remote branch exists, if not push with upstream
         try:
-            run(f"git ls-remote --heads {remote_name} {branch}", capture=True)
+            run(f"{GIT_CMD} ls-remote --heads {remote_name} {branch}", capture=True)
             # Branch exists, push normally
-            run(f"git push {remote_name} {branch}")
+            run(f"{GIT_CMD} push {remote_name} {branch}")
         except:
             # Branch might not exist, try to create it
             log(f"Creating and pushing {branch} branch", "INFO")
-            run(f"git push -u {remote_name} {branch}")
+            run(f"{GIT_CMD} push -u {remote_name} {branch}")
 
         log("Code synced to GitHub successfully!", "SUCCESS")
         return True
@@ -571,7 +597,7 @@ def pull_from_github(ip, key_path, branch=None):
     # Detect current branch if not specified
     if not branch:
         try:
-            current_branch = run("git branch --show-current", capture=True)
+            current_branch = run(f"{GIT_CMD} branch --show-current", capture=True)
             if current_branch:
                 branch = current_branch.strip()
             else:
@@ -587,12 +613,12 @@ def pull_from_github(ip, key_path, branch=None):
     
     try:
         # First try origin
-        repo_url = run("git config --get remote.origin.url", capture=True)
+        repo_url = run(f"{GIT_CMD} config --get remote.origin.url", capture=True)
         if repo_url:
             remote_name = "origin"
         else:
             # If no origin, try to get any remote
-            remotes = run("git remote", capture=True)
+            remotes = run(f"{GIT_CMD} remote", capture=True)
             if remotes:
                 remote_name = remotes.strip().split('\n')[0]
                 repo_url = run(f"git config --get remote.{remote_name}.url", capture=True)
