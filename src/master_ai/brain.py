@@ -240,25 +240,46 @@ class MasterAI:
                 reasoning=parsed.get("reasoning")
             )
         except Exception as e:
-            # Check if this looks like a refusal
-            refusal_keywords = ["foster", "illegal", "fraudulent", "refuse", "assist with", "can't help", "unable to"]
-            is_refusal = any(kw in response.lower() for kw in refusal_keywords)
+            # Smart fallback: detect action-oriented requests
+            user_lower = user_input.lower()
             
-            if is_refusal:
-                logger.warning(
-                    "LLM refused to classify intent. High-accuracy model might be needed.",
-                    refusal=response[:200]
+            # Keywords that suggest the user wants ACTION, not conversation
+            action_keywords = [
+                "create", "build", "start", "make", "launch", "setup", "set up",
+                "research", "find", "analyze", "investigate", "look up", "search",
+                "generate", "produce", "write", "develop", "implement",
+                "stop", "shut down", "cancel", "pause",
+                "optimize", "improve", "fix", "update",
+                "do this", "do it", "just do", "execute", "run"
+            ]
+            
+            is_action_request = any(kw in user_lower for kw in action_keywords)
+            
+            if is_action_request:
+                logger.info(
+                    "Intent parse failed, detected action keywords - routing to COMMAND",
+                    keywords_found=[kw for kw in action_keywords if kw in user_lower]
                 )
-                # If we're in a situation where we can't classify, maybe just force it to research
-                # if the user input looks like research
-                if "research" in user_input.lower() or "analyze" in user_input.lower():
-                    return ClassifiedIntent(
-                        type=IntentType.COMMAND,
-                        action=ActionType.RESEARCH_MARKET,
-                        confidence=0.4,
-                        requires_planning=True,
-                        reasoning="Detected likely research intent despite LLM refusal/parse error."
-                    )
+                
+                # Determine the best action based on keywords
+                if any(kw in user_lower for kw in ["research", "find", "analyze", "investigate", "look up", "search"]):
+                    action = ActionType.RESEARCH_MARKET
+                elif any(kw in user_lower for kw in ["create", "build", "start", "make", "launch", "setup"]):
+                    action = ActionType.START_BUSINESS
+                elif any(kw in user_lower for kw in ["optimize", "improve"]):
+                    action = ActionType.OPTIMIZE_BUSINESS
+                elif any(kw in user_lower for kw in ["generate", "write"]):
+                    action = ActionType.CREATE_CONTENT
+                else:
+                    action = ActionType.UNKNOWN
+                
+                return ClassifiedIntent(
+                    type=IntentType.COMMAND,
+                    action=action,
+                    confidence=0.6,
+                    requires_planning=True,
+                    reasoning=f"Detected action intent from keywords, bypassing failed parse."
+                )
 
             logger.warning(
                 "Failed to parse intent, defaulting to conversation",

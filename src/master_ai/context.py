@@ -335,11 +335,12 @@ class ContextManager:
             if total_tokens <= max_tokens:
                 # Can include full history
                 lines = ["RECENT CONVERSATION:"]
-                for m in messages[-20:]:  # Last 20 messages
+                for m in messages[-50:]:  # Last 50 messages for better memory
                     role = m.role.upper()
                     content = m.content[:500]  # Truncate individual messages
                     lines.append(f"  {role}: {content}")
                 return "\n".join(lines)
+
             
             # Need to summarize older messages
             if self.summarizer:
