@@ -1,0 +1,25 @@
+{
+  "business_id": "biz_20260109174412_my_saas_business",
+  "name": "My Saas Business",
+  "business_type": "saas",
+  "description": "Create a SaaS business for project management",
+  "target_market": "General consumers",
+  "revenue_model": "Product sales",
+  "startup_cost_estimate": 500.0,
+  "monthly_cost_estimate": 100.0,
+  "revenue_target_monthly": 300.0,
+  "stage": "planning",
+  "tasks_completed": [],
+  "tasks_pending": [
+    "Set up business structure",
+    "Create website",
+    "Set up payment processing",
+    "Create marketing materials"
+  ],
+  "created_at": "2026-01-09T17:44:12.259499",
+  "metadata": {
+    "required_tools": [],
+    "risks": [],
+    "success_metrics": []
+  }
+}
