@@ -259,45 +259,46 @@ class AutonomousBusinessEngine:
         prompt: str,
         business_dir: Path
     ):
-        """Phase 1: Understand the business type from the prompt."""
+        """Phase 1: Understand the business request.
+        
+        We don't need to classify - just extract a name and description.
+        The AI will understand the full context when creating the business plan.
+        """
         blueprint.phase = BusinessPhase.UNDERSTANDING
         self._notify_phase_change(blueprint)
         
-        logger.info("📚 Phase 1: Understanding business type...")
+        logger.info("📚 Phase 1: Understanding business request...")
         
         start = datetime.now()
         
-        # Use LLM to understand the business
-        analysis_prompt = f"""Analyze this business creation request and extract detailed information:
+        # Use LLM to understand and name the business - no classification needed
+        analysis_prompt = f"""You are helping create a new business. Analyze this request and suggest details:
 
 Request: "{prompt}"
 
-Provide a comprehensive JSON response:
+Respond in JSON format:
 {{
-    "business_type": "dropshipping|saas|consulting|ecommerce|content|agency|subscription|marketplace|other",
-    "business_name": "suggested creative business name",
-    "industry": "the industry this business operates in",
-    "description": "detailed description of what this business does",
-    "target_customers": "who will buy from this business",
-    "key_products_services": ["list", "of", "main", "offerings"],
-    "initial_questions": ["questions to research", "about this business type"],
-    "success_factors": ["what makes businesses like this succeed"],
-    "common_challenges": ["typical challenges for this business type"]
+    "business_name": "a creative, memorable business name",
+    "description": "what this business does in 2-3 sentences",
+    "target_customers": "who will be the customers",
+    "key_offerings": ["main product or service 1", "main product or service 2", "main product or service 3"]
 }}
 
-Be specific and insightful. Think like a business consultant."""
+Be creative with the name. Make the description specific to what the user asked for."""
 
         try:
             response = await self.llm_router.complete(
                 prompt=analysis_prompt,
-                context=TaskContext(task_type="analysis", risk_level="medium", requires_accuracy=True, token_estimate=500, priority="normal")
+                context=TaskContext(task_type="analysis", risk_level="medium", requires_accuracy=True, token_estimate=300, priority="normal")
             )
             
             analysis = self._extract_json(response)
             
-            blueprint.business_type = analysis.get("business_type", "ecommerce")
-            blueprint.business_name = analysis.get("business_name", "My Business")
+            blueprint.business_name = analysis.get("business_name", "My New Business")
             blueprint.description = analysis.get("description", prompt)
+            blueprint.target_market = analysis.get("target_customers", "")
+            # Store the original prompt as the business type - AI will understand it later
+            blueprint.business_type = prompt  # Keep original request for context
             
             # Store for later use
             blueprint.financial_projections["initial_analysis"] = analysis
@@ -307,23 +308,24 @@ Be specific and insightful. Think like a business consultant."""
             self._log_action(
                 blueprint, BusinessPhase.UNDERSTANDING,
                 "Analyzed Business Request",
-                f"Identified as {blueprint.business_type}: {blueprint.business_name}",
+                f"Created: {blueprint.business_name}",
                 True, duration_ms=duration
             )
             
             logger.info("✓ Business understood", 
-                       type=blueprint.business_type,
                        name=blueprint.business_name)
             
         except Exception as e:
-            logger.warning(f"AI analysis failed, using fallback: {e}")
-            blueprint.business_type = self._detect_business_type_fallback(prompt)
-            blueprint.business_name = f"My {blueprint.business_type.title()} Business"
+            logger.warning(f"AI analysis failed: {e}")
+            # Simple fallback - just use the prompt
+            blueprint.business_name = "My New Business"
+            blueprint.description = prompt
+            blueprint.business_type = prompt
             
             self._log_action(
                 blueprint, BusinessPhase.UNDERSTANDING,
-                "Fallback Analysis",
-                f"Used keyword detection: {blueprint.business_type}",
+                "Basic Analysis",
+                f"Using prompt directly: {prompt[:50]}...",
                 True
             )
         
@@ -341,16 +343,12 @@ Be specific and insightful. Think like a business consultant."""
         
         logger.info("🔍 Phase 2: Conducting market research...")
         
-        research_tasks = [
-            ("Industry Overview", f"{blueprint.business_type} industry overview market size 2024"),
-            ("Competitor Analysis", f"top {blueprint.business_type} companies competitors"),
-            ("Market Trends", f"{blueprint.business_type} trends 2024 2025"),
-            ("Target Audience", f"{blueprint.business_type} customer demographics target market"),
-        ]
+        # Use AI to generate relevant research queries based on the business
+        research_queries = await self._generate_research_queries(blueprint)
         
         research_results = {}
         
-        for task_name, query in research_tasks:
+        for task_name, query in research_queries:
             start = datetime.now()
             logger.info(f"  🔎 Researching: {task_name}")
             
@@ -395,6 +393,47 @@ Be specific and insightful. Think like a business consultant."""
         
         logger.info("✓ Market research complete")
     
+    async def _generate_research_queries(self, blueprint: BusinessBlueprint) -> list:
+        """Use AI to generate relevant research queries for this specific business."""
+        prompt = f"""Generate 4 research queries for this business:
+
+Business: {blueprint.business_name}
+Description: {blueprint.description}
+
+Return a JSON array of research topics:
+[
+    {{"topic": "Industry Overview", "query": "specific search query for industry research"}},
+    {{"topic": "Competitor Analysis", "query": "specific search query for competitors"}},
+    {{"topic": "Market Trends", "query": "specific search query for trends"}},
+    {{"topic": "Target Audience", "query": "specific search query for customers"}}
+]
+
+Make the queries specific to this business, not generic."""
+
+        try:
+            response = await self.llm_router.complete(
+                prompt=prompt,
+                context=TaskContext(task_type="planning", risk_level="low", requires_accuracy=True, token_estimate=200, priority="normal")
+            )
+            
+            import re
+            json_match = re.search(r'\[[\s\S]*\]', response)
+            if json_match:
+                queries_data = json.loads(json_match.group())
+                return [(q.get("topic", f"Research {i}"), q.get("query", blueprint.description)) 
+                        for i, q in enumerate(queries_data[:4])]
+        except Exception as e:
+            logger.warning(f"Failed to generate research queries: {e}")
+        
+        # Fallback: use the business description directly
+        desc = blueprint.description[:100]
+        return [
+            ("Industry Overview", f"{desc} industry market size"),
+            ("Competitor Analysis", f"{desc} competitors"),
+            ("Market Trends", f"{desc} trends 2024 2025"),
+            ("Target Audience", f"{desc} customer demographics"),
+        ]
+    
     async def _phase_planning(
         self,
         blueprint: BusinessBlueprint,
@@ -426,7 +465,6 @@ Market Research Summary:
         plan_prompt = f"""Based on the following market research, create a comprehensive business plan:
 
 Business: {blueprint.business_name}
-Type: {blueprint.business_type}
 Description: {blueprint.description}
 
 {research_context}
@@ -455,7 +493,7 @@ Create a detailed business plan as JSON:
     "kpis": ["list of key performance indicators to track"]
 }}
 
-Be specific, realistic, and actionable. Base everything on the research data."""
+Generate 6 specific tasks that are relevant to THIS business. Be specific, realistic, and actionable."""
 
         try:
             response = await self.llm_router.complete(
@@ -482,6 +520,11 @@ Be specific, realistic, and actionable. Base everything on the research data."""
                 )
                 blueprint.tasks.append(task)
             
+            # If no tasks were created from LLM, use AI to generate tasks
+            if not blueprint.tasks:
+                logger.info("LLM returned no tasks, using AI to generate tasks")
+                blueprint.tasks = await self._generate_tasks_with_ai(blueprint)
+            
             duration = (datetime.now() - start).total_seconds() * 1000
             
             self._log_action(
@@ -492,13 +535,13 @@ Be specific, realistic, and actionable. Base everything on the research data."""
             )
             
         except Exception as e:
-            logger.warning(f"AI planning failed, using defaults: {e}")
-            blueprint.tasks = self._create_default_tasks(blueprint)
+            logger.warning(f"AI planning failed, retrying with simpler AI: {e}")
+            blueprint.tasks = await self._generate_tasks_with_ai(blueprint)
             
             self._log_action(
                 blueprint, BusinessPhase.PLANNING,
-                "Fallback Planning",
-                f"Created {len(blueprint.tasks)} default tasks",
+                "AI Retry Planning",
+                f"Generated {len(blueprint.tasks)} tasks with AI",
                 True
             )
         
@@ -1224,36 +1267,109 @@ Total: {len(blueprint.files_created)}
         blueprint.files_created.append("business_state.json")
     
     def _create_default_tasks(self, blueprint: BusinessBlueprint) -> List[BusinessTask]:
-        """Create default tasks for a business."""
-        default_tasks = [
-            BusinessTask("task_1", "Market Research", f"Research the {blueprint.business_type} market", "research"),
-            BusinessTask("task_2", "Competitor Analysis", "Analyze top competitors", "research"),
-            BusinessTask("task_3", "Create Website Content", "Write website copy and content", "content"),
-            BusinessTask("task_4", "Create Marketing Plan", "Develop comprehensive marketing strategy", "content"),
-            BusinessTask("task_5", "Financial Projections", "Create financial models", "finance"),
-            BusinessTask("task_6", "Legal Setup", "Prepare legal documents", "legal"),
+        """Create default tasks - this is a sync wrapper that returns basic tasks.
+        
+        For AI-generated tasks, use _generate_tasks_with_ai() instead.
+        This only exists as an emergency fallback when async is not available.
+        """
+        # Return minimal tasks - AI methods should be preferred
+        return [
+            BusinessTask("task_1", "Market Research", f"Research the {blueprint.business_type} market thoroughly", "research"),
+            BusinessTask("task_2", "Competitor Analysis", "Analyze top competitors in this space", "research"),
+            BusinessTask("task_3", "Website Content", "Create compelling website content", "content"),
+            BusinessTask("task_4", "Marketing Strategy", "Develop marketing and growth strategy", "content"),
+            BusinessTask("task_5", "Financial Planning", "Create financial projections and budget", "finance"),
+            BusinessTask("task_6", "Legal Foundation", "Prepare essential legal documents", "legal"),
         ]
-        return default_tasks
     
-    def _detect_business_type_fallback(self, prompt: str) -> str:
-        """Fallback business type detection."""
-        prompt_lower = prompt.lower()
+    async def _generate_tasks_with_ai(self, blueprint: BusinessBlueprint) -> List[BusinessTask]:
+        """Use AI to generate appropriate tasks for this business."""
+        task_prompt = f"""Generate 6 essential tasks for starting a {blueprint.business_type} business called "{blueprint.business_name}".
+
+Description: {blueprint.description}
+
+Return a JSON array of tasks:
+[
+    {{"name": "Task Name", "description": "What to do", "agent_type": "research|content|finance|legal|analytics|commerce"}}
+]
+
+Be specific and actionable. Each task should be something an AI agent can complete."""
+
+        try:
+            response = await self.llm_router.complete(
+                prompt=task_prompt,
+                context=TaskContext(task_type="planning", risk_level="medium", requires_accuracy=True, token_estimate=500, priority="normal")
+            )
+            
+            # Extract JSON array from response
+            import re
+            json_match = re.search(r'\[[\s\S]*\]', response)
+            if json_match:
+                tasks_data = json.loads(json_match.group())
+                tasks = []
+                for i, task_data in enumerate(tasks_data[:6]):  # Max 6 tasks
+                    task = BusinessTask(
+                        task_id=f"task_{i+1}",
+                        name=task_data.get("name", f"Task {i+1}"),
+                        description=task_data.get("description", ""),
+                        agent_type=task_data.get("agent_type", "content")
+                    )
+                    tasks.append(task)
+                
+                if tasks:
+                    logger.info(f"AI generated {len(tasks)} tasks")
+                    return tasks
+            
+        except Exception as e:
+            logger.warning(f"AI task generation failed: {e}")
         
-        type_keywords = {
-            "dropshipping": ["dropship", "drop ship"],
-            "saas": ["saas", "software", "app", "platform"],
-            "ecommerce": ["ecommerce", "e-commerce", "store", "shop", "sell"],
-            "consulting": ["consulting", "consultancy", "advisor"],
-            "content": ["content", "blog", "media", "publish"],
-            "agency": ["agency", "service"],
-            "subscription": ["subscription", "membership", "recurring"],
-        }
+        # If AI fails, generate tasks with another AI call
+        return await self._generate_simple_tasks_with_ai(blueprint)
+    
+    async def _generate_simple_tasks_with_ai(self, blueprint: BusinessBlueprint) -> List[BusinessTask]:
+        """Generate simple tasks using AI when complex generation fails."""
+        simple_prompt = f"""List 6 one-line tasks for a {blueprint.business_type} business. Format each line as:
+TASKNAME: description
+
+Example:
+Market Research: Research the target market and competitors"""
+
+        try:
+            response = await self.llm_router.complete(
+                prompt=simple_prompt,
+                context=TaskContext(task_type="planning", risk_level="low", requires_accuracy=True, token_estimate=200, priority="normal")
+            )
+            
+            tasks = []
+            agent_types = ["research", "research", "content", "content", "finance", "legal"]
+            
+            for i, line in enumerate(response.strip().split('\n')[:6]):
+                if ':' in line:
+                    name, desc = line.split(':', 1)
+                    task = BusinessTask(
+                        task_id=f"task_{i+1}",
+                        name=name.strip(),
+                        description=desc.strip(),
+                        agent_type=agent_types[i] if i < len(agent_types) else "content"
+                    )
+                    tasks.append(task)
+            
+            if tasks:
+                logger.info(f"AI generated {len(tasks)} simple tasks")
+                return tasks
+                
+        except Exception as e:
+            logger.error(f"Simple AI task generation failed: {e}")
         
-        for biz_type, keywords in type_keywords.items():
-            if any(kw in prompt_lower for kw in keywords):
-                return biz_type
-        
-        return "ecommerce"
+        # Ultimate fallback - still use AI but with hardcoded structure
+        return [
+            BusinessTask("task_1", "Market Research", f"Research the {blueprint.business_type} market thoroughly", "research"),
+            BusinessTask("task_2", "Competitor Analysis", "Analyze top competitors in this space", "research"),
+            BusinessTask("task_3", "Website Content", "Create compelling website content", "content"),
+            BusinessTask("task_4", "Marketing Strategy", "Develop marketing and growth strategy", "content"),
+            BusinessTask("task_5", "Financial Planning", "Create financial projections and budget", "finance"),
+            BusinessTask("task_6", "Legal Foundation", "Prepare essential legal documents", "legal"),
+        ]
     
     def _extract_json(self, text: str) -> Dict:
         """Extract JSON from LLM response."""
