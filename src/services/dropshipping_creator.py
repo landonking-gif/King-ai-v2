@@ -172,7 +172,7 @@ Examples: "Pet Accessories", "Yoga Equipment", "Home Office Gadgets"
 Your niche selection:"""
         
         try:
-            response = await self.llm_router.route(
+            response = await self.llm_router.complete(
                 prompt=prompt,
                 context=TaskContext(task_type="research", complexity="moderate")
             )
@@ -197,7 +197,7 @@ Requirements:
 Respond with ONLY the business name, nothing else."""
         
         try:
-            response = await self.llm_router.route(
+            response = await self.llm_router.complete(
                 prompt=prompt,
                 context=TaskContext(task_type="creative", complexity="simple")
             )
@@ -222,7 +222,7 @@ Include:
 Keep it to 2-3 sentences."""
         
         try:
-            response = await self.llm_router.route(
+            response = await self.llm_router.complete(
                 prompt=prompt,
                 context=TaskContext(task_type="research", complexity="simple")
             )
@@ -280,7 +280,7 @@ Requirements:
 Return ONLY the JSON, no other text."""
         
         try:
-            response = await self.llm_router.route(
+            response = await self.llm_router.complete(
                 prompt=prompt,
                 context=TaskContext(task_type="research", complexity="moderate")
             )
@@ -366,7 +366,7 @@ The page should be ready to use - fully styled and functional.
 Return ONLY the complete HTML code."""
 
         try:
-            html_content = await self.llm_router.route(
+            html_content = await self.llm_router.complete(
                 prompt=prompt,
                 context=TaskContext(task_type="code_generation", complexity="high")
             )
@@ -631,7 +631,7 @@ Include:
 Format as a professional marketing document with clear sections."""
 
         try:
-            content = await self.llm_router.route(
+            content = await self.llm_router.complete(
                 prompt=prompt,
                 context=TaskContext(task_type="document", complexity="high")
             )
@@ -809,7 +809,7 @@ Include these sections:
 Make it professional and realistic for a new dropshipping venture."""
 
         try:
-            content = await self.llm_router.route(
+            content = await self.llm_router.complete(
                 prompt=prompt,
                 context=TaskContext(task_type="document", complexity="high")
             )
