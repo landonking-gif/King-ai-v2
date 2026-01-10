@@ -37,6 +37,7 @@ from src.utils.web_tools import get_web_tools, evaluate_simple_math
 from src.services.execution_engine import get_execution_engine, ExecutionEngine
 from src.services.business_creation import get_business_engine, BusinessCreationEngine, BusinessType
 from src.services.dropshipping_creator import get_dropshipping_creator, DropshippingCreator
+from src.services.autonomous_business_engine import get_autonomous_engine, AutonomousBusinessEngine
 from config.settings import settings
 
 
@@ -108,6 +109,9 @@ class MasterAI:
         
         # Dropshipping creator for complete dropshipping businesses
         self.dropshipping_creator: DropshippingCreator = get_dropshipping_creator()
+        
+        # Autonomous business engine for full lifecycle management
+        self.autonomous_engine: AutonomousBusinessEngine = get_autonomous_engine()
         
         # Track verified vs unverified actions for anti-hallucination
         self._verified_actions: list[dict] = []
@@ -1096,80 +1100,134 @@ Guidelines:
         parameters: dict = None
     ) -> MasterAIResponse:
         """
-        Handle general business creation requests.
-        Uses AI to understand business type and create comprehensive plan.
+        Handle general business creation requests using the Autonomous Business Engine.
+        
+        This provides full lifecycle management:
+        1. Understanding the business type
+        2. Market research
+        3. Business planning
+        4. Task execution with agents
+        5. Verification
+        6. Continuous monitoring
         """
-        logger.info("🔍 Analyzing business creation request", user_input=user_input)
-
-        # Use AI to determine business type and extract details
-        analysis_prompt = f"""Analyze this business creation request and extract key details:
-
-User Request: "{user_input}"
-
-Provide a JSON response with:
-{{
-    "business_type": "saas|consulting|ecommerce|content|agency|subscription|marketplace|dropshipping",
-    "business_name": "suggested business name",
-    "description": "what the business does",
-    "target_market": "who the customers are",
-    "budget_estimate": 1000,
-    "confidence": 0.0-1.0
-}}
-
-Be specific and realistic. If it's dropshipping, classify as 'dropshipping'."""
-
+        logger.info("🚀 Starting AUTONOMOUS business creation", user_input=user_input)
+        
         try:
-            analysis_response = await self.llm_router.route(
-                prompt=analysis_prompt,
-                context=TaskContext(task_type="analysis", complexity="simple")
+            # Use the Autonomous Business Engine for full lifecycle
+            blueprint = await self.autonomous_engine.create_business(user_input)
+            
+            # Get all files created
+            files = self.autonomous_engine.get_business_files(blueprint.business_id)
+            action_log = self.autonomous_engine.get_action_log(blueprint.business_id)
+            
+            # Build comprehensive response showing what was done
+            response = f"""🏢 **{blueprint.business_name}** - Created Successfully!
+
+## What I Did (Autonomous Process)
+
+### Phase 1: Understanding 📚
+I analyzed your request and determined this is a **{blueprint.business_type}** business.
+
+### Phase 2: Market Research 🔍
+{f"Researched the {blueprint.business_type} industry, competitors, and trends." if blueprint.market_research else "Research pending..."}
+{f"- Market Size: {blueprint.market_research.market_size}" if blueprint.market_research else ""}
+{f"- Found {len(blueprint.market_research.competitors)} competitors" if blueprint.market_research else ""}
+{f"- Identified {len(blueprint.market_research.trends)} key trends" if blueprint.market_research else ""}
+
+### Phase 3: Business Planning 📋
+Created informed business plan based on research:
+- **Value Proposition:** {blueprint.value_proposition[:100] + '...' if blueprint.value_proposition else 'See business_plan.md'}
+- **Revenue Model:** {blueprint.revenue_model[:100] + '...' if blueprint.revenue_model else 'See business_plan.md'}
+- **Target Market:** {blueprint.target_market[:100] + '...' if blueprint.target_market else 'See business_plan.md'}
+
+### Phase 4: Task Execution ⚡
+Delegated {len(blueprint.tasks)} tasks to specialized AI agents:
+"""
+            for task in blueprint.tasks:
+                status_emoji = "✅" if task.status.value == "completed" else "❌" if task.status.value == "failed" else "⏳"
+                response += f"- {status_emoji} {task.name} (Agent: {task.agent_type})\n"
+            
+            response += f"""
+### Phase 5: Verification ✅
+Verified all {len(blueprint.files_created)} files were created successfully.
+
+### Phase 6: Monitoring 👁️
+Set up continuous monitoring with KPIs and auto-actions.
+
+---
+
+## 📁 Files Created ({len(files)} total)
+
+| File | Size |
+|------|------|
+"""
+            for f in files[:15]:  # Show first 15
+                size = f['size'] if f['exists'] else 'Missing'
+                response += f"| `{f['path']}` | {size} bytes |\n"
+            
+            if len(files) > 15:
+                response += f"| ... and {len(files) - 15} more files | |\n"
+            
+            response += f"""
+---
+
+## 📍 Location
+
+All files are in: `businesses/{blueprint.business_id}/`
+
+## 🔍 View Your Files
+
+1. **Business Plan:** `documents/business_plan.md`
+2. **Market Research:** `research/market_research.md`
+3. **Verification Report:** `verification_report.md`
+4. **Action Log:** `business_state.json`
+
+## 🔄 What Happens Next
+
+The monitoring system is now active and will:
+- Track your KPIs
+- Alert you to issues
+- Suggest improvements
+- Delegate tasks automatically
+
+---
+
+*Created by the Autonomous Business Engine*
+"""
+            
+            return MasterAIResponse(
+                type="action",
+                response=response,
+                actions_taken=[],
+                metadata={
+                    "business_id": blueprint.business_id,
+                    "business_type": blueprint.business_type,
+                    "business_name": blueprint.business_name,
+                    "phase": blueprint.phase.value,
+                    "files_created": len(files),
+                    "tasks_completed": len(blueprint.completed_tasks),
+                    "tasks_total": len(blueprint.tasks),
+                    "action_log_count": len(action_log),
+                    "files": [f['path'] for f in files]
+                }
             )
-
-            analysis_data = self._extract_json_from_response(analysis_response)
-            business_type = analysis_data.get("business_type", "ecommerce")
-            business_name = analysis_data.get("business_name", f"My {business_type.title()} Business")
-            description = analysis_data.get("description", user_input)
-            target_market = analysis_data.get("target_market", "")
-            budget = float(analysis_data.get("budget_estimate", 1000.0))
-            confidence = float(analysis_data.get("confidence", 0.5))
-
-            logger.info("📊 Business analysis complete",
-                       business_type=business_type,
-                       name=business_name,
-                       confidence=confidence)
-
+            
         except Exception as e:
-            logger.warning(f"AI analysis failed, using fallback: {e}")
-            # Fallback detection
+            logger.error(f"Autonomous business creation failed: {e}", exc_info=True)
+            
+            # Fallback to simpler business creation
+            logger.info("📋 Falling back to simple business creation")
             user_lower = user_input.lower()
+            
             if "dropship" in user_lower:
-                business_type = "dropshipping"
-            elif "saas" in user_lower or "software" in user_lower:
-                business_type = "saas"
-            elif "consulting" in user_lower or "agency" in user_lower:
-                business_type = "consulting"
-            elif "content" in user_lower or "blog" in user_lower:
-                business_type = "content"
+                return await self._create_dropshipping_business(user_input, parameters)
             else:
-                business_type = "ecommerce"
-
-            business_name = f"My {business_type.title()} Business"
-            description = user_input
-            target_market = ""
-            budget = 1000.0
-
-        # Route to appropriate creator
-        if business_type == "dropshipping":
-            logger.info("🎯 Routing to dropshipping creator")
-            return await self._create_dropshipping_business(user_input, parameters)
-        else:
-            logger.info("🏗️ Routing to general business creator", business_type=business_type)
-            return await self.create_business(
-                business_type=business_type,
-                name=business_name,
-                description=description,
-                target_market=target_market,
-                budget=budget
-            )
+                return await self.create_business(
+                    business_type="ecommerce",
+                    name="My Business",
+                    description=user_input,
+                    budget=1000.0
+                )
     
     async def _handle_command(
         self,

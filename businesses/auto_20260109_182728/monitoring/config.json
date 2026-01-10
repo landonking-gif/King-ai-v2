@@ -1,0 +1,23 @@
+{
+  "business_id": "auto_20260109_182728",
+  "business_name": "My Ecommerce Business",
+  "kpis_to_track": [
+    "website_traffic",
+    "conversion_rate",
+    "revenue",
+    "customer_acquisition_cost",
+    "customer_lifetime_value"
+  ],
+  "check_interval_hours": 24,
+  "alert_thresholds": {
+    "revenue_drop_percent": 20,
+    "traffic_drop_percent": 30
+  },
+  "auto_actions": {
+    "low_traffic": "run_marketing_campaign",
+    "low_conversion": "optimize_landing_page",
+    "high_bounce_rate": "improve_content"
+  },
+  "last_check": "2026-01-09T18:50:37.443484",
+  "created_at": "2026-01-09T18:50:37.443484"
+}

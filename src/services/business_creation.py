@@ -188,7 +188,7 @@ Provide a JSON response with:
 Be realistic and specific. This is for an actual business launch."""
 
         try:
-            plan_response = await self.llm_router.route(
+            plan_response = await self.llm_router.complete(
                 prompt=plan_prompt,
                 context=TaskContext(
                     task_type="business_planning",
