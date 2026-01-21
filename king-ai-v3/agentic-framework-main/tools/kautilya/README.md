@@ -375,7 +375,7 @@ providers:
 
   local:
     endpoint: http://localhost:11434
-    model: llama3.1:70b
+    model: qwen3:32b
 
 default_provider: anthropic
 ```

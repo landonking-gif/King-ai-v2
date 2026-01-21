@@ -60,7 +60,7 @@ for i in {1..30}; do
 done
 
 # Pull the configured model (passed as user data or default)
-OLLAMA_MODEL="${OLLAMA_MODEL:-llama3.1:70b}"
+OLLAMA_MODEL="${OLLAMA_MODEL:-qwen3:32b}"
 echo "Pulling model: $OLLAMA_MODEL"
 ollama pull "$OLLAMA_MODEL"
 

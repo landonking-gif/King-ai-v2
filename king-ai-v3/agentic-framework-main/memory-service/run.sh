@@ -7,9 +7,12 @@ set -e
 cd "$(dirname "$0")"
 
 # Activate virtual environment if it exists
-if [ -d "../../.venv" ]; then
-    source ../../.venv/bin/activate
+if [ -d "/home/ubuntu/agentic-framework-main/.venv" ]; then
+    source /home/ubuntu/agentic-framework-main/.venv/bin/activate
 fi
+
+# Set PYTHONPATH to include the project root
+export PYTHONPATH="$PWD:$PWD/../..:$PYTHONPATH"
 
 # Check if .env exists
 if [ ! -f ".env" ] && [ -f "../.env" ]; then

@@ -244,7 +244,7 @@ def list_llm_providers() -> None:
         ("openai", "gpt-4o", "gpt-4o-mini", "OPENAI_API_KEY", "API"),
         ("azure", "gpt-4o", "gpt-4o-mini", "AZURE_OPENAI_KEY", "Custom"),
         ("gemini", "gemini-2.0-flash", "gemini-1.5-pro", "GEMINI_API_KEY", "API"),
-        ("local", "llama3.1:70b", "llama3.1:8b", "N/A", "localhost:11434"),
+        ("local", "qwen3:32b", "llama3.1:8b", "N/A", "localhost:11434"),
         ("vllm", "meta-llama/Llama-2-70b", "meta-llama/Llama-2-13b", "N/A", "localhost:8000"),
     ]
 
@@ -393,7 +393,7 @@ def _select_model_for_provider(provider: str) -> str:
         "openai": ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo"],
         "azure": ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo"],
         "gemini": ["gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"],
-        "local": ["llama3.1:70b", "llama3.1:8b", "mistral:latest"],
+        "local": ["qwen3:32b", "llama3.1:8b", "mistral:latest"],
         "vllm": ["meta-llama/Llama-2-70b-hf", "meta-llama/Llama-2-13b-hf", "mistralai/Mistral-7B-v0.1"],
     }
 
@@ -408,7 +408,7 @@ def _get_default_model(provider: str) -> str:
         "openai": "gpt-4o",
         "azure": "gpt-4o",
         "gemini": "gemini-2.0-flash",
-        "local": "llama3.1:70b",
+        "local": "qwen3:32b",
         "vllm": "meta-llama/Llama-2-70b-hf",
     }
     return defaults.get(provider, "default")

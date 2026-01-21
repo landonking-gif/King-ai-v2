@@ -130,7 +130,7 @@ resource "aws_launch_template" "gpu_inference" {
     pip install vllm
     
     # Pull the model
-    ollama pull llama3.1:70b
+    ollama pull qwen3:32b
     
     # Start Ollama service
     systemctl enable ollama

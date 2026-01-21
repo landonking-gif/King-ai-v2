@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  control-panel-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    ports:
+      - "8100:8100"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://user:password@postgres/control_panel
+      - REDIS_URL=redis://redis:6379
+      - OLLAMA_URL=http://host.docker.internal:11434
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - king-ai-network
+
+  control-panel-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - control-panel-backend
+    networks:
+      - king-ai-network
+
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: control_panel
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/setup_db.sql:/docker-entrypoint-initdb.d/setup_db.sql
+    networks:
+      - king-ai-network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - king-ai-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  king-ai-network:
+    driver: bridge

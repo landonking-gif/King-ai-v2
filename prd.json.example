@@ -1,0 +1,21 @@
+{
+  "branchName": "feature/my-feature",
+  "userStories": [
+    {
+      "id": "story-1",
+      "title": "Add user authentication",
+      "description": "Implement user login and registration functionality",
+      "acceptanceCriteria": "Users can register, login, and logout. Passwords are hashed. JWT tokens are used.",
+      "passes": false,
+      "priority": 1
+    },
+    {
+      "id": "story-2",
+      "title": "Create user dashboard",
+      "description": "Build a dashboard page showing user information",
+      "acceptanceCriteria": "Dashboard displays user profile info. Page is responsive. Verify in browser.",
+      "passes": false,
+      "priority": 2
+    }
+  ]
+}

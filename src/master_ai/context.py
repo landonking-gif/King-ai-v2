@@ -35,7 +35,7 @@ class ContextManager:
     
     # Model context window limits
     CONTEXT_LIMITS = {
-        "llama3.1:70b": 128000,
+        "qwen3:32b": 128000,
         "llama3.1:8b": 128000,
         "gemini-pro": 32000,
         "default": 100000

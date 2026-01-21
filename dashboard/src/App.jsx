@@ -4,10 +4,12 @@ import './App.css';
 import { PLDashboard } from './components/Charts/PLDashboard';
 import { CircuitBreakerDashboard } from './components/Monitoring/CircuitBreakerDashboard';
 
-// Dynamic API base to handle port 80 (proxy) or port 8000 (direct)
-const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-  ? `http://${window.location.hostname}:8000/api`
-  : `http://${window.location.hostname}/api`;
+// Dynamic API base - can be overridden with VITE_API_BASE env var
+const API_BASE = import.meta.env.VITE_API_BASE || (
+  window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? `http://${window.location.hostname}:8000/api`
+    : `http://${window.location.hostname}/api`
+);
 
 function App() {
   const [activeTab, setActiveTab] = useState('empire');

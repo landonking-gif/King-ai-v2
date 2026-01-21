@@ -11,6 +11,8 @@ echo ""
 # Automatically deploy to AWS server
 run_on_aws=y
 read -p "Enter AWS server IP address: " aws_ip
+# Update dashboard .env with the new IP
+/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -Command "Set-Content -Path 'C:\Users\dmilner.AGV-040318-PC\Downloads\landon\king-ai-v2\king-ai-v3\agentic-framework-main\dashboard\.env' -Value 'VITE_API_BASE=http://$aws_ip:8000/api'"
 ssh_key="$(cd .. && pwd)/king-ai-studio.pem"
 ssh_user=ubuntu
 
@@ -56,7 +58,7 @@ EOF
 
         # Install python3-venv, redis, and postgresql
         sudo apt update
-        sudo apt install -y python3-venv redis-server postgresql postgresql-contrib
+        sudo apt install -y python3-venv redis-server postgresql postgresql-contrib wget
 
         # Start services
         sudo systemctl enable redis-server
@@ -78,15 +80,30 @@ EOF
         pip install pydantic fastapi uvicorn pydantic-settings httpx sqlmodel alembic redis psycopg2-binary pyyaml
         pip install -r requirements.txt
 
+        # Install MinIO
+        pkill -f minio || true
+        rm -rf ~/minio
+        wget https://dl.min.io/server/minio/release/linux-amd64/minio -O ~/minio
+        chmod +x ~/minio
+
         # Copy env file
         cp .env.example .env
         sed -i 's|OLLAMA_ENDPOINT=http://localhost:11434|OLLAMA_ENDPOINT=http://localhost:11434|' .env
         sed -i 's|postgresql://user:password@localhost:5432/agentic_framework|postgresql://agentic_user:agentic_pass@localhost:5432/agentic_framework|' .env
+        echo "MEMORY_SERVICE_PORT=8002" >> .env
 
         # Copy .env to service directories
         cp .env mcp-gateway/.env
         cp .env memory-service/.env
         cp .env subagent-manager/.env
+
+        # Remove old renamed directories if they exist
+        rm -rf mcp_gateway memory_service subagent_manager
+
+        # Rename directories to match module names
+        mv mcp-gateway mcp_gateway
+        mv memory-service memory_service
+        mv subagent-manager subagent_manager
 EOF
 
     # Run the services on AWS server
@@ -95,38 +112,61 @@ EOF
         cd ~/agentic-framework-main
         source .venv/bin/activate
         
+        # Start MinIO
+        mkdir -p ~/agentic-framework-main/data/minio
+        nohup ~/minio server ~/agentic-framework-main/data/minio --console-address :9001 > minio.log 2>&1 &
+        
         # Start MCP Gateway in background
         echo "Starting MCP Gateway..."
-        cd mcp-gateway && nohup bash run.sh > mcp-gateway.log 2>&1 &
+        cd mcp_gateway && nohup bash run.sh > mcp-gateway.log 2>&1 &
         
         # Start Memory Service in background
         echo "Starting Memory Service..."
-        export MEMORY_SERVICE_PORT=8002
-        nohup bash memory-service/run.sh > memory-service.log 2>&1 &
+        cd memory_service && nohup bash run.sh > memory-service.log 2>&1 &
         
         # Start Subagent Manager in background
         echo "Starting Subagent Manager..."
-        cd subagent-manager && nohup uvicorn subagent_manager.service.main:app --host 0.0.0.0 --port 8001 > subagent-manager.log 2>&1 &
+        cd subagent_manager && nohup bash run.sh > subagent-manager.log 2>&1 &
         
         # Create data directories
         mkdir -p ~/agentic-framework-main/data/chroma
-        mkdir -p ~/agentic-framework-main/memory-service/data/chroma
+        mkdir -p ~/agentic-framework-main/memory_service/data/chroma
 
         # Wait a bit for services to start
         sleep 30
 
         # Check if services are healthy
         echo "Checking service health..."
-        curl -f http://localhost:8080/health && echo "MCP Gateway healthy" || echo "MCP Gateway unhealthy"
-        curl -f http://localhost:8002/health && echo "Memory Service healthy" || echo "Memory Service unhealthy"
-        curl -f http://localhost:8001/health && echo "Subagent Manager healthy" || echo "Subagent Manager unhealthy"
+        if curl -f http://localhost:8080/health; then
+            echo "MCP Gateway healthy"
+        else
+            echo "MCP Gateway unhealthy"
+            echo "MCP Gateway log:"
+            cat mcp_gateway/mcp-gateway.log 2>/dev/null || echo "No log file"
+        fi
+        
+        if curl -f http://localhost:8002/health; then
+            echo "Memory Service healthy"
+        else
+            echo "Memory Service unhealthy"
+            echo "Memory Service log:"
+            cat memory_service/memory-service.log 2>/dev/null || echo "No log file"
+        fi
+        
+        if curl -f http://localhost:8001/health; then
+            echo "Subagent Manager healthy"
+        else
+            echo "Subagent Manager unhealthy"
+            echo "Subagent Manager log:"
+            cat subagent_manager/subagent-manager.log 2>/dev/null || echo "No log file"
+        fi
         
         # Kill any process using port 8000
         echo "Checking for processes on port 8000..."
         sudo lsof -ti:8000 | xargs sudo kill -9 2>/dev/null || echo "No process found on port 8000"
         sleep 2
         
-        python -m orchestrator.service.main --host 0.0.0.0 --port 8000
+        source /home/ubuntu/agentic-framework-main/.venv/bin/activate && python -m orchestrator.service.main --host 0.0.0.0 --port 8000
 EOF
 
     exit 0

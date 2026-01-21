@@ -212,7 +212,7 @@ class ModelTierSelector:
         ],
         ModelTier.BALANCED: [
             ModelConfig(
-                name="llama3.1:70b",
+                name="qwen3:32b",
                 tier=ModelTier.BALANCED,
                 provider="ollama",
                 max_tokens=8192,
