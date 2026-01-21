@@ -3,10 +3,21 @@
 
 set -e
 
+echo "Starting MCP Gateway script"
+
 # Activate virtual environment if exists
-if [ -d "../../.venv" ]; then
-    source ../../.venv/bin/activate
+if [ -d "/home/ubuntu/agentic-framework-main/.venv" ]; then
+    echo "Activating venv..."
+    source /home/ubuntu/agentic-framework-main/.venv/bin/activate
+    echo "Venv activated, python: $(which python)"
+else
+    echo "Venv not found"
+    exit 1
 fi
+
+# Set PYTHONPATH to include the project root
+export PYTHONPATH="$PWD:$PWD/../..:$PYTHONPATH"
+echo "PYTHONPATH: $PYTHONPATH"
 
 # Check if Redis is running
 if ! redis-cli ping > /dev/null 2>&1; then

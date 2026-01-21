@@ -78,7 +78,7 @@ PROVIDER_ENV_MAP = {
         "api_key": None,  # No API key needed
         "model": "LOCAL_MODEL",
         "endpoint": "OLLAMA_ENDPOINT",
-        "default_model": "llama3.1:70b",
+        "default_model": "qwen3:32b",
         "default_endpoint": "http://localhost:11434",
     },
     LLMProvider.VLLM: {

@@ -22,7 +22,7 @@ class LocalLLMAdapter(LLMAdapter):
     """
 
     DEFAULT_ENDPOINT: str = "http://localhost:11434"
-    DEFAULT_MODEL: str = "llama3.1:70b"
+    DEFAULT_MODEL: str = "qwen3:32b"
     DEFAULT_MAX_TOKENS: int = 4096
 
     def __init__(

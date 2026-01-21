@@ -908,7 +908,7 @@ class ToolExecutor:
             },
             {
                 "name": "local",
-                "default_model": "llama3.1:70b",
+                "default_model": "qwen3:32b",
                 "fallback_model": "llama3.1:8b",
                 "api_key_env": "N/A",
                 "endpoint": "localhost:11434",

@@ -12,6 +12,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from uuid import uuid4
 import asyncio
 
+from src.memory.diary_reflection import AgentDiary, ReflectionEngine
 from src.utils.structured_logging import get_logger
 
 logger = get_logger("reflective_agent")
@@ -214,6 +215,8 @@ class ReflectiveAgentLoop:
         max_iterations: int = 3,
         min_quality_score: float = 0.7,
         strict_validation: bool = False,
+        project_id: str = "default",
+        memory_manager=None,
     ):
         """
         Initialize the loop.
@@ -223,11 +226,18 @@ class ReflectiveAgentLoop:
             max_iterations: Maximum refinement iterations
             min_quality_score: Minimum quality score to pass
             strict_validation: If True, all criteria must pass
+            project_id: Project identifier for memory
+            memory_manager: Memory manager for long-term storage
         """
         self.llm_router = llm_router
         self.max_iterations = max_iterations
         self.min_quality_score = min_quality_score
         self.strict_validation = strict_validation
+        self.project_id = project_id
+        
+        # Initialize diary and reflection
+        self.diary = AgentDiary(project_id)
+        self.reflection_engine = ReflectionEngine(project_id, memory_manager) if memory_manager else None
         
         # Custom handlers
         self._planner: Optional[Callable] = None
@@ -371,7 +381,57 @@ class ReflectiveAgentLoop:
             f"duration={result.duration_ms}ms"
         )
         
+        # Generate diary entry for this session
+        await self._generate_diary_entry(result, context)
+        
         return result
+    
+    async def _generate_diary_entry(self, result: ReflectiveLoopResult, context: Dict[str, Any]):
+        """Generate diary entry for the session."""
+        try:
+            session_data = {
+                "agent_id": "reflective_loop",
+                "task": result.objective,
+                "actions": [
+                    {
+                        "type": "planning",
+                        "description": f"Created plan with {len(result.plan.steps)} steps",
+                        "result": "success" if result.plan else "failed"
+                    },
+                    {
+                        "type": "execution",
+                        "description": f"Executed {result.execution_result.steps_completed} steps",
+                        "result": "success" if result.execution_result.success else "failed"
+                    },
+                    {
+                        "type": "validation",
+                        "description": f"Validation score: {result.validation_report.quality_score:.2f}",
+                        "result": result.validation_report.result.value
+                    }
+                ] if result.execution_result else [],
+                "decisions": [entry.decisions_made for entry in result.reflection_log if entry.decisions_made],
+                "preferences": [],  # Can be populated from context
+                "feedback": [],  # Validation suggestions
+                "challenges": result.validation_report.issues if result.validation_report else [],
+                "solutions": result.validation_report.suggestions if result.validation_report else [],
+                "patterns": [],  # Can be extracted from reflection log
+                "learnings": [entry.lessons for entry in result.reflection_log if entry.lessons]
+            }
+            
+            # Flatten lists
+            session_data["decisions"] = [item for sublist in session_data["decisions"] for item in sublist]
+            session_data["learnings"] = [item for sublist in session_data["learnings"] for item in sublist]
+            
+            diary_path = self.diary.generate_diary_entry(session_data)
+            logger.info(f"Diary entry generated: {diary_path}")
+            
+            # Perform reflection if memory manager available
+            if self.reflection_engine:
+                reflection_result = await self.reflection_engine.perform_reflection()
+                logger.info(f"Reflection completed: {reflection_result.get('entries_analyzed', 0)} entries analyzed")
+                
+        except Exception as e:
+            logger.error(f"Failed to generate diary entry: {e}")
     
     # Phase implementations
     

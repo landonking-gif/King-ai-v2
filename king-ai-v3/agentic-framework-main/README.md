@@ -339,7 +339,7 @@ export GEMINI_API_KEY="..."
 # Local (Ollama - no API key needed)
 # 1. Install: https://ollama.ai
 # 2. Start: ollama serve
-# 3. Pull model: ollama pull llama3.1:70b
+# 3. Pull model: ollama pull qwen3:32b
 ```
 
 ### Step 3: Start Infrastructure (Optional)

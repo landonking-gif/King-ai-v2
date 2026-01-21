@@ -1,0 +1,69 @@
+{
+  "name": "copilot-memory-plugin",
+  "displayName": "GitHub Copilot Memory Plugin",
+  "description": "A long-term memory plugin for GitHub Copilot that learns from your activity over time and continuously improves Copilot's understanding of your preferences, patterns, and workflows.",
+  "version": "0.0.1",
+  "homepage": "https://github.com/your-repo/copilot-memory-plugin",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-repo/copilot-memory-plugin.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-repo/copilot-memory-plugin/issues"
+  },
+  "engines": {
+    "vscode": "^1.89.0"
+  },
+  "enabledApiProposals": ["chatParticipant"],
+  "enabledApiProposals": ["chat"],
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "chatParticipants": [
+      {
+        "id": "copilot-memory.diary",
+        "name": "diary",
+        "description": "Generate a diary entry for the current coding session",
+        "isSticky": true
+      },
+      {
+        "id": "copilot-memory.reflect",
+        "name": "reflect",
+        "description": "Perform reflection across multiple diary entries and update memory",
+        "isSticky": true
+      }
+    ],
+    "commands": [
+      {
+        "command": "copilot-memory.autoDiary",
+        "title": "Auto Generate Diary Entry"      },
+      {
+        "command": "copilot-memory.test",
+        "title": "Test Memory Plugin"      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.89.0",
+    "@types/mocha": "10.0.6",
+    "@types/node": "20.10.0",
+    "eslint": "8.56.0",
+    "@typescript-eslint/eslint-plugin": "6.21.0",
+    "@typescript-eslint/parser": "6.21.0",
+    "mocha": "10.2.0",
+    "typescript": "5.3.3",
+    "@vscode/test-electron": "2.3.9"
+  }
+}

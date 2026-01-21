@@ -1,0 +1,125 @@
+{
+  "branchName": "feature/master-control-panel",
+  "userStories": [
+    {
+      "id": "story-1",
+      "title": "Set up backend with FastAPI",
+      "description": "Create the Master Control Panel backend using FastAPI with WebSocket support, SQLAlchemy ORM, Redis caching, and JWT authentication",
+      "acceptanceCriteria": "FastAPI server runs on port 8100, WebSocket endpoints functional, database connections established, authentication endpoints working",
+      "passes": true,
+      "priority": 1
+    },
+    {
+      "id": "story-2",
+      "title": "Set up frontend with React/TypeScript",
+      "description": "Initialize React 18 + TypeScript frontend with shadcn/ui, Tailwind CSS, and required libraries (Zustand, React Query, React Flow, etc.)",
+      "acceptanceCriteria": "React app runs on port 3000, basic layout renders, routing configured, UI components imported",
+      "passes": true,
+      "priority": 1
+    },
+    {
+      "id": "story-3",
+      "title": "Implement authentication system",
+      "description": "Build JWT-based authentication with role-based access control (Admin, Operator, Analyst, Auditor, Developer roles)",
+      "acceptanceCriteria": "Login/logout endpoints functional, JWT tokens issued, RBAC middleware working, protected routes secured",
+      "passes": true,
+      "priority": 1
+    },
+    {
+      "id": "story-4",
+      "title": "Create service proxy layer",
+      "description": "Implement API proxy routes to forward requests to all 5 microservices (Orchestrator, Subagent Manager, Memory Service, MCP Gateway, Code Executor)",
+      "acceptanceCriteria": "All proxy routes configured (/api/orchestrator/* -> localhost:8000, etc.), requests properly forwarded, error handling implemented",
+      "passes": false,
+      "priority": 1
+    },
+    {
+      "id": "story-5",
+      "title": "Build Command Center dashboard",
+      "description": "Create the main hub dashboard with system health bar, KPI cards, live activity feed, quick actions, throughput chart, P&L summary, agent metrics, and model costs",
+      "acceptanceCriteria": "Dashboard renders all components, WebSocket connections active, real-time updates working, all KPIs display correctly",
+      "passes": true,
+      "priority": 2
+    },
+    {
+      "id": "story-6",
+      "title": "Implement Workflow Studio",
+      "description": "Build drag-and-drop workflow builder with visual step configuration, model selection, artifact flow visualization, live execution overlay, YAML import/export, and template library",
+      "acceptanceCriteria": "Workflows can be created visually, steps configured, execution monitored in real-time, YAML export/import functional",
+      "passes": true,
+      "priority": 2
+    },
+    {
+      "id": "story-7",
+      "title": "Create Approval Center",
+      "description": "Build approval management interface with pending approvals list, risk assessment display, AI thinking traces, provenance visualization, bulk operations, and audit trail",
+      "acceptanceCriteria": "Approvals display with all metadata, bulk approve/reject works, audit trail recorded, real-time updates",
+      "passes": true,
+      "priority": 2
+    },
+    {
+      "id": "story-8",
+      "title": "Develop Agent Control Center",
+      "description": "Create agent management dashboard with active agents list, spawn configuration, capability assignment, performance metrics, utilization charts, and control actions",
+      "acceptanceCriteria": "Agents list displays, spawn/destroy actions work, metrics update in real-time, performance charts render",
+      "passes": false,
+      "priority": 2
+    },
+    {
+      "id": "story-9",
+      "title": "Implement Analytics and Settings dashboards",
+      "description": "Build Analytics dashboard with performance metrics, system health, agent performance, and activity monitoring. Create Settings panel for system configuration management.",
+      "acceptanceCriteria": "Analytics dashboard displays metrics and charts, Settings panel allows configuration updates, data displays correctly, interactive features operational",
+      "passes": true,
+      "priority": 3
+    },
+    {
+      "id": "story-10",
+      "title": "Add real-time WebSocket integration",
+      "description": "Implement WebSocket connections for live updates across all dashboards (/ws/activity-feed, /ws/approvals, /ws/workflows/{id}) with Redis PubSub backend",
+      "acceptanceCriteria": "WebSocket connections stable, events broadcast correctly, <100ms latency achieved, reconnection handling works",
+      "passes": false,
+      "priority": 3
+    },
+    {
+      "id": "story-11",
+      "title": "Build P&L tracking system",
+      "description": "Implement business intelligence with revenue/expense tracking, margin analysis, cost attribution, ROI calculations, budget alerts, and historical trends",
+      "acceptanceCriteria": "Financial data tracked accurately, charts display trends, alerts trigger on budget thresholds, reports generate correctly",
+      "passes": false,
+      "priority": 3
+    },
+    {
+      "id": "story-12",
+      "title": "Create conversational interface",
+      "description": "Build 'Talk to King AI' interface with auto mode detection, inline workflow creation, execution confirmation, and live progress display",
+      "acceptanceCriteria": "Conversational input accepted, workflows created from text, execution monitored, responses displayed appropriately",
+      "passes": false,
+      "priority": 3
+    },
+    {
+      "id": "story-13",
+      "title": "Configure Docker Compose deployment",
+      "description": "Create docker-compose.yml with all services (frontend, backend, PostgreSQL, Redis, Nginx) properly configured with correct ports and networking",
+      "acceptanceCriteria": "docker-compose up starts all services, ports mapped correctly, services communicate properly, volumes configured",
+      "passes": false,
+      "priority": 4
+    },
+    {
+      "id": "story-14",
+      "title": "Implement service integration testing",
+      "description": "Create comprehensive tests for API integrations, WebSocket connections, proxy routes, and cross-service communication",
+      "acceptanceCriteria": "All integration tests pass, API calls work end-to-end, error scenarios handled, performance requirements met",
+      "passes": false,
+      "priority": 4
+    },
+    {
+      "id": "story-15",
+      "title": "Perform end-to-end testing",
+      "description": "Conduct full system testing including user workflows, data persistence, real-time features, security validation, and performance benchmarking",
+      "acceptanceCriteria": "All user stories functional, system stable under load, security validated, performance targets met (<1.5s page load, <200ms API response)",
+      "passes": false,
+      "priority": 4
+    }
+  ]
+}
