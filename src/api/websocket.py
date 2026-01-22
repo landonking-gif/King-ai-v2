@@ -162,14 +162,54 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 
+# Optional Redis pubsub integration for horizontal scaling
+try:
+    import redis.asyncio as aioredis
+    redis_client = None
+    async def _ensure_redis():
+        global redis_client
+        if redis_client is None:
+            from config.settings import settings
+            redis_client = aioredis.from_url(settings.redis_url)
+        return redis_client
+
+    async def _redis_listener():
+        client = await _ensure_redis()
+        pubsub = client.pubsub()
+        await pubsub.psubscribe("ws_events:*")
+        async for message in pubsub.listen():
+            if message is None or message.get("type") != "pmessage":
+                continue
+            try:
+                payload = json.loads(message.get("data", "{}"))
+                channel = message.get("channel", b"").decode() if isinstance(message.get("channel"), bytes) else message.get("channel")
+                # Broadcast to local subscribers
+                await manager.broadcast_to_channel(channel, payload)
+            except Exception as e:
+                logger.error(f"Redis listener error: {e}")
+
+    # Start background redis listener
+    import asyncio
+    asyncio.create_task(_redis_listener())
+except Exception:
+    # Redis not available; continue without pubsub
+    redis_client = None
+
+
 async def websocket_endpoint(
     websocket: WebSocket,
     user_id: str = None,
     business_id: str = None,
+    initial_channels: list[str] | None = None,
 ):
     """WebSocket endpoint handler."""
     connection_id = await manager.connect(websocket, user_id, business_id)
-    
+
+    # Subscribe to any initial channels requested
+    if initial_channels:
+        for ch in initial_channels:
+            await manager.subscribe(connection_id, ch)
+
     try:
         while True:
             data = await websocket.receive_json()

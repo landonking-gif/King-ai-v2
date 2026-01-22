@@ -253,18 +253,35 @@ app.include_router(workflows.router, prefix="/api/workflows", tags=["workflows"]
 app.include_router(dev_dashboard.router, prefix="/dev", tags=["dev-dashboard"])
 
 @app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
+async def websocket_endpoint(websocket: WebSocket, user_id: str | None = None, business_id: str | None = None, channels: str | None = None):
     """
     Real-time update stream for the dashboard.
+    Supports optional query params: user_id, business_id, channels (comma-separated)
     """
-    from src.api.websocket import manager
-    await manager.connect(websocket)
-    try:
-        while True:
-            # Keep connection alive
-            await websocket.receive_text()
-    except Exception:
-        manager.disconnect(websocket)
+    from src.api.websocket import websocket_endpoint as ws_handler
+    initial_channels = channels.split(",") if channels else None
+    await ws_handler(websocket, user_id=user_id, business_id=business_id, initial_channels=initial_channels)
+
+
+@app.websocket("/ws/activity-feed")
+async def websocket_activity_feed(websocket: WebSocket, user_id: str | None = None, business_id: str | None = None):
+    """Subscribe to the global activity feed channel."""
+    from src.api.websocket import websocket_endpoint as ws_handler
+    await ws_handler(websocket, user_id=user_id, business_id=business_id, initial_channels=["activity"])
+
+
+@app.websocket("/ws/approvals")
+async def websocket_approvals(websocket: WebSocket, user_id: str | None = None, business_id: str | None = None):
+    """Subscribe to approvals channel for real-time approval events."""
+    from src.api.websocket import websocket_endpoint as ws_handler
+    await ws_handler(websocket, user_id=user_id, business_id=business_id, initial_channels=["approvals"])
+
+
+@app.websocket("/ws/workflows/{workflow_id}")
+async def websocket_workflow(websocket: WebSocket, workflow_id: str, user_id: str | None = None, business_id: str | None = None):
+    """Subscribe to a specific workflow's execution channel."""
+    from src.api.websocket import websocket_endpoint as ws_handler
+    await ws_handler(websocket, user_id=user_id, business_id=business_id, initial_channels=[f"workflow:{workflow_id}"])
 
 def get_master_ai() -> MasterAI:
     """Dependency to get MasterAI instance."""

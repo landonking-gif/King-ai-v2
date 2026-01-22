@@ -1,32 +1,58 @@
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { Activity, Zap, CheckCircle, AlertTriangle, DollarSign, Users, Cpu, TrendingUp } from 'lucide-react';
-import { io } from 'socket.io-client';
+import { useWebSocket } from '../hooks/useWebSocket';
 
 const CommandCenter = () => {
   // ... existing state ...
 
   const [socket, setSocket] = useState(null);
 
+  // WebSocket for real-time updates
+  const { connected } = useWebSocket('ws://localhost:8100/ws', {
+    onEvent: (eventType, data, timestamp) => {
+      handleWebSocketEvent(eventType, data);
+    }
+  });
+
+  const handleWebSocketEvent = (eventType, data) => {
+    switch (eventType) {
+      case 'task.completed':
+      case 'task.started':
+      case 'task.failed':
+        // Update activity feed
+        const activityDesc = `${data.status}: ${data.task_id}`;
+        setActivityFeed(prev => [{
+          id: Date.now(),
+          type: data.status,
+          message: activityDesc,
+          timestamp: new Date().toLocaleTimeString()
+        }, ...prev.slice(0, 9)]);
+        break;
+      case 'approval.required':
+        setKpis(prev => ({ ...prev, pendingApprovals: (prev.pendingApprovals || 0) + 1 }));
+        break;
+      case 'system.alert':
+        // Update system health based on alerts
+        if (data.level === 'error') {
+          setSystemHealth(prev => ({
+            ...prev,
+            orchestrator: { ...prev.orchestrator, status: 'unhealthy' }
+          }));
+        }
+        break;
+      case 'analytics.kpi_update':
+        setKpis(prev => ({ ...prev, ...data.kpis }));
+        break;
+      default:
+        break;
+    }
+  };
+
   useEffect(() => {
-    // Initialize WebSocket connection
-    const newSocket = io('http://localhost:8100');
-    setSocket(newSocket);
-
-    newSocket.on('activity', (data) => {
-      setActivityFeed(prev => [data, ...prev.slice(0, 9)]); // Keep last 10
-    });
-
-    newSocket.on('approvals', (data) => {
-      setKpis(prev => ({ ...prev, pendingApprovals: data.count }));
-    });
-
-    newSocket.on('health', (data) => {
-      setSystemHealth(data);
-    });
-
-    return () => newSocket.close();
-  }, []);
+    // Initialize WebSocket connection is now handled by useWebSocket hook
+    setSocket({ connected }); // For backward compatibility
+  }, [connected]);
 
   // ... rest of component ...
   const [systemHealth, setSystemHealth] = useState({

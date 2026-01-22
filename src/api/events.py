@@ -6,6 +6,7 @@ from enum import Enum
 from typing import Any
 from src.api.websocket import manager
 from src.utils.logging import get_logger
+import json
 
 logger = get_logger(__name__)
 
@@ -69,6 +70,30 @@ class EventBroadcaster:
         # Always broadcast to global for system events
         if event_type.value.startswith("system."):
             await manager.broadcast_to_channel("global", event)
+
+        # Publish to Redis pubsub for horizontal scaling if available
+        try:
+            import src.api.websocket as ws
+            if getattr(ws, "redis_client", None) is not None:
+                try:
+                    client = await ws._ensure_redis()
+                    channels = []
+                    if business_id:
+                        channels.append(f"business:{business_id}")
+                    if user_id:
+                        channels.append(f"user:{user_id}")
+                    if event_type.value.startswith("system."):
+                        channels.append("global")
+                    for ch in channels:
+                        try:
+                            await client.publish(f"ws_events:{ch}", json.dumps(event))
+                        except Exception as e:
+                            logger.error(f"Redis publish error for channel {ch}: {e}")
+                except Exception as e:
+                    logger.error(f"Failed to ensure Redis client: {e}")
+        except Exception:
+            # Redis integration not available; ignore
+            pass
 
         logger.debug(f"Emitted event: {event_type.value}")
 

@@ -78,7 +78,7 @@
       "title": "Add real-time WebSocket integration",
       "description": "Implement WebSocket connections for live updates across all dashboards (/ws/activity-feed, /ws/approvals, /ws/workflows/{id}) with Redis PubSub backend",
       "acceptanceCriteria": "WebSocket connections stable, events broadcast correctly, <100ms latency achieved, reconnection handling works",
-      "passes": false,
+      "passes": true,
       "priority": 3
     },
     {

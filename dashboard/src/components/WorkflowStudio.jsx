@@ -115,7 +115,7 @@ const WorkflowStudio = () => {
       const executionId = result.execution_id;
 
       // Connect to WebSocket for real-time updates
-      const wsUrl = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/api/workflows/executions/${executionId}/ws`;
+      const wsUrl = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws/workflows/${executionId}`;
       const ws = new WebSocket(wsUrl);
 
       ws.onmessage = (event) => {

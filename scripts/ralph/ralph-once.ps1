@@ -53,7 +53,7 @@ if (-not (Test-Path $Prompt)) {
 }
 
 # Check if PRD file exists
-$Prd = "prd.json"
+$Prd = "..\..\prd.json"
 if (-not (Test-Path $Prd)) {
     Write-Error "PRD file not found: $Prd"
     exit 1
@@ -64,8 +64,8 @@ $contextFile = [System.IO.Path]::GetTempFileName()
 Write-Host "Building context file: $contextFile"
 
 # Add progress.txt if it exists
-if (Test-Path "progress.txt") {
-    Get-Content "progress.txt" | Add-Content $contextFile
+if (Test-Path "..\..\progress.txt") {
+    Get-Content "..\..\progress.txt" | Add-Content $contextFile
     Add-Content $contextFile "`n`n---`n`n"
 }
 
@@ -99,21 +99,62 @@ $copilotArgs = @()
 $copilotArgs += "--model"
 $copilotArgs += $Model
 $copilotArgs += "--allow-all-tools"
-$copilotArgs += "-p"
-$copilotArgs += "Follow the instructions below to implement the next feature from the PRD."
+$copilotArgs += "--silent"
 
 # Run copilot with piped input
 Write-Host "Piping context to Copilot CLI..."
 try {
-    Get-Content $contextFile -Raw | & copilot @copilotArgs
+    $output = Get-Content $contextFile -Raw | & copilot @copilotArgs 2>&1
     $exitCode = $LASTEXITCODE
+    Write-Host "Copilot exit code: $exitCode"
+    Write-Host "Copilot output received:"
+    Write-Host $output
 } catch {
     Write-Error "Failed to run Copilot CLI: $_"
     Remove-Item $contextFile -ErrorAction SilentlyContinue
     exit 1
 }
+
+# Parse the JSON output and apply changes
+try {
+    $jsonOutput = $output | ConvertFrom-Json
+    Write-Host "Parsed implementation: $($jsonOutput.feature)"
     
+    foreach ($change in $jsonOutput.changes) {
+        $filePath = $change.file
+        $action = $change.action
+        $content = $change.content
+        
+        if ($action -eq "create" -or $action -eq "edit") {
+            Write-Host "Creating/Updating file: $filePath"
+            $content | Set-Content -Path $filePath -Encoding UTF8
+        } elseif ($action -eq "delete") {
+            Write-Host "Deleting file: $filePath"
+            if (Test-Path $filePath) {
+                Remove-Item $filePath
+            }
+        }
+    }
+    
+    Write-Host "Summary: $($jsonOutput.summary)"
+    
+    # Update progress.txt
+    if (Test-Path "..\..\progress.txt") {
+        $progressContent = Get-Content "..\..\progress.txt" -Raw
+    } else {
+        $progressContent = ""
+    }
+    $newProgress = $progressContent + "`n$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss'): $($jsonOutput.feature) - $($jsonOutput.summary)"
+    $newProgress | Set-Content -Path "..\..\progress.txt" -Encoding UTF8
+    
+} catch {
+    Write-Warning "Failed to parse Copilot output as JSON or apply changes: $_"
+    Write-Host "Raw output was:"
+    Write-Host $output
+}
+
 # Clean up context file
 Remove-Item $contextFile -ErrorAction SilentlyContinue
-    
+
+Write-Host "Ralph execution complete."
 exit $exitCode
