@@ -170,7 +170,11 @@ class RalphLoop:
 
             # Apply the generated code
             print("Applying code changes...")
-            self._apply_code_changes(generated_code)
+            applied = self._apply_code_changes(generated_code)
+            
+            if not applied:
+                print("No code changes were applied")
+                return False
 
             # Run quality checks
             print("Running quality checks...")
@@ -182,6 +186,8 @@ class RalphLoop:
 
         except Exception as e:
             print(f"💥 Implementation error: {e}")
+            import traceback
+            traceback.print_exc()
             return False
 
     def _create_prompt(self, title, description, acceptance, iteration):
@@ -189,60 +195,191 @@ class RalphLoop:
         with open(self.prompt_file, 'r') as f:
             template = f.read()
 
+        # Load full PRD for context
+        with open(self.prd_file, 'r') as f:
+            prd_data = json.load(f)
+
         # Replace placeholders
         prompt = template.replace('{{STORY_TITLE}}', title)
         prompt = prompt.replace('{{STORY_DESCRIPTION}}', description)
         prompt = prompt.replace('{{STORY_ACCEPTANCE}}', acceptance)
         prompt = prompt.replace('{{ITERATION}}', str(iteration))
 
+        # Add full PRD context
+        prd_context = json.dumps(prd_data, indent=2)
+        prompt = prompt.replace('{{PRD_CONTEXT}}', prd_context)
+
         # Add progress context
         if self.progress_file.exists():
             with open(self.progress_file, 'r') as f:
                 progress_context = f.read().split('\n')[-20:]  # Last 20 lines
             progress_context = '\n'.join(progress_context)
-            prompt = prompt.replace('{{PROGRESS_CONTEXT}}', progress_context)
+        else:
+            progress_context = "No progress yet - this is the first iteration"
+        
+        prompt = prompt.replace('{{PROGRESS_CONTEXT}}', progress_context)
 
         return prompt
 
     async def _generate_code(self, prompt):
-        """Generate code using AI (currently manual implementation required)"""
+        """Generate code using GitHub Copilot CLI"""
         try:
-            # GitHub Copilot CLI requires interactive authentication
-            # It cannot be used programmatically without session authentication
-            print("⚠️  AI code generation not available - manual implementation required")
-            print("")
-            print("GitHub Copilot CLI requires interactive authentication that cannot be automated.")
-            print("For this story to be implemented automatically, you would need:")
-            print("  1. Run 'copilot' in terminal and authenticate interactively")
-            print("  2. Or use an alternative AI backend (Ollama, OpenAI API, etc.)")
-            print("")
-            print("Story will be marked as failed after max retries.")
-            print("You can implement this story manually and then mark it complete in prd.json")
+            print("🤖 Generating code using GitHub Copilot CLI...")
+            
+            # Save prompt to temporary file
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False, encoding='utf-8') as f:
+                f.write(prompt)
+                prompt_file = f.name
+            
+            try:
+                # Try using 'gh copilot suggest' command
+                # This assumes the user has gh CLI with copilot extension installed
+                result = subprocess.run(
+                    ['gh', 'copilot', 'suggest', '-t', 'shell', prompt],
+                    capture_output=True,
+                    text=True,
+                    timeout=300
+                )
+                
+                if result.returncode == 0 and result.stdout:
+                    print(f"✅ Generated code from Copilot")
+                    return result.stdout
+                else:
+                    # Fallback: try calling copilot directly with stdin
+                    print("Trying alternative copilot invocation...")
+                    with open(prompt_file, 'r', encoding='utf-8') as pf:
+                        result = subprocess.run(
+                            ['copilot'],
+                            stdin=pf,
+                            capture_output=True,
+                            text=True,
+                            timeout=300
+                        )
+                    
+                    if result.returncode == 0 and result.stdout:
+                        print(f"✅ Generated code from Copilot")
+                        return result.stdout
+                    else:
+                        print(f"❌ Copilot CLI failed: {result.stderr}")
+                        print("")
+                        print("Make sure GitHub Copilot CLI is installed and authenticated:")
+                        print("  1. Install: gh extension install github/gh-copilot")
+                        print("  2. Authenticate: gh auth login")
+                        print("  3. Test: gh copilot --version")
+                        return None
+                        
+            finally:
+                # Clean up temp file
+                try:
+                    Path(prompt_file).unlink()
+                except:
+                    pass
+                    
+        except subprocess.TimeoutExpired:
+            print("❌ Copilot CLI timed out after 5 minutes")
             return None
+        except FileNotFoundError:
+            print("❌ GitHub Copilot CLI not found")
+            print("")
+            print("Please install GitHub Copilot CLI:")
+            print("  gh extension install github/gh-copilot")
+            print("  gh auth login")
             return None
         except Exception as e:
             print(f"❌ AI code generation failed: {e}")
+            import traceback
+            traceback.print_exc()
             return None
 
     def _apply_code_changes(self, generated_code):
         """Apply the generated code changes to files"""
         import re
 
-        # Parse code blocks
-        pattern = r'```\s*([^`\n]+)\s*\n(.*?)\n```'
-        matches = re.findall(pattern, generated_code, re.MULTILINE | re.DOTALL)
+        changes_made = 0
 
-        for file_path, code in matches:
+        # Pattern 1: filepath blocks - ```filepath: path/to/file.ext
+        filepath_pattern = r'```filepath:\s*([^\n]+)\n(.*?)\n```'
+        filepath_matches = re.findall(filepath_pattern, generated_code, re.MULTILINE | re.DOTALL)
+
+        for file_path, code in filepath_matches:
             file_path = file_path.strip()
-
+            
+            # Make path relative to project root
+            full_path = self.project_root / file_path
+            
             # Ensure directory exists
-            Path(file_path).parent.mkdir(parents=True, exist_ok=True)
+            full_path.parent.mkdir(parents=True, exist_ok=True)
 
             # Write the code
-            with open(file_path, 'w', encoding='utf-8') as f:
-                f.write(code.strip())
+            with open(full_path, 'w', encoding='utf-8') as f:
+                f.write(code.strip() + '\n')
 
-            print(f"Created/updated: {file_path}")
+            print(f"📝 Created/updated: {file_path}")
+            changes_made += 1
+
+        # Pattern 2: edit blocks - ```edit: path/to/file.ext with SEARCH/REPLACE
+        edit_pattern = r'```edit:\s*([^\n]+)\nSEARCH:\n(.*?)\n\nREPLACE:\n(.*?)\n```'
+        edit_matches = re.findall(edit_pattern, generated_code, re.MULTILINE | re.DOTALL)
+
+        for file_path, search_text, replace_text in edit_matches:
+            file_path = file_path.strip()
+            full_path = self.project_root / file_path
+
+            if not full_path.exists():
+                print(f"⚠️  File not found for edit: {file_path}")
+                continue
+
+            # Read existing content
+            with open(full_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+
+            # Apply the replacement
+            search_text = search_text.strip()
+            replace_text = replace_text.strip()
+            
+            if search_text in content:
+                new_content = content.replace(search_text, replace_text)
+                
+                with open(full_path, 'w', encoding='utf-8') as f:
+                    f.write(new_content)
+                
+                print(f"✏️  Edited: {file_path}")
+                changes_made += 1
+            else:
+                print(f"⚠️  Search text not found in {file_path}")
+
+        # Pattern 3: standard code blocks (fallback) - ```language
+        if changes_made == 0:
+            # Try standard markdown code blocks
+            standard_pattern = r'```(?:[\w]+)?\s*([^\n]*)\n(.*?)\n```'
+            standard_matches = re.findall(standard_pattern, generated_code, re.MULTILINE | re.DOTALL)
+
+            for header, code in standard_matches:
+                # Skip if this looks like it was already processed
+                if header.startswith('filepath:') or header.startswith('edit:'):
+                    continue
+                
+                # Try to extract filename from header or context
+                if header and not header.isalpha():
+                    file_path = header.strip()
+                    
+                    full_path = self.project_root / file_path
+                    full_path.parent.mkdir(parents=True, exist_ok=True)
+
+                    with open(full_path, 'w', encoding='utf-8') as f:
+                        f.write(code.strip() + '\n')
+
+                    print(f"📝 Created/updated: {file_path}")
+                    changes_made += 1
+
+        if changes_made == 0:
+            print("⚠️  No file changes detected in AI output")
+            print("The AI may have provided explanatory text without code blocks.")
+            print("Please check the output manually.")
+        else:
+            print(f"✅ Applied {changes_made} file change(s)")
+
+        return changes_made > 0
 
     async def _run_quality_checks(self):
         """Run quality checks on the codebase"""
