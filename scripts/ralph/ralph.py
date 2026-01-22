@@ -14,7 +14,6 @@ import tempfile
 import base64
 from pathlib import Path
 from datetime import datetime
-import httpx
 
 class RalphLoop:
     def __init__(self, max_iterations=None, max_retries_per_story=3):
