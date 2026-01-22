@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useWebSocket } from '../hooks/useWebSocket';
 import './Analytics.css';
 
 const Analytics = () => {
@@ -10,15 +11,70 @@ const Analytics = () => {
   });
 
   const [charts, setCharts] = useState([]);
+  const [activityFeed, setActivityFeed] = useState([
+    { time: '2 min ago', desc: 'Workflow execution completed' },
+    { time: '5 min ago', desc: 'Agent spawned successfully' },
+    { time: '10 min ago', desc: 'Approval request processed' }
+  ]);
+
+  // WebSocket connection for real-time updates
+  const { connected, subscribe } = useWebSocket('ws://localhost:8100/ws/activity-feed', {
+    onEvent: (eventType, data, timestamp) => {
+      handleWebSocketEvent(eventType, data, timestamp);
+    }
+  });
+
+  const handleWebSocketEvent = (eventType, data, timestamp) => {
+    switch (eventType) {
+      case 'analytics.kpi_update':
+        setMetrics(prev => ({ ...prev, ...data.kpis }));
+        break;
+      case 'task.completed':
+      case 'task.started':
+      case 'task.failed':
+        addActivityItem(`${data.status}: ${data.task_id}`, timestamp);
+        break;
+      case 'approval.required':
+        addActivityItem(`Approval required: ${data.title}`, timestamp);
+        break;
+      case 'system.alert':
+        addActivityItem(`System alert: ${data.message}`, timestamp);
+        break;
+      default:
+        break;
+    }
+  };
+
+  const addActivityItem = (description, timestamp) => {
+    const timeAgo = getTimeAgo(new Date(timestamp));
+    setActivityFeed(prev => [
+      { time: timeAgo, desc: description },
+      ...prev.slice(0, 9) // Keep only last 10 items
+    ]);
+  };
+
+  const getTimeAgo = (date) => {
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 1) return 'Just now';
+    if (diffMins === 1) return '1 min ago';
+    return `${diffMins} min ago`;
+  };
 
   useEffect(() => {
-    // Fetch analytics data
+    // Fetch initial analytics data
     fetchAnalyticsData();
-  }, []);
+
+    // Subscribe to analytics channel
+    if (connected) {
+      subscribe('analytics');
+    }
+  }, [connected, subscribe]);
 
   const fetchAnalyticsData = async () => {
     try {
-      // Mock data for now
+      // Mock data for now - in production this would fetch from API
       setCharts([
         { id: 1, title: 'System Health Over Time', data: [90, 92, 95, 93, 95] },
         { id: 2, title: 'Agent Performance Metrics', data: [85, 87, 89, 87, 87] },
@@ -87,19 +143,17 @@ const Analytics = () => {
 
       <div className="activity-monitor">
         <h3>Recent Activity</h3>
+        <div className="connection-status">
+          <span className={`status-dot ${connected ? 'connected' : 'disconnected'}`}></span>
+          {connected ? 'Live Updates Active' : 'Connecting...'}
+        </div>
         <div className="activity-list">
-          <div className="activity-item">
-            <span className="activity-time">2 min ago</span>
-            <span className="activity-desc">Workflow execution completed</span>
-          </div>
-          <div className="activity-item">
-            <span className="activity-time">5 min ago</span>
-            <span className="activity-desc">Agent spawned successfully</span>
-          </div>
-          <div className="activity-item">
-            <span className="activity-time">10 min ago</span>
-            <span className="activity-desc">Approval request processed</span>
-          </div>
+          {activityFeed.map((item, index) => (
+            <div key={index} className="activity-item">
+              <span className="activity-time">{item.time}</span>
+              <span className="activity-desc">{item.desc}</span>
+            </div>
+          ))}
         </div>
       </div>
     </div>

@@ -11,13 +11,27 @@ router = APIRouter(tags=["monitoring"])
 
 
 @router.websocket("/ws")
-async def websocket_route(
-    websocket: WebSocket,
-    user_id: str = None,
-    business_id: str = None,
-):
+async def websocket_route(websocket: WebSocket, user_id: str = None, business_id: str = None):
     """WebSocket endpoint for real-time updates."""
     await websocket_endpoint(websocket, user_id, business_id)
+
+
+@router.websocket("/ws/activity-feed")
+async def websocket_activity_feed(websocket: WebSocket, user_id: str = None, business_id: str = None):
+    """WebSocket endpoint for activity feed."""
+    await websocket_endpoint(websocket, user_id, business_id, initial_channels=["activity-feed"])
+
+
+@router.websocket("/ws/approvals")
+async def websocket_approvals(websocket: WebSocket, user_id: str = None, business_id: str = None):
+    """WebSocket endpoint for approvals."""
+    await websocket_endpoint(websocket, user_id, business_id, initial_channels=["approvals"])
+
+
+@router.websocket("/ws/workflows/{workflow_id}")
+async def websocket_workflows(websocket: WebSocket, workflow_id: str, user_id: str = None, business_id: str = None):
+    """WebSocket endpoint for workflow-specific updates."""
+    await websocket_endpoint(websocket, user_id, business_id, initial_channels=[f"workflow:{workflow_id}"])
 
 
 @router.get("/health")
