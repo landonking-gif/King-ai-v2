@@ -62,7 +62,7 @@
       "title": "Develop Agent Control Center",
       "description": "Create agent management dashboard with active agents list, spawn configuration, capability assignment, performance metrics, utilization charts, and control actions",
       "acceptanceCriteria": "Agents list displays, spawn/destroy actions work, metrics update in real-time, performance charts render",
-      "passes": false,
+      "passes": true,
       "priority": 2
     },
     {
