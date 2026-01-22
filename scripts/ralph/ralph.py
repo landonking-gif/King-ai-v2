@@ -12,10 +12,16 @@ import asyncio
 import subprocess
 import tempfile
 import base64
+import difflib
 from pathlib import Path
 from datetime import datetime
 
 class RalphLoop:
+    # Configuration constants
+    FUZZY_MATCH_THRESHOLD = 0.85  # 85% similarity threshold for fuzzy matching
+    MAX_CONTEXT_FILES = 5  # Maximum files to include in AI context
+    MAX_FILE_SIZE_FOR_CONTEXT = 50000  # Skip files larger than 50KB for context
+    
     def __init__(self, max_iterations=None, max_retries_per_story=3):
         self.max_iterations = max_iterations
         self.max_retries_per_story = max_retries_per_story
@@ -234,9 +240,9 @@ class RalphLoop:
                 prompt_file = f.name
             
             try:
-                # Try using 'gh copilot suggest' command with code generation type
+                # Try using 'gh copilot suggest' command for shell/code generation
                 result = subprocess.run(
-                    ['gh', 'copilot', 'suggest', '-t', 'git', enhanced_prompt[:500]],  # Shortened for CLI
+                    ['gh', 'copilot', 'suggest', '-t', 'shell', enhanced_prompt[:500]],  # Shortened for CLI
                     capture_output=True,
                     text=True,
                     timeout=300
@@ -308,9 +314,9 @@ class RalphLoop:
         enhanced = prompt
         if mentioned_files:
             enhanced += "\n\n## Current File Contents for Context\n"
-            for file_path in mentioned_files[:5]:  # Limit to 5 files to avoid token limits
+            for file_path in mentioned_files[:self.MAX_CONTEXT_FILES]:  # Use class constant
                 full_path = self.project_root / file_path
-                if full_path.exists() and full_path.stat().st_size < 50000:  # Skip large files
+                if full_path.exists() and full_path.stat().st_size < self.MAX_FILE_SIZE_FOR_CONTEXT:
                     try:
                         with open(full_path, 'r', encoding='utf-8') as f:
                             content = f.read()
@@ -392,7 +398,12 @@ class RalphLoop:
             replace_text = replace_text.strip()
             
             if search_text in content:
-                new_content = content.replace(search_text, replace_text, 1)  # Replace first occurrence
+                # Count occurrences to warn about multiple matches
+                occurrence_count = content.count(search_text)
+                if occurrence_count > 1:
+                    print(f"⚠️  Warning: Found {occurrence_count} occurrences, replacing first only")
+                
+                new_content = content.replace(search_text, replace_text, 1)  # Replace first occurrence only
                 
                 with open(full_path, 'w', encoding='utf-8') as f:
                     f.write(new_content)
@@ -401,7 +412,6 @@ class RalphLoop:
                 changes_made += 1
             else:
                 # Try fuzzy matching for minor whitespace differences
-                import difflib
                 lines = content.split('\n')
                 search_lines = search_text.split('\n')
                 
@@ -410,7 +420,7 @@ class RalphLoop:
                     block = '\n'.join(lines[i:i+len(search_lines)])
                     similarity = difflib.SequenceMatcher(None, search_text, block).ratio()
                     
-                    if similarity > 0.85:  # 85% similarity threshold
+                    if similarity > self.FUZZY_MATCH_THRESHOLD:
                         print(f"⚠️  Found approximate match (similarity: {similarity:.1%}) in {file_path}")
                         new_lines = lines[:i] + replace_text.split('\n') + lines[i+len(search_lines):]
                         new_content = '\n'.join(new_lines)
