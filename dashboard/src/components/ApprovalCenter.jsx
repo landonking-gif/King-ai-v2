@@ -1,33 +1,54 @@
 import React, { useState, useEffect } from 'react';
 import { CheckCircle, XCircle, Clock, AlertTriangle, Eye } from 'lucide-react';
+import { useWebSocket } from '../hooks/useWebSocket';
 
 const ApprovalCenter = () => {
-  const [approvals, setApprovals] = useState([
-    {
-      id: '1',
-      title: 'High-risk workflow execution',
-      description: 'Deploy new business unit with $50K budget',
-      priority: 'high',
-      risk_level: 'high',
-      ai_thinking: 'This workflow involves significant financial commitment. Risk factors include market volatility and execution complexity.',
-      provenance_chain: ['User Request', 'AI Analysis', 'Risk Assessment', 'Approval Required'],
-      expires_at: new Date(Date.now() + 3600000).toISOString(), // 1 hour from now
-      status: 'pending'
-    },
-    {
-      id: '2',
-      title: 'Medium-risk agent spawn',
-      description: 'Create new marketing agent for social media campaign',
-      priority: 'medium',
-      risk_level: 'medium',
-      ai_thinking: 'Moderate risk due to content generation capabilities. Standard safety protocols should mitigate concerns.',
-      provenance_chain: ['Campaign Request', 'Agent Selection', 'Capability Check'],
-      expires_at: new Date(Date.now() + 7200000).toISOString(), // 2 hours from now
-      status: 'pending'
-    }
-  ]);
-
+  const [approvals, setApprovals] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [selectedApprovals, setSelectedApprovals] = useState([]);
+
+  // WebSocket for real-time updates
+  const { connected } = useWebSocket('/api/ws/approvals', {
+    onEvent: (event, data) => {
+      if (event === 'approval_created') {
+        fetchApprovals(); // Refresh the list
+      } else if (event === 'approval_approved' || event === 'approval_rejected') {
+        // Remove the processed approval from the list
+        setApprovals(prev => prev.filter(app => app.id !== data.request_id));
+        setSelectedApprovals(prev => prev.filter(id => id !== data.request_id));
+      }
+    }
+  });
+
+  useEffect(() => {
+    fetchApprovals();
+  }, []);
+
+  const fetchApprovals = async () => {
+    try {
+      const response = await fetch('/api/approvals/pending');
+      const data = await response.json();
+      // Transform API response to component format
+      const transformedApprovals = (data.requests || []).map(req => ({
+        id: req.id,
+        title: req.title,
+        description: req.description,
+        priority: req.risk_level === 'critical' ? 'high' : req.risk_level === 'high' ? 'high' : req.risk_level === 'medium' ? 'medium' : 'low',
+        risk_level: req.risk_level,
+        ai_thinking: req.payload?.ai_analysis || 'AI analysis not available',
+        provenance_chain: req.payload?.provenance_chain || ['System Request', 'Risk Assessment'],
+        expires_at: req.expires_at,
+        status: 'pending',
+        risk_factors: req.risk_factors || [],
+        waiting_hours: req.waiting_hours || 0
+      }));
+      setApprovals(transformedApprovals);
+    } catch (error) {
+      console.error('Failed to fetch approvals:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getPriorityColor = (priority) => {
     switch (priority) {
@@ -61,16 +82,53 @@ const ApprovalCenter = () => {
   };
 
   const handleApprove = async (id) => {
-    // In real app, call API
-    setApprovals(prev => prev.map(app =>
-      app.id === id ? { ...app, status: 'approved' } : app
-    ));
+    try {
+      const response = await fetch(`/api/approvals/${id}/approve`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_id: 'dashboard-user', // In real app, get from auth context
+          notes: 'Approved from dashboard'
+        })
+      });
+
+      if (response.ok) {
+        // Remove from local state and refresh
+        setApprovals(prev => prev.filter(app => app.id !== id));
+        setSelectedApprovals(prev => prev.filter(selectedId => selectedId !== id));
+      } else {
+        console.error('Failed to approve request');
+      }
+    } catch (error) {
+      console.error('Error approving request:', error);
+    }
   };
 
   const handleReject = async (id) => {
-    setApprovals(prev => prev.map(app =>
-      app.id === id ? { ...app, status: 'rejected' } : app
-    ));
+    try {
+      const response = await fetch(`/api/approvals/${id}/reject`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_id: 'dashboard-user', // In real app, get from auth context
+          notes: 'Rejected from dashboard'
+        })
+      });
+
+      if (response.ok) {
+        // Remove from local state and refresh
+        setApprovals(prev => prev.filter(app => app.id !== id));
+        setSelectedApprovals(prev => prev.filter(selectedId => selectedId !== id));
+      } else {
+        console.error('Failed to reject request');
+      }
+    } catch (error) {
+      console.error('Error rejecting request:', error);
+    }
   };
 
   const handleBulkApprove = () => {
@@ -120,7 +178,19 @@ const ApprovalCenter = () => {
 
       {/* Approvals List */}
       <div className="space-y-6">
-        {approvals.filter(app => app.status === 'pending').map((approval) => (
+        {loading ? (
+          <div className="card glass text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+            <p className="text-gray-400">Loading approvals...</p>
+          </div>
+        ) : approvals.length === 0 ? (
+          <div className="card glass text-center py-12">
+            <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">All Caught Up!</h3>
+            <p className="text-gray-400">No pending approvals at this time.</p>
+          </div>
+        ) : (
+          approvals.map((approval) => (
           <div key={approval.id} className="card glass">
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-start gap-4">
@@ -209,14 +279,6 @@ const ApprovalCenter = () => {
           </div>
         ))}
       </div>
-
-      {approvals.filter(app => app.status === 'pending').length === 0 && (
-        <div className="card glass text-center py-12">
-          <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold mb-2">All Caught Up!</h3>
-          <p className="text-gray-400">No pending approvals at this time.</p>
-        </div>
-      )}
     </div>
   );
 };
