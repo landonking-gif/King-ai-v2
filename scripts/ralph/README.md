@@ -1,33 +1,51 @@
 # Ralph: Autonomous AI Agent Loop
 
-Ralph is an autonomous AI coding assistant that iteratively implements Product Requirement Documents (PRDs) using GitHub Copilot CLI. Based on Geoffrey Huntley's Ralph pattern, it maintains fresh context across iterations while accumulating learnings.
+Ralph is an autonomous AI coding assistant that iteratively implements Product Requirement Documents (PRDs) using AI code generation. Based on Geoffrey Huntley's Ralph pattern and Ryan Carson's implementation, it maintains fresh context across iterations while accumulating learnings.
 
-## Table of Contents
-- [Overview](#overview)
-- [Architecture](#architecture)
-- [Prerequisites](#prerequisites)
-- [Installation](#installation)
-- [Workflow](#workflow)
-- [Configuration](#configuration)
-- [Usage](#usage)
-- [PRD Format](#prd-format)
-- [Quality Assurance](#quality-assurance)
-- [Troubleshooting](#troubleshooting)
-- [Advanced Features](#advanced-features)
+**Ralph is a standalone tool** that can work with any codebase. While it was originally developed for King AI v2, it operates independently and can be used in any software project.
+
+## Quick Start
+
+1. **Check authentication**: `python check_auth.py`
+2. **Set up GitHub token** (if needed): `$env:GITHUB_TOKEN = 'your_token'`
+3. **Run Ralph**: `python ralph.py`
+
+## Requirements
+
+- Python 3.8+
+- GitHub Copilot CLI (`npm install -g @github/copilot-cli`)
+- A `prd.json` file in the project root
+- Optional: `progress.txt` for tracking progress across runs
 
 ## Overview
 
-Ralph automates the implementation of software features by:
-- Breaking down PRDs into small, implementable user stories
-- Generating detailed prompts for each story
-- Using GitHub Copilot CLI to implement code changes
-- Running quality checks to ensure code standards
-- Committing successful implementations
-- Accumulating learnings across iterations
+Ralph implements user stories from a PRD by:
+1. Reading the next incomplete story from `prd.json`
+2. Using GitHub Copilot CLI to generate implementation code
+3. Applying code changes to the codebase
+4. Running quality checks and tests
+5. Committing changes and marking stories complete
+6. Repeating until all stories are implemented or max retries reached
 
-### Key Benefits
-- **Autonomous Execution**: Runs without human intervention per story
-- **Fresh Context**: Each iteration starts clean, avoiding context limits
+## Key Features
+
+- **Cross-platform**: Python implementation works on Windows, Mac, and Linux
+- **AI-powered**: Uses GitHub Copilot CLI for code generation
+- **Smart retry logic**: Max 3 attempts per story before moving on
+- **Quality gates**: Automated testing, linting, and type checking
+- **Git integration**: Automatic branching, committing, and progress tracking
+- **Error recovery**: Continues working even if individual stories fail
+- **Failed story tracking**: Marks stories as failed after max retries
+- **Windows asyncio fixes**: Proper event loop handling for Windows
+
+## Files
+
+- `ralph.py` - Main Python implementation (recommended)
+- `check_auth.py` - Authentication checker and setup helper
+- `generate_code.py` - AI code generation wrapper
+- `prompt.md` - AI prompt template with codebase context
+- `ralph.bat` - Windows batch wrapper (legacy)
+- `ralph.sh` - Bash implementation (legacy)
 - **Quality Gates**: Automated testing prevents bad code commits
 - **Memory Persistence**: Learns from past iterations
 - **Project Awareness**: Adapts to your codebase conventions
@@ -53,73 +71,93 @@ Git History ───────────────┘
 ### Required
 - **GitHub Copilot Subscription**: Active Copilot plan
 - **GitHub Copilot CLI**: Installed and authenticated
-- **Node.js**: For Copilot CLI (v16+)
-- **Python 3.8+**: For JSON processing
+- **Python 3.8+**: For Ralph script
 - **Git**: Version control
-- **Bash**: Shell environment
 
 ### Optional
-- **jq**: Alternative JSON processor (script uses Python by default)
-- **Quality Tools**: pytest, ruff, mypy, bandit (configured in prompt.md)
+- **GitHub CLI (gh)**: For easier authentication
+- **Quality Tools**: pytest, ruff, mypy, bandit (configured in project)
 
 ## Installation
 
-### 1. Install Dependencies
-```bash
-# GitHub Copilot CLI
+### 1. Install GitHub Copilot CLI
+```powershell
+# Windows (PowerShell)
+npm install -g @githubnext/github-copilot-cli
+
+# Or with winget
 winget install GitHub.Copilot
-
-# Node.js (if not already installed)
-winget install OpenJS.NodeJS
-
-# Authenticate Copilot
-copilot
-/login  # Follow prompts
 ```
 
-### 2. Install Ralph
-Ralph is already installed in your project at `scripts/ralph/`.
+### 2. Set up Authentication
 
-### 3. Configure Skills (Optional)
-Skills are pre-installed in:
-- `.copilot/skills/prd/`
-- `.copilot/skills/ralph/`
-- `.opencode/skill/prd/`
-- `.opencode/skill/ralph/`
-
-## Workflow
-
-### 1. Create PRD
-Use the PRD skill to generate requirements:
-```
-/load prd
-Create a PRD for [feature description]
+**Option A: GitHub CLI (Recommended)**
+```powershell
+gh auth login
 ```
 
-This saves to `tasks/prd-[feature-name].md`
-
-### 2. Convert to Ralph Format
-Use the Ralph skill to convert markdown to JSON:
-```
-/load ralph
-Convert tasks/prd-[feature-name].md to prd.json
+**Option B: Personal Access Token**
+```powershell
+# Create token at: https://github.com/settings/tokens
+# Required scopes: read:user, user:email
+$env:GITHUB_TOKEN = 'your_token_here'
 ```
 
-### 3. Run Auto Ralph (Fully Automated)
-For complete automation from feature description to implementation:
-```bash
-./scripts/ralph/auto_ralph.sh "Add user authentication system with login, logout, and password reset"
+### 3. Verify Setup
+```powershell
+python scripts/ralph/check_auth.py
 ```
 
-This will:
-- Generate a PRD using Copilot
-- Convert it to JSON format
-- Run Ralph until all stories are completed
+## Usage
 
-### 4. Monitor Progress
-- Check `progress.txt` for learnings
-- Review git log for commits
-- Monitor `prd.json` for completion status
+### Basic Usage
+```powershell
+# Run until all stories complete or max retries
+python scripts/ralph/ralph.py
+
+# Run for specific number of iterations
+python scripts/ralph/ralph.py 5
+
+# Set custom max retries per story
+python scripts/ralph/ralph.py --max-retries 5
+
+# Reset all stories to incomplete
+python scripts/ralph/ralph.py --reset
+```
+
+### Command Line Arguments
+```
+usage: ralph.py [-h] [--max-retries MAX_RETRIES] [--reset] [max_iterations]
+
+positional arguments:
+  max_iterations        Maximum number of iterations (default: unlimited)
+
+optional arguments:
+  -h, --help           Show this help message and exit
+  --max-retries N      Maximum retries per story before marking as failed (default: 3)
+  --reset              Reset all stories to incomplete
+```
+
+### Workflow
+
+1. **Create PRD**: Edit `prd.json` with your user stories
+2. **Check Auth**: Run `python scripts/ralph/check_auth.py`
+3. **Run Ralph**: Run `python scripts/ralph/ralph.py`
+4. **Monitor**: Check `progress.txt` and git commits
+
+### Understanding Story Status
+
+Stories can have three states:
+- **Incomplete** (`passes: false`): Not yet implemented
+- **Complete** (`passes: true`): Successfully implemented
+- **Failed** (`metadata.failed: true`): Exceeded max retries, skipped
+
+### Retry Logic
+
+- Each story gets up to 3 attempts by default (configurable with `--max-retries`)
+- After max retries, story is marked as failed and Ralph moves to next story
+- Failed stories are tracked in `prd.json` metadata
+- Use `--reset` to clear all completion and failure status
 
 ## Configuration
 
@@ -131,14 +169,10 @@ Edit `scripts/ralph/prompt.md` to include:
 - Team preferences
 
 ### Quality Checks
-Modify the quality check section in `ralph.sh`:
-```bash
-# Add your checks here
-pytest
-ruff check
-mypy
-bandit
-```
+Quality checks run automatically in `ralph.py`:
+- Python: Syntax check with `py_compile`
+- TypeScript: Type checking with `npm run type-check`
+- Extensible: Add more checks in `_run_quality_checks()`
 
 ### Project Context
 Update the prompt template with:

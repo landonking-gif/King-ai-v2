@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  control-panel-backend:
+    build:
+      context: ./control-panel
+      dockerfile: Dockerfile
+    ports:
+      - "8100:8100"
+    environment:
+      - SECRET_KEY=your-secret-key-here
+      - DATABASE_URL=postgresql+asyncpg://control_user:password@control-postgres:5432/control_panel
+      - REDIS_URL=redis://control-redis:6379
+    depends_on:
+      - control-postgres
+      - control-redis
+    volumes:
+      - ./control-panel:/app
+    networks:
+      - control-panel-network
+
+  control-panel-frontend:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_BASE=http://localhost:8100
+    depends_on:
+      - control-panel-backend
+    networks:
+      - control-panel-network
+
+  control-postgres:
+    image: postgres:16
+    environment:
+      - POSTGRES_USER=control_user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=control_panel
+    volumes:
+      - control_pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - control-panel-network
+
+  control-redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    networks:
+      - control-panel-network
+
+volumes:
+  control_pgdata:
+
+networks:
+  control-panel-network:
+    driver: bridge

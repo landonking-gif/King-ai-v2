@@ -179,6 +179,23 @@ class WorkflowExecutor:
         
         return run
     
+    async def execute_workflow(
+        self,
+        workflow: WorkflowManifest,
+        variables: Dict[str, Any] = None,
+        business_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+    ) -> WorkflowRun:
+        """
+        Alias for execute method to match API expectations.
+        """
+        return await self.execute(
+            workflow=workflow,
+            variables=variables,
+            business_id=business_id,
+            user_id=user_id,
+        )
+
     async def cancel(self, run_id: str) -> bool:
         """Cancel a running workflow."""
         run = self._active_runs.get(run_id)
@@ -218,15 +235,18 @@ class WorkflowExecutor:
         run: WorkflowRun,
         step_ids: List[str],
     ) -> None:
-        """Execute a batch of steps in parallel."""
-        tasks = []
-        for step_id in step_ids:
-            task = asyncio.create_task(
-                self._execute_step(workflow, run, step_id)
-            )
-            tasks.append(task)
-        
-        # Wait for all with limit
+        """Execute a batch of steps in parallel honoring max_parallel_steps."""
+        # Respect workflow-level max_parallel_steps
+        max_parallel = max(1, getattr(workflow, "max_parallel_steps", len(step_ids)))
+        sem = asyncio.Semaphore(max_parallel)
+
+        async def _run_step_with_semaphore(sid: str):
+            async with sem:
+                return await self._execute_step(workflow, run, sid)
+
+        tasks = [asyncio.create_task(_run_step_with_semaphore(sid)) for sid in step_ids]
+
+        # Wait for all tasks to complete
         await asyncio.gather(*tasks, return_exceptions=True)
     
     async def _execute_step(

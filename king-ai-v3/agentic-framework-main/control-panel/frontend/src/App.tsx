@@ -6,6 +6,9 @@ import WorkflowStudioPage from './pages/WorkflowStudio'
 import ApprovalCenterPage from './pages/ApprovalCenter'
 import AnalyticsPage from './pages/Analytics'
 import SettingsPage from './pages/Settings'
+import AgentControlCenterPage from './pages/AgentControlCenter'
+import PLTrackerPage from './pages/PLTracker'
+import ConversationalInterfacePage from './pages/ConversationalInterface'
 import Login from './components/Login'
 import ProtectedRoute from './components/ProtectedRoute'
 import Layout from './components/Layout'
@@ -27,6 +30,9 @@ function App() {
                     <Route path="/" element={<Dashboard />} />
                     <Route path="/workflow-studio" element={<WorkflowStudioPage />} />
                     <Route path="/approvals" element={<ApprovalCenterPage />} />
+                    <Route path="/agents" element={<AgentControlCenterPage />} />
+                    <Route path="/pl-tracker" element={<PLTrackerPage />} />
+                    <Route path="/talk-to-ai" element={<ConversationalInterfacePage />} />
                     <Route path="/analytics" element={<AnalyticsPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
                   </Routes>
