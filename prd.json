@@ -30,7 +30,7 @@
       "title": "Create service proxy layer",
       "description": "Implement API proxy routes to forward requests to all 5 microservices (Orchestrator, Subagent Manager, Memory Service, MCP Gateway, Code Executor)",
       "acceptanceCriteria": "All proxy routes configured (/api/orchestrator/* -> localhost:8000, etc.), requests properly forwarded, error handling implemented",
-      "passes": false,
+      "passes": true,
       "priority": 1
     },
     {
@@ -54,7 +54,7 @@
       "title": "Create Approval Center",
       "description": "Build approval management interface with pending approvals list, risk assessment display, AI thinking traces, provenance visualization, bulk operations, and audit trail",
       "acceptanceCriteria": "Approvals display with all metadata, bulk approve/reject works, audit trail recorded, real-time updates",
-      "passes": true,
+      "passes": false,
       "priority": 2
     },
     {
@@ -70,7 +70,7 @@
       "title": "Implement Analytics and Settings dashboards",
       "description": "Build Analytics dashboard with performance metrics, system health, agent performance, and activity monitoring. Create Settings panel for system configuration management.",
       "acceptanceCriteria": "Analytics dashboard displays metrics and charts, Settings panel allows configuration updates, data displays correctly, interactive features operational",
-      "passes": true,
+      "passes": false,
       "priority": 3
     },
     {

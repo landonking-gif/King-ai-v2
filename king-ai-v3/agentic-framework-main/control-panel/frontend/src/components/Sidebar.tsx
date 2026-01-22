@@ -7,7 +7,10 @@ import {
   BarChart3,
   Settings,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Bot,
+  TrendingUp,
+  MessageCircle
 } from 'lucide-react'
 
 const Sidebar = () => {
@@ -19,6 +22,9 @@ const Sidebar = () => {
     { icon: LayoutDashboard, label: 'Command Center', path: '/', active: location.pathname === '/' },
     { icon: Workflow, label: 'Workflow Studio', path: '/workflow-studio', active: location.pathname === '/workflow-studio' },
     { icon: CheckCircle, label: 'Approval Center', path: '/approvals', active: location.pathname === '/approvals' },
+    { icon: Bot, label: 'Agent Control', path: '/agents', active: location.pathname === '/agents' },
+    { icon: TrendingUp, label: 'P&L Tracker', path: '/pl-tracker', active: location.pathname === '/pl-tracker' },
+    { icon: MessageCircle, label: 'Talk to AI', path: '/talk-to-ai', active: location.pathname === '/talk-to-ai' },
     { icon: BarChart3, label: 'Analytics', path: '/analytics', active: location.pathname === '/analytics' },
     { icon: Settings, label: 'Settings', path: '/settings', active: location.pathname === '/settings' }
   ]

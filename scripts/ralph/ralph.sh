@@ -15,8 +15,8 @@ PROGRESS_FILE="progress.txt"
 PROMPT_FILE="scripts/ralph/prompt.md"
 
 # Check prerequisites
-if ! command -v python3 >/dev/null 2>&1; then
-    echo "python3 is required but not installed. Aborting."
+if ! command -v python >/dev/null 2>&1; then
+    echo "python is required but not installed. Aborting."
     exit 1
 fi
 command -v git >/dev/null 2>&1 || { echo "git is required but not installed. Aborting."; exit 1; }
@@ -29,7 +29,7 @@ if [ ! -f "$PRD_FILE" ]; then
 fi
 
 # Get branch name from prd.json
-BRANCH_NAME=$(python3 -c "import json; print(json.load(open('$PRD_FILE'))['branchName'])" 2>/dev/null)
+BRANCH_NAME=$(python -c "import json; print(json.load(open('$PRD_FILE'))['branchName'])" 2>/dev/null)
 if [ "$BRANCH_NAME" = "null" ] || [ -z "$BRANCH_NAME" ]; then
     echo "branchName not found in prd.json"
     exit 1
@@ -54,7 +54,7 @@ while [ $iteration -le $MAX_ITERATIONS ]; do
     echo "=== Ralph Iteration $iteration ==="
 
     # Find highest priority incomplete story
-    STORY=$(python3 -c "
+    STORY=$(python -c "
 import json, base64
 data = json.load(open('$PRD_FILE'))
 incomplete_stories = [s for s in data['userStories'] if not s['passes']]
@@ -72,10 +72,10 @@ else:
 
     # Decode story
     STORY_JSON=$(echo "$STORY" | base64 -d)
-    STORY_ID=$(python3 -c "import json, base64; story = json.loads(base64.b64decode('$STORY').decode()); print(story['id'])" 2>/dev/null)
-    STORY_TITLE=$(python3 -c "import json, base64; story = json.loads(base64.b64decode('$STORY').decode()); print(story['title'])" 2>/dev/null)
-    STORY_DESCRIPTION=$(python3 -c "import json, base64; story = json.loads(base64.b64decode('$STORY').decode()); print(story['description'])" 2>/dev/null)
-    STORY_ACCEPTANCE=$(python3 -c "import json, base64; story = json.loads(base64.b64decode('$STORY').decode()); print(story['acceptanceCriteria'])" 2>/dev/null)
+    STORY_ID=$(python -c "import json, base64; story = json.loads(base64.b64decode('$STORY').decode()); print(story['id'])" 2>/dev/null)
+    STORY_TITLE=$(python -c "import json, base64; story = json.loads(base64.b64decode('$STORY').decode()); print(story['title'])" 2>/dev/null)
+    STORY_DESCRIPTION=$(python -c "import json, base64; story = json.loads(base64.b64decode('$STORY').decode()); print(story['description'])" 2>/dev/null)
+    STORY_ACCEPTANCE=$(python -c "import json, base64; story = json.loads(base64.b64decode('$STORY').decode()); print(story['acceptanceCriteria'])" 2>/dev/null)
 
     echo "Working on story: $STORY_TITLE"
 
@@ -100,7 +100,7 @@ $PROGRESS_CONTEXT"
 
     # Run AI code generation
     echo "Running AI code generation for story $STORY_ID..."
-    GENERATED_CODE=$(echo "$ITERATION_PROMPT" | python3 scripts/ralph/generate_code.py)
+    GENERATED_CODE=$(echo "$ITERATION_PROMPT" | python scripts/ralph/generate_code.py)
 
     # Check if generation succeeded
     if [ $? -eq 0 ] && [ -n "$GENERATED_CODE" ]; then
@@ -112,7 +112,7 @@ $PROGRESS_CONTEXT"
         echo "$GENERATED_CODE" > "/tmp/ralph_code_$iteration.txt"
 
         # Parse and apply code changes (simple implementation - could be enhanced)
-        python3 -c "
+        python -c "
 import re
 import os
 
@@ -155,7 +155,7 @@ for file_match in re.finditer(r'```\s*([^`\n]+)\s*\n(.*?)\n```', content, re.MUL
             git commit -m "Ralph: Complete story $STORY_ID - $STORY_TITLE"
 
             # Update prd.json
-            python3 -c "
+            python -c "
 import json
 data = json.load(open('$PRD_FILE'))
 for story in data['userStories']:

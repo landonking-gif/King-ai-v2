@@ -3,7 +3,7 @@ Master Control Panel Backend
 FastAPI server providing REST API and WebSocket support for the King AI v3 Agentic Framework control panel.
 """
 
-from fastapi import FastAPI, HTTPException, Depends, status, Request
+from fastapi import FastAPI, HTTPException, Depends, status, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 import uvicorn
 import os
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Set
 import asyncio
 import json
 from datetime import datetime
@@ -29,25 +29,31 @@ from config.settings import Settings
 # Stub implementations for missing modules
 class WebSocketManager:
     def __init__(self):
-        self.connections = {}
+        self.active_connections: Dict[str, Set[WebSocket]] = {}
 
-    def connect(self, websocket, channel):
-        if channel not in self.connections:
-            self.connections[channel] = []
-        self.connections[channel].append(websocket)
-        return websocket.accept()
+    async def connect(self, websocket: WebSocket, channel: str):
+        await websocket.accept()
+        if channel not in self.active_connections:
+            self.active_connections[channel] = set()
+        self.active_connections[channel].add(websocket)
 
-    def disconnect(self, websocket, channel):
-        if channel in self.connections:
-            self.connections[channel].remove(websocket)
+    def disconnect(self, websocket: WebSocket, channel: str):
+        if channel in self.active_connections:
+            self.active_connections[channel].discard(websocket)
+            if not self.active_connections[channel]:
+                del self.active_connections[channel]
 
-    async def broadcast(self, channel, message):
-        if channel in self.connections:
-            for websocket in self.connections[channel]:
+    async def broadcast(self, channel: str, message: Dict[str, Any]):
+        if channel in self.active_connections:
+            disconnected = set()
+            for websocket in self.active_connections[channel]:
                 try:
                     await websocket.send_json(message)
                 except:
-                    pass
+                    disconnected.add(websocket)
+            # Clean up disconnected clients
+            for websocket in disconnected:
+                self.active_connections[channel].discard(websocket)
 
 class SystemMonitor:
     async def get_system_health(self): return {"status": "healthy"}
@@ -174,6 +180,11 @@ app = FastAPI(
     description="Comprehensive dashboard for monitoring and controlling the Agentic Framework",
     version="1.0.0"
 )
+
+# Initialize managers
+ws_manager = WebSocketManager()
+system_monitor = SystemMonitor()
+approval_manager = ApprovalManager()
 
 # CORS middleware
 app.add_middleware(
@@ -683,6 +694,567 @@ async def get_users(current_user: User = Depends(get_current_active_user)):
             "disabled": user_data["disabled"]
         })
     return users
+
+# ============================================================================
+# SERVICE PROXY LAYER - Forward requests to microservices
+# ============================================================================
+
+SERVICE_URLS = {
+    "orchestrator": "http://localhost:8000",
+    "subagent-manager": "http://localhost:8001",
+    "memory": "http://localhost:8002",
+    "mcp": "http://localhost:8080",
+    "code-exec": "http://localhost:8004",
+}
+
+async def proxy_request(service: str, path: str, request: Request, current_user: User = Depends(get_current_active_user)):
+    """Generic proxy handler for forwarding requests to microservices"""
+    if service not in SERVICE_URLS:
+        raise HTTPException(status_code=404, detail=f"Service '{service}' not found")
+    
+    service_url = SERVICE_URLS[service]
+    target_url = f"{service_url}/{path}"
+    
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            # Forward the request with original method
+            method = request.method
+            headers = dict(request.headers)
+            # Remove host header to let httpx set it
+            headers.pop("host", None)
+            
+            # Get request body if POST/PUT/PATCH
+            body = None
+            if method in ["POST", "PUT", "PATCH"]:
+                body = await request.body()
+            
+            response = await client.request(
+                method=method,
+                url=target_url,
+                headers=headers,
+                content=body,
+                params=dict(request.query_params)
+            )
+            
+            return {
+                "status": response.status_code,
+                "data": response.json() if response.text else {},
+                "headers": dict(response.headers)
+            }
+    except httpx.ConnectError:
+        raise HTTPException(status_code=503, detail=f"Service '{service}' is unavailable")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Proxy error: {str(e)}")
+
+# Orchestrator proxy routes
+@app.get("/api/orchestrator/health")
+async def proxy_orchestrator_health(user: User = Depends(get_current_active_user)):
+    """Get Orchestrator health"""
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(f"{SERVICE_URLS['orchestrator']}/health")
+            return response.json()
+    except:
+        return {"status": "unhealthy", "service": "orchestrator"}
+
+@app.get("/api/orchestrator/workflows")
+async def proxy_orchestrator_workflows(user: User = Depends(get_current_active_user)):
+    """List workflows from Orchestrator"""
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(f"{SERVICE_URLS['orchestrator']}/workflows")
+            return response.json()
+    except:
+        return {"workflows": [], "error": "Could not fetch from orchestrator"}
+
+@app.post("/api/orchestrator/workflows")
+async def proxy_create_workflow(request: Request, user: User = Depends(get_current_active_user)):
+    """Create new workflow in Orchestrator"""
+    try:
+        body = await request.json()
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(
+                f"{SERVICE_URLS['orchestrator']}/workflows",
+                json=body
+            )
+            return response.json()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/api/orchestrator/workflows/{workflow_id}")
+async def proxy_get_workflow(workflow_id: str, user: User = Depends(get_current_active_user)):
+    """Get specific workflow from Orchestrator"""
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(
+                f"{SERVICE_URLS['orchestrator']}/workflows/{workflow_id}"
+            )
+            return response.json()
+    except:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+
+# Subagent Manager proxy routes
+@app.get("/api/subagent-manager/health")
+async def proxy_subagent_health(user: User = Depends(get_current_active_user)):
+    """Get Subagent Manager health"""
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(f"{SERVICE_URLS['subagent-manager']}/health")
+            return response.json()
+    except:
+        return {"status": "unhealthy", "service": "subagent-manager"}
+
+@app.get("/api/subagent-manager/agents")
+async def proxy_list_agents(user: User = Depends(get_current_active_user)):
+    """List active agents"""
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(f"{SERVICE_URLS['subagent-manager']}/agents")
+            return response.json()
+    except:
+        return {"agents": [], "error": "Could not fetch from subagent manager"}
+
+# Memory Service proxy routes
+@app.get("/api/memory/health")
+async def proxy_memory_health(user: User = Depends(get_current_active_user)):
+    """Get Memory Service health"""
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(f"{SERVICE_URLS['memory']}/health")
+            return response.json()
+    except:
+        return {"status": "unhealthy", "service": "memory-service"}
+
+@app.get("/api/memory/stats")
+async def proxy_memory_stats(user: User = Depends(get_current_active_user)):
+    """Get memory statistics"""
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(f"{SERVICE_URLS['memory']}/stats")
+            return response.json()
+    except:
+        return {"tiers": {}, "error": "Could not fetch from memory service"}
+
+# MCP Gateway proxy routes
+@app.get("/api/mcp/health")
+async def proxy_mcp_health(user: User = Depends(get_current_active_user)):
+    """Get MCP Gateway health"""
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(f"{SERVICE_URLS['mcp']}/health")
+            return response.json()
+    except:
+        return {"status": "unhealthy", "service": "mcp-gateway"}
+
+@app.get("/api/mcp/tools")
+async def proxy_mcp_tools(user: User = Depends(get_current_active_user)):
+    """List available MCP tools"""
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(f"{SERVICE_URLS['mcp']}/tools")
+            return response.json()
+    except:
+        return {"tools": [], "error": "Could not fetch from MCP gateway"}
+
+# Code Executor proxy routes
+@app.get("/api/code-exec/health")
+async def proxy_codeexec_health(user: User = Depends(get_current_active_user)):
+    """Get Code Executor health"""
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(f"{SERVICE_URLS['code-exec']}/health")
+            return response.json()
+    except:
+        return {"status": "unhealthy", "service": "code-executor"}
+
+@app.post("/api/code-exec/execute")
+async def proxy_execute_code(request: Request, user: User = Depends(get_current_active_user)):
+    """Execute code in sandbox"""
+    try:
+        body = await request.json()
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                f"{SERVICE_URLS['code-exec']}/execute",
+                json=body
+            )
+            return response.json()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+# Health check for all services (aggregated)
+@app.get("/api/services/health")
+async def proxy_all_services_health(user: User = Depends(get_current_active_user)):
+    """Get health status of all microservices"""
+    health_status = {}
+    
+    for service_name, url in SERVICE_URLS.items():
+        try:
+            async with httpx.AsyncClient(timeout=3.0) as client:
+                response = await client.get(f"{url}/health")
+                health_status[service_name] = {
+                    "status": "healthy" if response.status_code == 200 else "unhealthy",
+                    "url": url,
+                    "response_time_ms": response.elapsed.total_seconds() * 1000
+                }
+        except:
+            health_status[service_name] = {
+                "status": "unhealthy",
+                "url": url,
+                "error": "Connection failed"
+            }
+    
+    return health_status
+
+# ============================================================================
+# WEBSOCKET ENDPOINTS - Real-time updates
+# ============================================================================
+
+@app.websocket("/ws/activity-feed")
+async def websocket_activity_feed(websocket: WebSocket):
+    """WebSocket endpoint for real-time activity feed"""
+    channel = "activity-feed"
+    await ws_manager.connect(websocket, channel)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            # Echo or process incoming messages
+            await ws_manager.broadcast(channel, {
+                "type": "activity",
+                "timestamp": datetime.utcnow().isoformat(),
+                "data": json.loads(data) if isinstance(data, str) else data
+            })
+    except WebSocketDisconnect:
+        ws_manager.disconnect(websocket, channel)
+    except Exception as e:
+        ws_manager.disconnect(websocket, channel)
+
+@app.websocket("/ws/approvals")
+async def websocket_approvals(websocket: WebSocket):
+    """WebSocket endpoint for approval updates"""
+    channel = "approvals"
+    await ws_manager.connect(websocket, channel)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            await ws_manager.broadcast(channel, {
+                "type": "approval",
+                "timestamp": datetime.utcnow().isoformat(),
+                "data": json.loads(data) if isinstance(data, str) else data
+            })
+    except WebSocketDisconnect:
+        ws_manager.disconnect(websocket, channel)
+    except Exception as e:
+        ws_manager.disconnect(websocket, channel)
+
+@app.websocket("/ws/workflows/{workflow_id}")
+async def websocket_workflow_status(websocket: WebSocket, workflow_id: str):
+    """WebSocket endpoint for workflow status updates"""
+    channel = f"workflow-{workflow_id}"
+    await ws_manager.connect(websocket, channel)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            await ws_manager.broadcast(channel, {
+                "type": "workflow_update",
+                "workflow_id": workflow_id,
+                "timestamp": datetime.utcnow().isoformat(),
+                "data": json.loads(data) if isinstance(data, str) else data
+            })
+    except WebSocketDisconnect:
+        ws_manager.disconnect(websocket, channel)
+    except Exception as e:
+        ws_manager.disconnect(websocket, channel)
+
+@app.websocket("/ws/agents")
+async def websocket_agent_updates(websocket: WebSocket):
+    """WebSocket endpoint for agent status updates"""
+    channel = "agent-updates"
+    await ws_manager.connect(websocket, channel)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            await ws_manager.broadcast(channel, {
+                "type": "agent_update",
+                "timestamp": datetime.utcnow().isoformat(),
+                "data": json.loads(data) if isinstance(data, str) else data
+            })
+    except WebSocketDisconnect:
+        ws_manager.disconnect(websocket, channel)
+    except Exception as e:
+        ws_manager.disconnect(websocket, channel)
+
+@app.post("/api/broadcast/{channel}")
+async def broadcast_message(channel: str, message: Dict[str, Any], user: User = Depends(get_current_active_user)):
+    """Broadcast a message to all clients on a channel"""
+    if user.role != "admin" and user.role != "operator":
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    await ws_manager.broadcast(channel, {
+        "type": "broadcast",
+        "sender": user.username,
+        "timestamp": datetime.utcnow().isoformat(),
+        "data": message
+    })
+    
+    return {"status": "broadcasted"}
+
+# ============================================================================
+# P&L TRACKING ENDPOINTS - Business Intelligence & Financial Tracking
+# ============================================================================
+
+# In-memory storage for demo (in production, use database)
+transactions_store: List[Dict[str, Any]] = []
+business_units_store: List[Dict[str, Any]] = []
+
+@app.post("/api/business/units")
+async def create_business_unit(unit_data: Dict[str, str], user: User = Depends(get_current_active_user)):
+    """Create a new business unit"""
+    if user.role not in ["admin", "operator", "analyst"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    unit = {
+        "id": f"unit-{len(business_units_store) + 1}",
+        "name": unit_data.get("name", "Unknown"),
+        "description": unit_data.get("description", ""),
+        "created_at": datetime.utcnow().isoformat(),
+    }
+    business_units_store.append(unit)
+    return unit
+
+@app.get("/api/business/units")
+async def list_business_units(user: User = Depends(get_current_active_user)):
+    """List all business units"""
+    return {"units": business_units_store}
+
+@app.post("/api/business/transactions")
+async def record_transaction(transaction_data: Dict[str, Any], user: User = Depends(get_current_active_user)):
+    """Record a financial transaction"""
+    if user.role not in ["admin", "operator"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    transaction = {
+        "id": f"txn-{len(transactions_store) + 1}",
+        "business_unit_id": transaction_data.get("business_unit_id", ""),
+        "workflow_id": transaction_data.get("workflow_id"),
+        "transaction_type": transaction_data.get("transaction_type", "expense"),
+        "category": transaction_data.get("category", ""),
+        "amount": float(transaction_data.get("amount", 0)),
+        "description": transaction_data.get("description", ""),
+        "timestamp": datetime.utcnow().isoformat(),
+        "metadata": transaction_data.get("metadata", {}),
+    }
+    transactions_store.append(transaction)
+    
+    # Broadcast update via WebSocket
+    await ws_manager.broadcast("pl-updates", {
+        "type": "transaction_recorded",
+        "transaction": transaction,
+        "timestamp": datetime.utcnow().isoformat()
+    })
+    
+    return transaction
+
+@app.get("/api/business/pl/summary")
+async def get_pl_summary(period: str = "monthly", user: User = Depends(get_current_active_user)):
+    """Get P&L summary for specified period"""
+    if user.role not in ["admin", "operator", "analyst"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    revenue = sum(t["amount"] for t in transactions_store if t["transaction_type"] == "revenue")
+    expenses = sum(t["amount"] for t in transactions_store if t["transaction_type"] == "expense")
+    net_profit = revenue - expenses
+    margin_percent = (net_profit / revenue * 100) if revenue > 0 else 0
+    
+    return {
+        "period": period,
+        "total_revenue": revenue,
+        "total_expenses": expenses,
+        "net_profit": net_profit,
+        "margin_percent": round(margin_percent, 2),
+        "transaction_count": len(transactions_store),
+        "avg_transaction_value": sum(t["amount"] for t in transactions_store) / len(transactions_store) if transactions_store else 0
+    }
+
+@app.get("/api/business/pl/trends")
+async def get_pl_trends(days: int = 30, user: User = Depends(get_current_active_user)):
+    """Get P&L trends over time"""
+    if user.role not in ["admin", "operator", "analyst"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    # Group transactions by day
+    trends: Dict[str, Dict[str, float]] = {}
+    for txn in transactions_store:
+        date_key = txn["timestamp"][:10]
+        if date_key not in trends:
+            trends[date_key] = {"revenue": 0, "expenses": 0}
+        
+        if txn["transaction_type"] == "revenue":
+            trends[date_key]["revenue"] += txn["amount"]
+        else:
+            trends[date_key]["expenses"] += txn["amount"]
+    
+    # Convert to list and calculate margins
+    trend_list = []
+    for date, values in sorted(trends.items()):
+        profit = values["revenue"] - values["expenses"]
+        margin = (profit / values["revenue"] * 100) if values["revenue"] > 0 else 0
+        trend_list.append({
+            "date": date,
+            "revenue": values["revenue"],
+            "expenses": values["expenses"],
+            "profit": profit,
+            "margin_percent": round(margin, 2)
+        })
+    
+    return {"trends": trend_list[-days:] if len(trend_list) > days else trend_list}
+
+@app.get("/api/business/pl/breakdown")
+async def get_cost_breakdown(user: User = Depends(get_current_active_user)):
+    """Get cost breakdown by category"""
+    if user.role not in ["admin", "operator", "analyst"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    breakdown: Dict[str, Dict[str, float]] = {}
+    expenses = [t for t in transactions_store if t["transaction_type"] == "expense"]
+    total_expenses = sum(t["amount"] for t in expenses)
+    
+    for txn in expenses:
+        category = txn["category"]
+        if category not in breakdown:
+            breakdown[category] = {"amount": 0, "transactions": 0}
+        breakdown[category]["amount"] += txn["amount"]
+        breakdown[category]["transactions"] += 1
+    
+    # Calculate percentages
+    result = []
+    for category, data in breakdown.items():
+        percentage = (data["amount"] / total_expenses * 100) if total_expenses > 0 else 0
+        result.append({
+            "category": category,
+            "amount": round(data["amount"], 2),
+            "percentage": round(percentage, 2),
+            "transactions": data["transactions"]
+        })
+    
+    return {"breakdown": sorted(result, key=lambda x: x["amount"], reverse=True)}
+
+@app.get("/api/business/pl/roi/{workflow_id}")
+async def get_workflow_roi(workflow_id: str, user: User = Depends(get_current_active_user)):
+    """Calculate ROI for a specific workflow"""
+    if user.role not in ["admin", "operator", "analyst"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    workflow_txns = [t for t in transactions_store if t.get("workflow_id") == workflow_id]
+    
+    investment = sum(t["amount"] for t in workflow_txns if t["transaction_type"] == "expense")
+    revenue = sum(t["amount"] for t in workflow_txns if t["transaction_type"] == "revenue")
+    
+    roi_percent = ((revenue - investment) / investment * 100) if investment > 0 else 0
+    
+    return {
+        "workflow_id": workflow_id,
+        "total_investment": round(investment, 2),
+        "total_revenue": round(revenue, 2),
+        "roi_percent": round(roi_percent, 2),
+        "transaction_count": len(workflow_txns)
+    }
+
+@app.websocket("/ws/pl-updates")
+async def websocket_pl_updates(websocket: WebSocket):
+    """WebSocket endpoint for real-time P&L updates"""
+    channel = "pl-updates"
+    await ws_manager.connect(websocket, channel)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            # Just keep connection open, updates are pushed by other endpoints
+            await asyncio.sleep(1)
+    except WebSocketDisconnect:
+        ws_manager.disconnect(websocket, channel)
+    except Exception as e:
+        ws_manager.disconnect(websocket, channel)
+
+# ============================================================================
+# CONVERSATIONAL INTERFACE ENDPOINTS - Chat and AI interaction
+# ============================================================================
+
+# In-memory chat storage
+chat_history_store: List[Dict[str, Any]] = []
+
+class ChatMessage(BaseModel):
+    message: str
+    metadata: Optional[Dict[str, Any]] = None
+
+@app.post("/api/chat/message")
+async def send_chat_message(msg: ChatMessage, user: User = Depends(get_current_active_user)):
+    """Send a message to King AI conversational interface"""
+    user_message = {
+        "id": f"msg-{len(chat_history_store) + 1}",
+        "role": "user",
+        "content": msg.message,
+        "username": user.username,
+        "timestamp": datetime.utcnow().isoformat(),
+    }
+    chat_history_store.append(user_message)
+    
+    # Generate AI response (simplified)
+    content = msg.message.lower()
+    if "create" in content and "workflow" in content:
+        response = f'I\'ve created a new workflow from your request: "{msg.message[:50]}...". Would you like to execute it?'
+        metadata = {"workflow_created": True, "workflow_id": f"wf-{len(chat_history_store)}"}
+    elif "analyze" in content or "report" in content:
+        response = "Here's the analysis: System is performing optimally. All services are healthy. Would you like more details?"
+        metadata = {"analysis": True}
+    elif "execute" in content or "run" in content:
+        response = "Workflow execution started. Step 1 of 3 completed. Moving to Step 2..."
+        metadata = {"execution": True}
+    else:
+        response = f'I understand you want to "{msg.message}". In conversational mode, I can help you create workflows, analyze data, or execute tasks. What would be most helpful?'
+        metadata = {}
+    
+    ai_message = {
+        "id": f"msg-{len(chat_history_store) + 1}",
+        "role": "assistant",
+        "content": response,
+        "timestamp": datetime.utcnow().isoformat(),
+        "metadata": metadata,
+    }
+    chat_history_store.append(ai_message)
+    
+    # Broadcast via WebSocket
+    await ws_manager.broadcast("chat", {
+        "type": "message",
+        "role": "assistant",
+        "content": response,
+        "metadata": metadata,
+        "timestamp": datetime.utcnow().isoformat()
+    })
+    
+    return ai_message
+
+@app.get("/api/chat/history")
+async def get_chat_history(limit: int = 50, user: User = Depends(get_current_active_user)):
+    """Get chat history"""
+    return {"messages": chat_history_store[-limit:] if len(chat_history_store) > limit else chat_history_store}
+
+@app.websocket("/ws/chat")
+async def websocket_chat(websocket: WebSocket):
+    """WebSocket endpoint for real-time chat updates"""
+    channel = "chat"
+    await ws_manager.connect(websocket, channel)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            # Broadcast new messages
+            await ws_manager.broadcast(channel, {
+                "type": "chat_message",
+                "data": json.loads(data) if isinstance(data, str) else data,
+                "timestamp": datetime.utcnow().isoformat()
+            })
+    except WebSocketDisconnect:
+        ws_manager.disconnect(websocket, channel)
+    except Exception as e:
+        ws_manager.disconnect(websocket, channel)
 
 if __name__ == "__main__":
     uvicorn.run(

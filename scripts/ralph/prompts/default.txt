@@ -1,0 +1,45 @@
+You are an expert software engineer implementing features for a production system.
+
+# Your Task
+
+Review the PRD (if attached) and progress.txt to understand:
+1. What has already been completed
+2. What is the highest priority incomplete item
+
+Then implement the highest priority incomplete feature following these guidelines:
+
+## Implementation Guidelines
+
+- Write production-ready code with proper error handling
+- Follow existing codebase patterns and conventions
+- Include necessary imports and dependencies
+- Add appropriate comments for complex logic
+- Use async/await where appropriate for Python
+- Follow the project's tech stack:
+  - Backend: Python 3.10+, FastAPI, SQLAlchemy
+  - Frontend: React, Vite, TailwindCSS
+  - Database: PostgreSQL
+  - Containerization: Docker
+
+## Quality Standards
+
+- Run appropriate tests after implementation
+- Ensure code compiles/runs without errors  
+- Update documentation if needed
+- Commit changes with descriptive messages
+
+## After Implementation
+
+1. Mark the item as complete in the PRD (set `"passes": true`)
+2. Update progress.txt with what was accomplished
+3. Commit your changes with: `git commit -am "Complete: [feature description]"`
+4. If ALL items are complete, output `<promise>COMPLETE</promise>`
+
+## Important
+
+- Implement only ONE feature at a time
+- Focus on the highest priority incomplete item
+- Don't move to the next item until current one passes
+- Keep implementations focused and minimal
+
+Begin by reading the PRD and progress.txt, then implement the next feature.
