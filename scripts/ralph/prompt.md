@@ -13,6 +13,13 @@ Implement the following user story completely:
 **Acceptance Criteria:**
 {{STORY_ACCEPTANCE}}
 
+## Full PRD Context
+Here is the complete PRD with all user stories and their status:
+
+```json
+{{PRD_CONTEXT}}
+```
+
 ## Codebase Context
 This is the King AI v3 Agentic Framework project with the following architecture:
 
@@ -33,12 +40,6 @@ This is the King AI v3 Agentic Framework project with the following architecture
 - **Reverse Proxy:** Nginx configuration for API routing and WebSocket support
 - **Databases:** PostgreSQL (port 5432), Redis (port 6379)
 
-### Key Existing Files
-- `control-panel/main.py`: Main FastAPI application with 30+ endpoints
-- `dashboard/src/components/`: React components for all dashboards
-- `docker-compose.yml`: Complete containerized deployment
-- `prd.json`: Current implementation status
-
 ## Implementation Guidelines
 - This is a FRESH CONTEXT - you have no memory of previous iterations except what's provided in the progress log below.
 - Implement ONLY this single story - do not work on other stories.
@@ -55,50 +56,45 @@ This is the King AI v3 Agentic Framework project with the following architecture
 - Docker Compose for local development.
 - Testing with pytest, linting with ruff, type checking with mypy.
 
-## Quality Checks
-After implementation, the system will run:
-- pytest (unit and integration tests)
-- ruff (linting)
-- mypy (type checking)
-- bandit (security scanning)
-- Docker Compose validation
-
-## Anti-Hallucination Measures (Critical)
-- Use appropriate temperature settings based on task type:
-  - research/finance/legal/analytics: 0.1-0.2
-  - conversation: 0.5
-  - content: 0.6
-- NEVER fabricate data or facts
-- Cite sources for factual claims
-- Express uncertainty when appropriate
-- Follow accuracy requirements in system prompts
-
-## Previous Learnings
+## Previous Progress
 {{PROGRESS_CONTEXT}}
 
+## OUTPUT FORMAT REQUIREMENTS
+
+You MUST provide your implementation in the following format. Use code blocks with file paths:
+
+```filepath: path/to/file.py
+[Full file content or clear edit instructions]
+```
+
+Example for creating/updating a file:
+```filepath: src/api/routes.py
+from fastapi import APIRouter
+
+router = APIRouter()
+
+@router.get("/health")
+async def health_check():
+    return {"status": "healthy"}
+```
+
+For editing existing files, you can use SEARCH/REPLACE blocks:
+```edit: path/to/existing/file.py
+SEARCH:
+def old_function():
+    pass
+
+REPLACE:
+def new_function():
+    return "updated"
+```
+
 ## Instructions
-1. Analyze the current codebase to understand the context.
-2. Implement the required changes for this story.
-3. Ensure all acceptance criteria are met.
-4. Update any relevant documentation.
-5. Make sure the code follows project conventions and anti-hallucination guidelines.
+1. Read the full PRD context above to understand what has been completed and what needs to be done.
+2. Analyze the current user story and determine what files need to be created or modified.
+3. Implement the required changes for THIS story only.
+4. Provide your implementation using the file format above.
+5. Ensure all acceptance criteria are met.
+6. Make sure the code follows project conventions.
 
-Remember: Small, focused changes. One story at a time. Fresh context each iteration.
-  - conversation: 0.5
-  - content: 0.6
-- NEVER fabricate data or facts
-- Cite sources for factual claims
-- Express uncertainty when appropriate
-- Follow accuracy requirements in system prompts
-
-## Previous Learnings
-{{PROGRESS_CONTEXT}}
-
-## Instructions
-1. Analyze the current codebase to understand the context.
-2. Implement the required changes for this story.
-3. Ensure all acceptance criteria are met.
-4. Update any relevant documentation, especially AGENTS.md.
-5. Make sure the code follows project conventions and anti-hallucination guidelines.
-
-Remember: Small, focused changes. One story at a time. Fresh context each iteration.
+Remember: Focus ONLY on the current story. Do NOT implement other stories from the PRD. Provide actual code that can be written to files.
