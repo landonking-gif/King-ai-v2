@@ -7,17 +7,8 @@ import BusinessPLTracker from './components/BusinessPLTracker';
 import AgentControlCenter from './components/AgentControlCenter';
 import WorkflowStudio from './components/WorkflowStudio';
 import TalkToKingAI from './components/TalkToKingAI';
-
-// Dashboard Components (to be implemented)
-const MemoryExplorer = () => <div>Memory Explorer</div>;
-const ModelHub = () => <div>Model Hub</div>;
-const ToolCatalog = () => <div>Tool Catalog</div>;
-const SkillManager = () => <div>Skill Manager</div>;
-const ProvenanceViewer = () => <div>Provenance Viewer</div>;
-const SummaryHub = () => <div>Summary Hub</div>;
-const ActivityMonitor = () => <div>Activity Monitor</div>;
-const HistoryArchive = () => <div>History Archive</div>;
-const SettingsConfig = () => <div>Settings & Configuration</div>;
+import Analytics from './components/Analytics';
+import Settings from './components/Settings';
 
 const dashboards = [
   { id: 'command-center', name: 'Command Center', component: CommandCenter },
@@ -25,6 +16,7 @@ const dashboards = [
   { id: 'approval-center', name: 'Approval Center', component: ApprovalCenter },
   { id: 'business-pl', name: 'Business P&L Tracker', component: BusinessPLTracker },
   { id: 'agent-control', name: 'Agent Control Center', component: AgentControlCenter },
+  { id: 'analytics', name: 'Analytics', component: Analytics },
   { id: 'memory-explorer', name: 'Memory Explorer', component: MemoryExplorer },
   { id: 'model-hub', name: 'Model Hub', component: ModelHub },
   { id: 'tool-catalog', name: 'Tool Catalog', component: ToolCatalog },
@@ -34,7 +26,7 @@ const dashboards = [
   { id: 'summary-hub', name: 'Summary Hub', component: SummaryHub },
   { id: 'activity-monitor', name: 'Activity Monitor', component: ActivityMonitor },
   { id: 'history-archive', name: 'History Archive', component: HistoryArchive },
-  { id: 'settings', name: 'Settings & Configuration', component: SettingsConfig },
+  { id: 'settings', name: 'Settings & Configuration', component: Settings },
 ];
 
 function App() {
