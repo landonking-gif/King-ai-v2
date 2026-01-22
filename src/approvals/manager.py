@@ -168,6 +168,35 @@ class ApprovalManager:
 
         return request
 
+    async def create_approval_request(
+        self,
+        workflow_id: str,
+        step_id: str,
+        operation: str,
+        description: str,
+        requested_by: str = "system",
+        payload: dict = None,
+        risk_level: RiskLevel = RiskLevel.MEDIUM,
+    ) -> ApprovalRequest:
+        """
+        Compatibility wrapper for workflow executor calls.
+        Maps workflow-specific parameters to the core create_request interface.
+        """
+        title = f"Workflow: {operation}"
+        payload = payload or {}
+        payload.update({"workflow_id": workflow_id, "step_id": step_id, "requested_by": requested_by})
+        business_id = workflow_id or "system"
+        return await self.create_request(
+            business_id=business_id,
+            action_type=ApprovalType.SYSTEM,
+            title=title,
+            description=description,
+            payload=payload,
+            risk_level=risk_level,
+            source_plan_id=workflow_id,
+            source_task_id=step_id,
+        )
+
     async def approve(
         self,
         request_id: str,
