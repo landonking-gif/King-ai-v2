@@ -1,76 +1,56 @@
 import React, { useState, useEffect } from 'react';
 import { Play, Pause, Square, Plus, Settings, Activity, Cpu, Zap } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
+import { useWebSocket } from '../hooks/useWebSocket';
 
 const AgentControlCenter = () => {
-  const [agents, setAgents] = useState([
-    {
-      id: 'agent-001',
-      name: 'Content Generator',
-      type: 'creative',
-      status: 'running',
-      capabilities: ['text-generation', 'content-creation', 'seo-optimization'],
-      performance: {
-        cpu: 45,
-        memory: 67,
-        throughput: 120,
-        uptime: '99.8%'
-      },
-      utilization: [
-        { time: '00:00', value: 30 },
-        { time: '04:00', value: 25 },
-        { time: '08:00', value: 80 },
-        { time: '12:00', value: 95 },
-        { time: '16:00', value: 85 },
-        { time: '20:00', value: 45 }
-      ]
-    },
-    {
-      id: 'agent-002',
-      name: 'Data Analyzer',
-      type: 'analytical',
-      status: 'running',
-      capabilities: ['data-processing', 'analytics', 'reporting'],
-      performance: {
-        cpu: 62,
-        memory: 78,
-        throughput: 85,
-        uptime: '99.5%'
-      },
-      utilization: [
-        { time: '00:00', value: 20 },
-        { time: '04:00', value: 15 },
-        { time: '08:00', value: 70 },
-        { time: '12:00', value: 88 },
-        { time: '16:00', value: 75 },
-        { time: '20:00', value: 35 }
-      ]
-    },
-    {
-      id: 'agent-003',
-      name: 'Task Automator',
-      type: 'automation',
-      status: 'paused',
-      capabilities: ['workflow-automation', 'task-scheduling', 'integration'],
-      performance: {
-        cpu: 12,
-        memory: 34,
-        throughput: 0,
-        uptime: '98.2%'
-      },
-      utilization: [
-        { time: '00:00', value: 0 },
-        { time: '04:00', value: 0 },
-        { time: '08:00', value: 0 },
-        { time: '12:00', value: 0 },
-        { time: '16:00', value: 0 },
-        { time: '20:00', value: 0 }
-      ]
-    }
-  ]);
-
+  const [agents, setAgents] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [showSpawnDialog, setShowSpawnDialog] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState(null);
+
+  // WebSocket for real-time updates
+  const { connected } = useWebSocket('/api/ws/agents', {
+    onEvent: (event, data) => {
+      if (event === 'agent_spawned' || event === 'agent_destroyed' || event === 'agent_updated') {
+        fetchAgents(); // Refresh the list
+      }
+    }
+  });
+
+  useEffect(() => {
+    fetchAgents();
+  }, []);
+
+  const fetchAgents = async () => {
+    try {
+      const response = await fetch('/api/agents');
+      const data = await response.json();
+      // Transform API response to component format
+      const transformedAgents = (data.agents || []).map(agent => ({
+        id: agent.id,
+        name: agent.name,
+        type: agent.capabilities.length > 0 ? agent.capabilities[0] : 'general',
+        status: agent.status === 'available' ? 'running' : agent.status === 'busy' ? 'running' : 'stopped',
+        capabilities: agent.capabilities,
+        performance: {
+          cpu: 45, // Mock for now - would come from metrics endpoint
+          memory: 67,
+          throughput: 120,
+          uptime: '99.8%'
+        },
+        utilization: Array.from({ length: 6 }, (_, i) => ({
+          time: `${i * 4}:00`,
+          value: Math.floor(Math.random() * 100) // Mock data
+        }))
+      }));
+      setAgents(transformedAgents);
+    } catch (error) {
+      console.error('Failed to fetch agents:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -90,39 +70,66 @@ const AgentControlCenter = () => {
     }
   };
 
-  const handleAgentAction = (agentId, action) => {
-    setAgents(prev => prev.map(agent =>
-      agent.id === agentId
-        ? {
-            ...agent,
-            status: action === 'start' ? 'running' :
-                   action === 'pause' ? 'paused' :
-                   action === 'stop' ? 'stopped' : agent.status
-          }
-        : agent
-    ));
+  const handleAgentAction = async (agentId, action) => {
+    try {
+      let status;
+      if (action === 'start') status = 'available';
+      else if (action === 'pause') status = 'disabled';
+      else if (action === 'stop') status = 'disabled';
+
+      const response = await fetch(`/api/agents/${agentId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status })
+      });
+
+      if (response.ok) {
+        // Update local state
+        setAgents(prev => prev.map(agent =>
+          agent.id === agentId
+            ? {
+                ...agent,
+                status: action === 'start' ? 'running' :
+                       action === 'pause' ? 'paused' :
+                       action === 'stop' ? 'stopped' : agent.status
+              }
+            : agent
+        ));
+      } else {
+        console.error('Failed to update agent status');
+      }
+    } catch (error) {
+      console.error('Error updating agent:', error);
+    }
   };
 
-  const spawnNewAgent = () => {
-    const newAgent = {
-      id: `agent-${Date.now()}`,
-      name: 'New Agent',
-      type: 'general',
-      status: 'running',
-      capabilities: ['basic-processing'],
-      performance: {
-        cpu: 0,
-        memory: 0,
-        throughput: 0,
-        uptime: '100%'
-      },
-      utilization: Array.from({ length: 6 }, (_, i) => ({
-        time: `${i * 4}:00`,
-        value: 0
-      }))
-    };
-    setAgents(prev => [...prev, newAgent]);
-    setShowSpawnDialog(false);
+  const spawnNewAgent = async () => {
+    try {
+      const response = await fetch('/api/agents', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: 'New Agent',
+          capabilities: ['basic-processing'],
+          config: {}
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Agent spawned:', data);
+        setShowSpawnDialog(false);
+        fetchAgents(); // Refresh the list
+      } else {
+        console.error('Failed to spawn agent');
+      }
+    } catch (error) {
+      console.error('Error spawning agent:', error);
+    }
   };
 
   return (
@@ -146,7 +153,25 @@ const AgentControlCenter = () => {
 
       {/* Agent List */}
       <div className="space-y-6">
-        {agents.map((agent) => (
+        {loading ? (
+          <div className="card glass text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+            <p className="text-gray-400">Loading agents...</p>
+          </div>
+        ) : agents.length === 0 ? (
+          <div className="card glass text-center py-12">
+            <Activity className="w-12 h-12 text-gray-500 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">No Agents Running</h3>
+            <p className="text-gray-400 mb-4">Spawn your first agent to get started.</p>
+            <button
+              className="btn-primary"
+              onClick={() => setShowSpawnDialog(true)}
+            >
+              Spawn New Agent
+            </button>
+          </div>
+        ) : (
+          agents.map((agent) => (
           <div key={agent.id} className="card glass">
             <div className="flex items-start justify-between mb-4">
               <div className="flex-1">
@@ -250,6 +275,7 @@ const AgentControlCenter = () => {
             </div>
           </div>
         ))}
+        )}
       </div>
 
       {/* Overall Metrics */}

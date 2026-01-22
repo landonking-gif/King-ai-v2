@@ -8,7 +8,7 @@ from datetime import datetime
 from src.api.routes import (
     chat, businesses, approvals, evolution, health, playbook, portfolio, system,
     analytics, banking, codegen, commerce, content, finance, legal, lifecycle,
-    monitoring, research, sandbox, supplier, webhooks, dev_dashboard, workflows
+    monitoring, research, sandbox, supplier, webhooks, dev_dashboard, workflows, agents
 )
 from src.api.routes import scheduler as scheduler_routes
 from src.api.middleware import RateLimitMiddleware, RateLimitConfig
@@ -236,6 +236,7 @@ app.include_router(system.router, prefix="/api/system", tags=["system"])
 
 # Additional feature routes
 app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"])
+app.include_router(agents.router, prefix="/api/agents", tags=["agents"])
 app.include_router(banking.router, prefix="/api/banking", tags=["banking"])
 app.include_router(codegen.router, prefix="/api/codegen", tags=["codegen"])
 app.include_router(commerce.router, prefix="/api/commerce", tags=["commerce"])
