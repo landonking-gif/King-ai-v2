@@ -61,13 +61,42 @@ This is the King AI v3 Agentic Framework project with the following architecture
 
 ## OUTPUT FORMAT REQUIREMENTS
 
-You MUST provide your implementation in the following format. Use code blocks with file paths:
+You MUST provide your implementation in the following format. Ralph now supports multiple code modification patterns:
 
+### Pattern 1: Create/Update Full Files
 ```filepath: path/to/file.py
-[Full file content or clear edit instructions]
+[Full file content]
 ```
 
-Example for creating/updating a file:
+### Pattern 2: Edit Existing Files (Search/Replace)
+```edit: path/to/existing/file.py
+SEARCH:
+def old_function():
+    pass
+
+REPLACE:
+def new_function():
+    return "updated"
+```
+
+### Pattern 3: Insert Code at Specific Location
+```insert: path/to/file.py after "def existing_function():"
+    # New code to insert
+    new_line = "value"
+```
+
+Or use `before` instead of `after`:
+```insert: path/to/file.py before "class MyClass:"
+import new_dependency
+```
+
+**Important Notes:**
+- For editing existing files, use Pattern 2 (edit with SEARCH/REPLACE) instead of rewriting the entire file
+- Ralph will attempt fuzzy matching if exact text isn't found (85% similarity threshold)
+- When inserting code, the marker text must exist in the file
+- Use Pattern 1 only for new files or when you need to replace entire file contents
+
+Example for creating a new file:
 ```filepath: src/api/routes.py
 from fastapi import APIRouter
 
@@ -78,15 +107,27 @@ async def health_check():
     return {"status": "healthy"}
 ```
 
-For editing existing files, you can use SEARCH/REPLACE blocks:
-```edit: path/to/existing/file.py
+Example for editing existing file:
+```edit: src/api/routes.py
 SEARCH:
-def old_function():
-    pass
+@router.get("/health")
+async def health_check():
+    return {"status": "healthy"}
 
 REPLACE:
-def new_function():
-    return "updated"
+@router.get("/health")
+async def health_check():
+    """Health check endpoint with detailed status"""
+    return {
+        "status": "healthy",
+        "version": "1.0.0",
+        "timestamp": datetime.now().isoformat()
+    }
+```
+
+Example for inserting code:
+```insert: src/api/routes.py after "from fastapi import APIRouter"
+from datetime import datetime
 ```
 
 ## Instructions

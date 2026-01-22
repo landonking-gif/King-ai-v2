@@ -222,20 +222,22 @@ class RalphLoop:
         return prompt
 
     async def _generate_code(self, prompt):
-        """Generate code using GitHub Copilot CLI"""
+        """Generate code using GitHub Copilot CLI with enhanced file reading"""
         try:
             print("🤖 Generating code using GitHub Copilot CLI...")
             
+            # Enhance prompt with current file contents if needed
+            enhanced_prompt = await self._enhance_prompt_with_context(prompt)
+            
             # Save prompt to temporary file
             with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False, encoding='utf-8') as f:
-                f.write(prompt)
+                f.write(enhanced_prompt)
                 prompt_file = f.name
             
             try:
-                # Try using 'gh copilot suggest' command
-                # This assumes the user has gh CLI with copilot extension installed
+                # Try using 'gh copilot suggest' command with code generation type
                 result = subprocess.run(
-                    ['gh', 'copilot', 'suggest', '-t', 'shell', prompt],
+                    ['gh', 'copilot', 'suggest', '-t', 'git', enhanced_prompt[:500]],  # Shortened for CLI
                     capture_output=True,
                     text=True,
                     timeout=300
@@ -245,7 +247,13 @@ class RalphLoop:
                     print(f"✅ Generated code from Copilot")
                     return result.stdout
                 else:
-                    # Fallback: try calling copilot directly with stdin
+                    # Try Python script approach for better code generation
+                    print("Using Python-based code generation...")
+                    code_result = await self._generate_with_python(enhanced_prompt)
+                    if code_result:
+                        return code_result
+                    
+                    # Final fallback: try calling copilot directly with stdin
                     print("Trying alternative copilot invocation...")
                     with open(prompt_file, 'r', encoding='utf-8') as pf:
                         result = subprocess.run(
@@ -290,9 +298,56 @@ class RalphLoop:
             import traceback
             traceback.print_exc()
             return None
+    
+    async def _enhance_prompt_with_context(self, prompt):
+        """Enhance prompt with current file contents for better editing"""
+        # Extract file paths mentioned in the prompt
+        import re
+        file_pattern = r'(?:src/|scripts/|config/|[\w\-]+/)[\w\-/]+\.(?:py|js|ts|tsx|json|yaml|yml|md)'
+        mentioned_files = re.findall(file_pattern, prompt)
+        
+        enhanced = prompt
+        if mentioned_files:
+            enhanced += "\n\n## Current File Contents for Context\n"
+            for file_path in mentioned_files[:5]:  # Limit to 5 files to avoid token limits
+                full_path = self.project_root / file_path
+                if full_path.exists() and full_path.stat().st_size < 50000:  # Skip large files
+                    try:
+                        with open(full_path, 'r', encoding='utf-8') as f:
+                            content = f.read()
+                        enhanced += f"\n### {file_path}\n```\n{content}\n```\n"
+                    except Exception:
+                        pass  # Skip files that can't be read
+        
+        return enhanced
+    
+    async def _generate_with_python(self, prompt):
+        """Use Python-based generation script as fallback"""
+        try:
+            script_path = self.project_root / 'scripts' / 'ralph' / 'generate_code.py'
+            if not script_path.exists():
+                return None
+            
+            process = await asyncio.create_subprocess_exec(
+                sys.executable, str(script_path),
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            
+            stdout, stderr = await process.communicate(input=prompt.encode())
+            
+            if process.returncode == 0 and stdout:
+                print("✅ Generated code using Python script")
+                return stdout.decode().strip()
+            
+            return None
+        except Exception as e:
+            print(f"Python generation fallback failed: {e}")
+            return None
 
     def _apply_code_changes(self, generated_code):
-        """Apply the generated code changes to files"""
+        """Apply the generated code changes to files with enhanced editing capabilities"""
         import re
 
         changes_made = 0
@@ -338,7 +393,7 @@ class RalphLoop:
             replace_text = replace_text.strip()
             
             if search_text in content:
-                new_content = content.replace(search_text, replace_text)
+                new_content = content.replace(search_text, replace_text, 1)  # Replace first occurrence
                 
                 with open(full_path, 'w', encoding='utf-8') as f:
                     f.write(new_content)
@@ -346,9 +401,61 @@ class RalphLoop:
                 print(f"✏️  Edited: {file_path}")
                 changes_made += 1
             else:
-                print(f"⚠️  Search text not found in {file_path}")
+                # Try fuzzy matching for minor whitespace differences
+                import difflib
+                lines = content.split('\n')
+                search_lines = search_text.split('\n')
+                
+                # Try to find approximate match
+                for i in range(len(lines) - len(search_lines) + 1):
+                    block = '\n'.join(lines[i:i+len(search_lines)])
+                    similarity = difflib.SequenceMatcher(None, search_text, block).ratio()
+                    
+                    if similarity > 0.85:  # 85% similarity threshold
+                        print(f"⚠️  Found approximate match (similarity: {similarity:.1%}) in {file_path}")
+                        new_lines = lines[:i] + replace_text.split('\n') + lines[i+len(search_lines):]
+                        new_content = '\n'.join(new_lines)
+                        
+                        with open(full_path, 'w', encoding='utf-8') as f:
+                            f.write(new_content)
+                        
+                        print(f"✏️  Edited with fuzzy match: {file_path}")
+                        changes_made += 1
+                        break
+                else:
+                    print(f"⚠️  Search text not found in {file_path}")
+                    print(f"    First few lines of search: {search_text[:100]}...")
 
-        # Pattern 3: standard code blocks (fallback) - ```language
+        # Pattern 3: Insert/append blocks - ```insert: path/to/file.ext after/before LINE
+        insert_pattern = r'```insert:\s*([^\n]+)\s+(after|before)\s+"([^"]+)"\n(.*?)\n```'
+        insert_matches = re.findall(insert_pattern, generated_code, re.MULTILINE | re.DOTALL)
+        
+        for file_path, position, marker, code_to_insert in insert_matches:
+            file_path = file_path.strip()
+            full_path = self.project_root / file_path
+            
+            if not full_path.exists():
+                print(f"⚠️  File not found for insert: {file_path}")
+                continue
+            
+            with open(full_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            if marker in content:
+                if position == 'after':
+                    new_content = content.replace(marker, marker + '\n' + code_to_insert.strip())
+                else:  # before
+                    new_content = content.replace(marker, code_to_insert.strip() + '\n' + marker)
+                
+                with open(full_path, 'w', encoding='utf-8') as f:
+                    f.write(new_content)
+                
+                print(f"📌 Inserted code {position} marker in: {file_path}")
+                changes_made += 1
+            else:
+                print(f"⚠️  Marker '{marker}' not found in {file_path}")
+
+        # Pattern 4: standard code blocks (fallback) - ```language
         if changes_made == 0:
             # Try standard markdown code blocks
             standard_pattern = r'```(?:[\w]+)?\s*([^\n]*)\n(.*?)\n```'
@@ -356,7 +463,7 @@ class RalphLoop:
 
             for header, code in standard_matches:
                 # Skip if this looks like it was already processed
-                if header.startswith('filepath:') or header.startswith('edit:'):
+                if header.startswith('filepath:') or header.startswith('edit:') or header.startswith('insert:'):
                     continue
                 
                 # Try to extract filename from header or context
@@ -417,6 +524,90 @@ class RalphLoop:
         except Exception as e:
             print(f"⚠️  Quality check error: {e}")
             return True  # Don't fail on check errors
+    
+    def _create_or_update_pr(self, branch_name):
+        """Create or update a pull request using GitHub CLI"""
+        try:
+            # Check if PR already exists
+            result = subprocess.run(
+                ['gh', 'pr', 'list', '--head', branch_name, '--json', 'number'],
+                capture_output=True,
+                text=True,
+                check=False
+            )
+            
+            if result.returncode == 0 and result.stdout.strip() and result.stdout.strip() != '[]':
+                pr_data = json.loads(result.stdout)
+                if pr_data:
+                    pr_number = pr_data[0]['number']
+                    print(f"✅ PR #{pr_number} already exists for branch {branch_name}")
+                    return pr_number
+            
+            # Create new PR
+            with open(self.prd_file, 'r') as f:
+                prd_data = json.load(f)
+            
+            # Generate PR body from completed stories
+            completed_stories = [s for s in prd_data['userStories'] if s['passes']]
+            pr_body = "## Completed User Stories\n\n"
+            for story in completed_stories:
+                pr_body += f"- [x] **{story['title']}** ({story['id']})\n"
+                pr_body += f"  - {story['description']}\n\n"
+            
+            incomplete_stories = [s for s in prd_data['userStories'] if not s['passes']]
+            if incomplete_stories:
+                pr_body += "\n## Remaining Stories\n\n"
+                for story in incomplete_stories:
+                    pr_body += f"- [ ] **{story['title']}** ({story['id']})\n"
+            
+            # Create PR
+            result = subprocess.run(
+                ['gh', 'pr', 'create', 
+                 '--title', f"Ralph: Implementing {branch_name}",
+                 '--body', pr_body,
+                 '--base', 'main'],
+                capture_output=True,
+                text=True,
+                check=False
+            )
+            
+            if result.returncode == 0:
+                # Extract PR number from output
+                import re
+                match = re.search(r'#(\d+)', result.stdout)
+                if match:
+                    pr_number = match.group(1)
+                    print(f"✅ Created PR #{pr_number}")
+                    return int(pr_number)
+                print(f"✅ Created PR: {result.stdout.strip()}")
+                return None
+            else:
+                print(f"⚠️  Could not create PR: {result.stderr}")
+                return None
+                
+        except Exception as e:
+            print(f"⚠️  PR creation error: {e}")
+            return None
+    
+    def _comment_on_pr(self, pr_number, comment):
+        """Add a comment to a PR using GitHub CLI"""
+        try:
+            result = subprocess.run(
+                ['gh', 'pr', 'comment', str(pr_number), '--body', comment],
+                capture_output=True,
+                text=True,
+                check=False
+            )
+            
+            if result.returncode == 0:
+                print(f"✅ Added comment to PR #{pr_number}")
+                return True
+            else:
+                print(f"⚠️  Could not comment on PR: {result.stderr}")
+                return False
+        except Exception as e:
+            print(f"⚠️  PR comment error: {e}")
+            return False
 
     def _mark_story_complete(self, story_id):
         """Mark a story as completed in the PRD"""
@@ -449,12 +640,32 @@ class RalphLoop:
             json.dump(data, f, indent=2)
 
     def _commit_changes(self, story_id, story_title):
-        """Commit the changes to git"""
+        """Commit the changes to git and optionally push/create PR"""
         try:
             subprocess.run(['git', 'add', '.'], check=True)
             commit_msg = f"Ralph: Complete story {story_id} - {story_title}"
             subprocess.run(['git', 'commit', '-m', commit_msg], check=True)
             print(f"Committed changes: {commit_msg}")
+            
+            # Try to push to remote (optional - won't fail if push fails)
+            try:
+                branch_name = self._get_branch_name()
+                result = subprocess.run(['git', 'push', '-u', 'origin', branch_name], 
+                                      capture_output=True, text=True, timeout=30)
+                if result.returncode == 0:
+                    print(f"✅ Pushed to remote branch: {branch_name}")
+                    
+                    # Try to create or update PR
+                    pr_number = self._create_or_update_pr(branch_name)
+                    if pr_number:
+                        # Add comment about completed story
+                        comment = f"✅ Completed story `{story_id}`: **{story_title}**\n\nCommit: {commit_msg}"
+                        self._comment_on_pr(pr_number, comment)
+                else:
+                    print(f"⚠️  Could not push to remote: {result.stderr}")
+            except (subprocess.TimeoutExpired, Exception) as e:
+                print(f"⚠️  Push/PR creation skipped: {e}")
+                
         except subprocess.CalledProcessError as e:
             print(f"⚠️  Git commit failed: {e}")
 

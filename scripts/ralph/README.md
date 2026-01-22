@@ -4,6 +4,16 @@ Ralph is an autonomous AI coding assistant that iteratively implements Product R
 
 **Ralph is a standalone tool** that can work with any codebase. While it was originally developed for King AI v2, it operates independently and can be used in any software project.
 
+## Key Features
+
+- **Autonomous Code Editing**: Ralph can now edit existing code, not just create new files
+- **Multiple Edit Patterns**: Supports full file replacement, search/replace edits, and code insertion
+- **Fuzzy Matching**: Attempts to find approximate matches when exact text isn't found (85% similarity)
+- **GitHub CLI Integration**: Automatically creates/updates PRs and adds progress comments
+- **Context-Aware**: Reads existing files to provide better context to AI for editing
+- **Smart File Application**: Multiple patterns for applying code changes (filepath, edit, insert)
+- **PRD-Driven Development**: Uses prd.json to track and implement user stories systematically
+
 ## Quick Start
 
 1. **Check authentication**: `python check_auth.py`
@@ -31,40 +41,97 @@ Ralph implements user stories from a PRD by:
 
 - **Cross-platform**: Python implementation works on Windows, Mac, and Linux
 - **AI-powered**: Uses GitHub Copilot CLI for code generation
+- **Autonomous Code Editing**: Can edit existing code, not just create new files
+- **Multiple Edit Patterns**: Supports full file replacement, search/replace, and targeted insertion
+- **Fuzzy Matching**: Attempts approximate matches when exact text isn't found (85% similarity)
+- **GitHub CLI Integration**: Automatically creates/updates PRs and tracks progress
+- **Context-Aware Generation**: Reads existing files to provide better AI context
 - **Smart retry logic**: Max 3 attempts per story before moving on
 - **Quality gates**: Automated testing, linting, and type checking
-- **Git integration**: Automatic branching, committing, and progress tracking
+- **Git integration**: Automatic branching, committing, pushing, and PR management
 - **Error recovery**: Continues working even if individual stories fail
 - **Failed story tracking**: Marks stories as failed after max retries
 - **Windows asyncio fixes**: Proper event loop handling for Windows
 
 ## Files
 
-- `ralph.py` - Main Python implementation (recommended)
+- `ralph.py` - Main Python implementation with autonomous editing capabilities
 - `check_auth.py` - Authentication checker and setup helper
 - `generate_code.py` - AI code generation wrapper
-- `prompt.md` - AI prompt template with codebase context
+- `prompt.md` - Enhanced AI prompt template with edit pattern documentation
 - `ralph.bat` - Windows batch wrapper (legacy)
 - `ralph.sh` - Bash implementation (legacy)
-- **Quality Gates**: Automated testing prevents bad code commits
-- **Memory Persistence**: Learns from past iterations
-- **Project Awareness**: Adapts to your codebase conventions
+
+## Code Editing Capabilities
+
+Ralph now supports three patterns for modifying code:
+
+### 1. Full File Creation/Replacement
+Use when creating new files or completely rewriting existing ones:
+```
+```filepath: path/to/file.py
+[Complete file content]
+```
+```
+
+### 2. Search/Replace Editing
+Use for modifying specific sections of existing files:
+```
+```edit: path/to/file.py
+SEARCH:
+[Exact text to find]
+
+REPLACE:
+[New text to use]
+```
+```
+
+Features:
+- Exact text matching for precise edits
+- Fuzzy matching fallback (85% similarity threshold)
+- Only replaces first occurrence for safety
+- Shows similarity percentage when using fuzzy match
+
+### 3. Targeted Code Insertion
+Use for adding code before or after specific markers:
+```
+```insert: path/to/file.py after "marker text"
+[Code to insert]
+```
+```
+
+### GitHub CLI Integration
+
+Ralph now automatically:
+- **Pushes commits** to remote repository after each completed story
+- **Creates Pull Requests** for the feature branch if one doesn't exist
+- **Updates PR description** with completed and remaining stories
+- **Adds PR comments** documenting each completed story
+- **Tracks progress** via GitHub's PR interface
+
+This integration requires:
+- GitHub CLI (`gh`) installed and authenticated
+- Push access to the repository
+- Network connectivity
+
+If GitHub operations fail, Ralph continues with local commits only.
 
 ## Architecture
 
 ```
 PRD JSON ──┐
            ├── Ralph Loop ──┤
-Progress.txt─┘             ├── Copilot CLI ─── Quality Checks ─── Commit
-Git History ───────────────┘
+Progress.txt─┘             ├── Copilot CLI ─── Code Edits ─── Quality Checks ─── Commit/Push ─── PR Update
+File Context ───────────────┘                      ↓
+                                              (filepath/edit/insert)
 ```
 
 ### Components
-- **ralph.sh**: Main bash script orchestrating the loop
-- **prompt.md**: Template for Copilot prompts
+- **ralph.py**: Main orchestration with enhanced editing logic
+- **prompt.md**: Template with edit pattern documentation
 - **prd.json**: User stories with completion status
 - **progress.txt**: Learnings and context from iterations
-- **Skills**: Copilot skills for PRD generation and conversion
+- **GitHub CLI**: PR and issue management integration
 
 ## Prerequisites
 
