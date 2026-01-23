@@ -12,7 +12,10 @@ echo ""
 run_on_aws=y
 read -p "Enter AWS server IP address: " aws_ip
 # Update dashboard .env with the new IP
-/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -Command "Set-Content -Path 'C:\Users\dmilner.AGV-040318-PC\Downloads\landon\king-ai-v2\king-ai-v3\agentic-framework-main\dashboard\.env' -Value 'VITE_API_BASE=http://$aws_ip:8000/api'"
+/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -Command "Set-Content -Path 'C:\Users\dmilner.AGV-040318-PC\Downloads\landon\king-ai-v2\dashboard\.env' -Value 'VITE_API_BASE=http://$aws_ip:8000/api'"
+# Create orchestrator .env with AWS_IP
+cp ../.env.example .env
+echo "AWS_IP=$aws_ip" >> .env
 ssh_key="$(cd .. && pwd)/king-ai-studio.pem"
 ssh_user=ubuntu
 
@@ -91,19 +94,13 @@ EOF
         sed -i 's|OLLAMA_ENDPOINT=http://localhost:11434|OLLAMA_ENDPOINT=http://localhost:11434|' .env
         sed -i 's|postgresql://user:password@localhost:5432/agentic_framework|postgresql://agentic_user:agentic_pass@localhost:5432/agentic_framework|' .env
         echo "MEMORY_SERVICE_PORT=8002" >> .env
+        echo "AWS_IP=$aws_ip" >> .env
 
         # Copy .env to service directories
         cp .env mcp-gateway/.env
         cp .env memory-service/.env
         cp .env subagent-manager/.env
-
-        # Remove old renamed directories if they exist
-        rm -rf mcp_gateway memory_service subagent_manager
-
-        # Rename directories to match module names
-        mv mcp-gateway mcp_gateway
-        mv memory-service memory_service
-        mv subagent-manager subagent_manager
+        cp .env orchestrator/.env
 EOF
 
     # Run the services on AWS server
@@ -118,15 +115,21 @@ EOF
         
         # Start MCP Gateway in background
         echo "Starting MCP Gateway..."
-        cd mcp_gateway && nohup bash run.sh > mcp-gateway.log 2>&1 &
+        cd mcp-gateway
+        nohup bash run.sh > mcp-gateway.log 2>&1 &
+        cd ..
         
         # Start Memory Service in background
         echo "Starting Memory Service..."
-        cd memory_service && nohup bash run.sh > memory-service.log 2>&1 &
+        cd memory-service
+        nohup bash run.sh > memory-service.log 2>&1 &
+        cd ..
         
         # Start Subagent Manager in background
         echo "Starting Subagent Manager..."
-        cd subagent_manager && nohup bash run.sh > subagent-manager.log 2>&1 &
+        cd subagent-manager
+        nohup bash run.sh > subagent-manager.log 2>&1 &
+        cd ..
         
         # Create data directories
         mkdir -p ~/agentic-framework-main/data/chroma
@@ -142,7 +145,7 @@ EOF
         else
             echo "MCP Gateway unhealthy"
             echo "MCP Gateway log:"
-            cat mcp_gateway/mcp-gateway.log 2>/dev/null || echo "No log file"
+            cat mcp-gateway/mcp-gateway.log 2>/dev/null || echo "No log file"
         fi
         
         if curl -f http://localhost:8002/health; then
@@ -150,7 +153,7 @@ EOF
         else
             echo "Memory Service unhealthy"
             echo "Memory Service log:"
-            cat memory_service/memory-service.log 2>/dev/null || echo "No log file"
+            cat memory-service/memory-service.log 2>/dev/null || echo "No log file"
         fi
         
         if curl -f http://localhost:8001/health; then
@@ -158,7 +161,7 @@ EOF
         else
             echo "Subagent Manager unhealthy"
             echo "Subagent Manager log:"
-            cat subagent_manager/subagent-manager.log 2>/dev/null || echo "No log file"
+            cat subagent-manager/subagent-manager.log 2>/dev/null || echo "No log file"
         fi
         
         # Kill any process using port 8000

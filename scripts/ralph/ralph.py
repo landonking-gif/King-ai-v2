@@ -112,14 +112,14 @@ class RalphLoop:
     def _init_progress(self):
         """Initialize progress tracking file"""
         if not self.progress_file.exists():
-            with open(self.progress_file, 'w') as f:
+            with open(self.progress_file, 'w', encoding='utf-8') as f:
                 f.write("# Ralph Progress Log\n")
                 f.write(f"Started: {datetime.now().isoformat()}\n")
                 f.write(f"Project: {self.project_root.name}\n\n")
 
     def _get_branch_name(self):
         """Extract branch name from PRD"""
-        with open(self.prd_file, 'r') as f:
+        with open(self.prd_file, 'r', encoding='utf-8') as f:
             data = json.load(f)
         return data['branchName']
 
@@ -140,7 +140,7 @@ class RalphLoop:
 
     def _get_next_story(self):
         """Find the highest priority incomplete story (excluding failed ones)"""
-        with open(self.prd_file, 'r') as f:
+        with open(self.prd_file, 'r', encoding='utf-8') as f:
             data = json.load(f)
 
         # Get incomplete stories that haven't been marked as failed
@@ -192,15 +192,23 @@ class RalphLoop:
 
     def _create_prompt(self, title, description, acceptance, iteration):
         """Create the AI prompt for this iteration"""
-        with open(self.prompt_file, 'r') as f:
+        with open(self.prompt_file, 'r', encoding='utf-8') as f:
             template = f.read()
 
         # Load full PRD for context
-        with open(self.prd_file, 'r') as f:
+        with open(self.prd_file, 'r', encoding='utf-8') as f:
             prd_data = json.load(f)
 
+        # Get current story ID
+        story_id = None
+        for story in prd_data['userStories']:
+            if story['title'] == title:
+                story_id = story['id']
+                break
+
         # Replace placeholders
-        prompt = template.replace('{{STORY_TITLE}}', title)
+        prompt = template.replace('{{STORY_ID}}', story_id or 'unknown')
+        prompt = prompt.replace('{{STORY_TITLE}}', title)
         prompt = prompt.replace('{{STORY_DESCRIPTION}}', description)
         prompt = prompt.replace('{{STORY_ACCEPTANCE}}', acceptance)
         prompt = prompt.replace('{{ITERATION}}', str(iteration))
@@ -211,7 +219,7 @@ class RalphLoop:
 
         # Add progress context
         if self.progress_file.exists():
-            with open(self.progress_file, 'r') as f:
+            with open(self.progress_file, 'r', encoding='utf-8') as f:
                 progress_context = f.read().split('\n')[-20:]  # Last 20 lines
             progress_context = '\n'.join(progress_context)
         else:
@@ -226,47 +234,59 @@ class RalphLoop:
         try:
             print("🤖 Generating code using GitHub Copilot CLI...")
             
-            # Save prompt to temporary file
+            # Save prompt to temporary file for reference
             with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False, encoding='utf-8') as f:
                 f.write(prompt)
                 prompt_file = f.name
             
             try:
-                # Try using 'gh copilot suggest' command
-                # This assumes the user has gh CLI with copilot extension installed
+                # Use 'copilot' command directly (VS Code Copilot CLI)
+                # This sends the prompt to Copilot and receives the response
+                print("Invoking Copilot CLI with prompt...")
+                
+                # Method 1: Try direct copilot invocation with prompt as input
                 result = subprocess.run(
-                    ['gh', 'copilot', 'suggest', '-t', 'shell', prompt],
+                    ['copilot', prompt],
                     capture_output=True,
                     text=True,
-                    timeout=300
+                    timeout=600,  # 10 minute timeout for complex tasks
+                    shell=True,
+                    cwd=str(self.project_root)
                 )
                 
                 if result.returncode == 0 and result.stdout:
-                    print(f"✅ Generated code from Copilot")
+                    print(f"✅ Generated code from Copilot CLI")
                     return result.stdout
-                else:
-                    # Fallback: try calling copilot directly with stdin
-                    print("Trying alternative copilot invocation...")
-                    with open(prompt_file, 'r', encoding='utf-8') as pf:
-                        result = subprocess.run(
-                            ['copilot'],
-                            stdin=pf,
-                            capture_output=True,
-                            text=True,
-                            timeout=300
-                        )
-                    
-                    if result.returncode == 0 and result.stdout:
-                        print(f"✅ Generated code from Copilot")
-                        return result.stdout
-                    else:
-                        print(f"❌ Copilot CLI failed: {result.stderr}")
-                        print("")
-                        print("Make sure GitHub Copilot CLI is installed and authenticated:")
-                        print("  1. Install: gh extension install github/gh-copilot")
-                        print("  2. Authenticate: gh auth login")
-                        print("  3. Test: gh copilot --version")
-                        return None
+                
+                # Method 2: Try with stdin if direct argument didn't work
+                print("Trying Copilot CLI with stdin...")
+                process = subprocess.Popen(
+                    ['copilot'],
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    shell=True,
+                    cwd=str(self.project_root)
+                )
+                
+                stdout, stderr = process.communicate(input=prompt, timeout=600)
+                
+                if process.returncode == 0 and stdout:
+                    print(f"✅ Generated code from Copilot CLI (stdin method)")
+                    return stdout
+                
+                # If both methods failed, provide helpful error
+                print(f"❌ Copilot CLI failed")
+                print(f"Return code: {process.returncode}")
+                if stderr:
+                    print(f"Error output: {stderr}")
+                
+                print("\nMake sure GitHub Copilot CLI is accessible:")
+                print("  1. Open VS Code")
+                print("  2. Type 'copilot' in the terminal to verify it's available")
+                print("  3. Ensure GitHub Copilot extension is installed and authenticated")
+                return None
                         
             finally:
                 # Clean up temp file
@@ -276,14 +296,14 @@ class RalphLoop:
                     pass
                     
         except subprocess.TimeoutExpired:
-            print("❌ Copilot CLI timed out after 5 minutes")
+            print("❌ Copilot CLI timed out after 10 minutes")
             return None
         except FileNotFoundError:
-            print("❌ GitHub Copilot CLI not found")
-            print("")
-            print("Please install GitHub Copilot CLI:")
-            print("  gh extension install github/gh-copilot")
-            print("  gh auth login")
+            print("❌ Copilot CLI not found in PATH")
+            print("\nTroubleshooting:")
+            print("  1. Make sure you're running this from VS Code terminal")
+            print("  2. Type 'copilot' to test if it's available")
+            print("  3. Install GitHub Copilot extension if not already installed")
             return None
         except Exception as e:
             print(f"❌ AI code generation failed: {e}")
@@ -296,11 +316,18 @@ class RalphLoop:
         import re
 
         changes_made = 0
+        
+        print("\n" + "="*60)
+        print("APPLYING CODE CHANGES")
+        print("="*60)
 
         # Pattern 1: filepath blocks - ```filepath: path/to/file.ext
         filepath_pattern = r'```filepath:\s*([^\n]+)\n(.*?)\n```'
         filepath_matches = re.findall(filepath_pattern, generated_code, re.MULTILINE | re.DOTALL)
 
+        if filepath_matches:
+            print(f"\nFound {len(filepath_matches)} file(s) to create/update:\n")
+            
         for file_path, code in filepath_matches:
             file_path = file_path.strip()
             
@@ -314,19 +341,22 @@ class RalphLoop:
             with open(full_path, 'w', encoding='utf-8') as f:
                 f.write(code.strip() + '\n')
 
-            print(f"📝 Created/updated: {file_path}")
+            print(f"  ✅ Created/updated: {file_path}")
             changes_made += 1
 
         # Pattern 2: edit blocks - ```edit: path/to/file.ext with SEARCH/REPLACE
         edit_pattern = r'```edit:\s*([^\n]+)\nSEARCH:\n(.*?)\n\nREPLACE:\n(.*?)\n```'
         edit_matches = re.findall(edit_pattern, generated_code, re.MULTILINE | re.DOTALL)
 
+        if edit_matches:
+            print(f"\nFound {len(edit_matches)} edit(s) to apply:\n")
+
         for file_path, search_text, replace_text in edit_matches:
             file_path = file_path.strip()
             full_path = self.project_root / file_path
 
             if not full_path.exists():
-                print(f"⚠️  File not found for edit: {file_path}")
+                print(f"  ⚠️  File not found for edit: {file_path}")
                 continue
 
             # Read existing content
@@ -343,13 +373,15 @@ class RalphLoop:
                 with open(full_path, 'w', encoding='utf-8') as f:
                     f.write(new_content)
                 
-                print(f"✏️  Edited: {file_path}")
+                print(f"  ✅ Edited: {file_path}")
                 changes_made += 1
             else:
-                print(f"⚠️  Search text not found in {file_path}")
+                print(f"  ⚠️  Search text not found in {file_path}")
 
         # Pattern 3: standard code blocks (fallback) - ```language
         if changes_made == 0:
+            print("\nNo filepath/edit blocks found. Trying standard code blocks...")
+            
             # Try standard markdown code blocks
             standard_pattern = r'```(?:[\w]+)?\s*([^\n]*)\n(.*?)\n```'
             standard_matches = re.findall(standard_pattern, generated_code, re.MULTILINE | re.DOTALL)
@@ -369,15 +401,28 @@ class RalphLoop:
                     with open(full_path, 'w', encoding='utf-8') as f:
                         f.write(code.strip() + '\n')
 
-                    print(f"📝 Created/updated: {file_path}")
+                    print(f"  ✅ Created/updated: {file_path}")
                     changes_made += 1
 
+        print("\n" + "="*60)
         if changes_made == 0:
-            print("⚠️  No file changes detected in AI output")
-            print("The AI may have provided explanatory text without code blocks.")
-            print("Please check the output manually.")
+            print("⚠️  NO FILE CHANGES DETECTED")
+            print("\nThe Copilot response may not have included code blocks.")
+            print("This could mean:")
+            print("  1. The story is already complete")
+            print("  2. Copilot provided explanations instead of code")
+            print("  3. The prompt needs to be more specific")
+            print("\nCopilot Response Preview:")
+            print("-" * 60)
+            # Show first 500 chars of response
+            preview = generated_code[:500] if len(generated_code) > 500 else generated_code
+            print(preview)
+            if len(generated_code) > 500:
+                print("... (truncated)")
+            print("-" * 60)
         else:
-            print(f"✅ Applied {changes_made} file change(s)")
+            print(f"✅ SUCCESSFULLY APPLIED {changes_made} CHANGE(S)")
+        print("="*60 + "\n")
 
         return changes_made > 0
 
@@ -420,7 +465,7 @@ class RalphLoop:
 
     def _mark_story_complete(self, story_id):
         """Mark a story as completed in the PRD"""
-        with open(self.prd_file, 'r') as f:
+        with open(self.prd_file, 'r', encoding='utf-8') as f:
             data = json.load(f)
 
         for story in data['userStories']:
@@ -428,12 +473,12 @@ class RalphLoop:
                 story['passes'] = True
                 break
 
-        with open(self.prd_file, 'w') as f:
+        with open(self.prd_file, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2)
 
     def _mark_story_failed(self, story_id):
         """Mark a story as failed in the PRD (still incomplete but flagged)"""
-        with open(self.prd_file, 'r') as f:
+        with open(self.prd_file, 'r', encoding='utf-8') as f:
             data = json.load(f)
 
         for story in data['userStories']:
@@ -445,7 +490,7 @@ class RalphLoop:
                 story['metadata']['failedAt'] = datetime.now().isoformat()
                 break
 
-        with open(self.prd_file, 'w') as f:
+        with open(self.prd_file, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2)
 
     def _commit_changes(self, story_id, story_title):
@@ -460,7 +505,7 @@ class RalphLoop:
 
     def _update_progress(self, iteration, story_id, story_title, success=True, error=None):
         """Update the progress log"""
-        with open(self.progress_file, 'a') as f:
+        with open(self.progress_file, 'a', encoding='utf-8') as f:
             timestamp = datetime.now().isoformat()
             status = "SUCCESS" if success else "FAILED"
             f.write(f"[{timestamp}] Iteration {iteration}: {status} - {story_id}\n")
@@ -486,7 +531,7 @@ def main():
     # Handle reset option
     if args.reset:
         print("Resetting all stories to incomplete...")
-        with open('prd.json', 'r') as f:
+        with open('prd.json', 'r', encoding='utf-8') as f:
             data = json.load(f)
 
         for story in data['userStories']:
@@ -496,7 +541,7 @@ def main():
                 story['metadata'].pop('failed', None)
                 story['metadata'].pop('failedAt', None)
 
-        with open('prd.json', 'w') as f:
+        with open('prd.json', 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2)
 
         print("All stories reset")
@@ -506,9 +551,6 @@ def main():
     loop = RalphLoop(max_iterations=args.max_iterations, max_retries_per_story=args.max_retries)
 
     try:
-        if sys.platform == 'win32':
-            # Use proper event loop policy for Windows to avoid cleanup issues
-            asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
         asyncio.run(loop.run())
     except KeyboardInterrupt:
         print("\n\nRalph loop interrupted by user")
