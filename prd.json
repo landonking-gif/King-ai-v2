@@ -87,7 +87,11 @@
       "description": "Implement business intelligence with revenue/expense tracking, margin analysis, cost attribution, ROI calculations, budget alerts, and historical trends",
       "acceptanceCriteria": "Financial data tracked accurately, charts display trends, alerts trigger on budget thresholds, reports generate correctly",
       "passes": false,
-      "priority": 3
+      "priority": 3,
+      "metadata": {
+        "failed": true,
+        "failedAt": "2026-01-22T18:18:30.944786"
+      }
     },
     {
       "id": "story-12",
@@ -95,7 +99,11 @@
       "description": "Build 'Talk to King AI' interface with auto mode detection, inline workflow creation, execution confirmation, and live progress display",
       "acceptanceCriteria": "Conversational input accepted, workflows created from text, execution monitored, responses displayed appropriately",
       "passes": false,
-      "priority": 3
+      "priority": 3,
+      "metadata": {
+        "failed": true,
+        "failedAt": "2026-01-22T18:18:31.119416"
+      }
     },
     {
       "id": "story-13",
@@ -103,7 +111,11 @@
       "description": "Create docker-compose.yml with all services (frontend, backend, PostgreSQL, Redis, Nginx) properly configured with correct ports and networking",
       "acceptanceCriteria": "docker-compose up starts all services, ports mapped correctly, services communicate properly, volumes configured",
       "passes": false,
-      "priority": 4
+      "priority": 4,
+      "metadata": {
+        "failed": true,
+        "failedAt": "2026-01-22T18:18:31.224364"
+      }
     },
     {
       "id": "story-14",
@@ -111,7 +123,11 @@
       "description": "Create comprehensive tests for API integrations, WebSocket connections, proxy routes, and cross-service communication",
       "acceptanceCriteria": "All integration tests pass, API calls work end-to-end, error scenarios handled, performance requirements met",
       "passes": false,
-      "priority": 4
+      "priority": 4,
+      "metadata": {
+        "failed": true,
+        "failedAt": "2026-01-22T18:18:31.322527"
+      }
     },
     {
       "id": "story-15",
@@ -119,7 +135,11 @@
       "description": "Conduct full system testing including user workflows, data persistence, real-time features, security validation, and performance benchmarking",
       "acceptanceCriteria": "All user stories functional, system stable under load, security validated, performance targets met (<1.5s page load, <200ms API response)",
       "passes": false,
-      "priority": 4
+      "priority": 4,
+      "metadata": {
+        "failed": true,
+        "failedAt": "2026-01-22T18:18:31.395391"
+      }
     }
   ]
 }

@@ -4,6 +4,7 @@ Configuration module for the Orchestrator service.
 Uses pydantic-settings for environment variable management with type validation.
 """
 
+import os
 from typing import Optional
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -13,7 +14,7 @@ class OrchestratorConfig(BaseSettings):
     """Configuration for the Lead Agent/Orchestrator service."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env"),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
@@ -23,6 +24,7 @@ class OrchestratorConfig(BaseSettings):
     host: str = Field(default="0.0.0.0", description="Host to bind the service")
     port: int = Field(default=8000, description="Port to bind the service")
     reload: bool = Field(default=False, description="Enable auto-reload for development")
+    aws_ip: Optional[str] = Field(default=None, description="AWS server IP address")
 
     # LLM Provider Configuration
     default_llm_provider: str = Field(
@@ -74,16 +76,16 @@ class OrchestratorConfig(BaseSettings):
 
     # Dependent Services
     mcp_gateway_url: str = Field(
-        default="http://localhost:8080", description="MCP Gateway service URL"
+        default=f"http://{os.getenv('AWS_IP', 'localhost')}:8080", description="MCP Gateway service URL"
     )
     subagent_manager_url: str = Field(
-        default="http://localhost:8001", description="Subagent Manager service URL"
+        default=f"http://{os.getenv('AWS_IP', 'localhost')}:8001", description="Subagent Manager service URL"
     )
     memory_service_url: str = Field(
-        default="http://localhost:8002", description="Memory Service URL"
+        default=f"http://{os.getenv('AWS_IP', 'localhost')}:8002", description="Memory Service URL"
     )
     code_executor_url: str = Field(
-        default="http://localhost:8003", description="Code Executor service URL"
+        default=f"http://{os.getenv('AWS_IP', 'localhost')}:8003", description="Code Executor service URL"
     )
 
     # Security Configuration
