@@ -36,12 +36,12 @@
 
 ### What problems does it solve?
 
-✅ **No vendor lock-in** - Switch between 6 LLM providers (Anthropic, OpenAI, Azure, Gemini, Ollama, vLLM)
+✅ **Local-first with Ollama** - Runs entirely on your infrastructure with llama3.1:70b, no cloud API costs
 ✅ **Safe tool execution** - Sandboxed Python skills + MCP gateway for external tools
 ✅ **Memory management** - Multi-tier storage with automatic compaction
 ✅ **Auditability** - Full provenance tracking for compliance
 ✅ **Scalability** - Production-grade architecture with observability
-✅ **Governance** - RBAC, approval workflows, and policy enforcement
+✅ **Optional cloud LLMs** - Switch to Anthropic, OpenAI, Azure, Gemini, or vLLM when needed
 
 ## 🤔 Why Agentic Framework?
 
@@ -115,7 +115,8 @@
 │ • Safety Flags   │  │ • Rate Limiting  │  │ • Cold (S3/MinIO)│
 │ • Dual Format:   │  │ • PII Filtering  │  │ • Auto-Compaction│
 │   - Native       │  │ • Proxy Runtime  │  │ • Provenance Log │
-│   - Anthropic    │  │                  │  │                  │
+│   - Anthropic    │  │                  │  │ • Diary/Reflect  │
+│ • Ralph Agent 🆕 │  │                  │  │   (Ralph Memory) │
 └──────────────────┘  └──────────────────┘  └──────────────────┘
          │                    │                    │
          └────────────────────┼────────────────────┘
@@ -305,29 +306,42 @@ pip install git+https://github.com/paragajg/agentic-framework.git
 
 ### Step 2: Set Up LLM Provider
 
-Create a `.env` file in the project root (recommended):
+The system uses **Ollama** for local LLM inference (no API keys required):
+
 ```bash
-# Copy the example and edit
-cp .env.example .env
+# Install Ollama
+# Windows/Mac: Download from https://ollama.ai
+# Linux: curl -fsSL https://ollama.ai/install.sh | sh
 
-# Edit .env with your API key:
-# For OpenAI:
-OPENAI_API_KEY=sk-...
-OPENAI_MODEL=gpt-4o-mini
+# Start Ollama service
+ollama serve
 
-# For Anthropic:
-ANTHROPIC_API_KEY=sk-ant-...
+# Pull the required model (in a new terminal)
+ollama pull llama3.1:70b
+
+# Verify it's working
+ollama run llama3.1:70b "Hello, test message"
 ```
 
-Or export environment variables directly:
+**Note:** Ralph loop uses GitHub Copilot CLI for code generation:
 ```bash
-# Choose one provider:
+# Install GitHub Copilot CLI
+npm install -g @githubnext/github-copilot-cli
 
-# Anthropic (Recommended)
-export ANTHROPIC_API_KEY="sk-ant-..."
+# Authenticate
+gh auth login
 
+# Verify
+copilot --version
+```
+
+**Optional Cloud Providers** (if you want to use cloud LLMs instead):
+```bash
 # OpenAI
 export OPENAI_API_KEY="sk-..."
+
+# Anthropic
+export ANTHROPIC_API_KEY="sk-ant-..."
 
 # Azure OpenAI
 export AZURE_OPENAI_KEY="..."
@@ -335,11 +349,6 @@ export AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com/"
 
 # Google Gemini
 export GEMINI_API_KEY="..."
-
-# Local (Ollama - no API key needed)
-# 1. Install: https://ollama.ai
-# 2. Start: ollama serve
-# 3. Pull model: ollama pull qwen3:32b
 ```
 
 ### Step 3: Start Infrastructure (Optional)
@@ -356,9 +365,13 @@ docker-compose up -d
 kautilya --version
 # Output: kautilya version 1.0.0
 
-# Test LLM connection
+# Test Ollama connection
+ollama list
+# Output: Should show llama3.1:70b model
+
+# Test LLM connection (optional)
 kautilya llm test
-# Output: ✓ Connected to Anthropic Claude Sonnet 4
+# Output: ✓ Connected to Ollama (llama3.1:70b)
 ```
 
 ### Step 5: Run Your First Agent
@@ -382,7 +395,7 @@ Simple Agent Example
 🤖 Agent Configuration:
    - Role: Research
    - Capabilities: web_search, summarize
-   - LLM: Anthropic Claude
+   - LLM: Ollama (llama3.1:70b)
 
 🔄 Execution Flow:
    [1/3] Spawning research agent...
@@ -573,23 +586,27 @@ Product Manager Agent ↔ Engineering Agent ↔ QA Agent
 
 ### Supported Providers (6)
 
-| Provider | Type | Models | Best For | Cost |
-|----------|------|--------|----------|------|
-| **Anthropic** | Cloud | Claude Opus 4.5, Sonnet 4.5, Haiku 4 | Enterprise, reasoning | $3-15/M tokens |
-| **OpenAI** | Cloud | GPT-4o, GPT-4o-mini | General purpose | $2.50-15/M tokens |
-| **Azure OpenAI** | Cloud | GPT-4o, GPT-4 Turbo | Enterprise Azure | $2.50-15/M tokens |
-| **Google Gemini** | Cloud | Gemini 2.0 Flash, 1.5 Pro | Multimodal, cost-effective | $0.075-7/M tokens |
-| **Ollama** | Local | Llama 3.1, Mistral, Mixtral | Privacy, offline | $0 (self-hosted) |
-| **vLLM** | Local | Any HuggingFace model | High performance | $0 (self-hosted) |
+| Provider | Type | Models | Best For | Cost | Status |
+|----------|------|--------|----------|------|--------|
+| **Ollama** ⭐ | Local | Llama 3.1:70b (default), Mistral, Mixtral | Privacy, offline, default | $0 (self-hosted) | **Active** |
+| **GitHub Copilot CLI** | Cloud | GPT-4 | Code generation (Ralph) | Included with Copilot | **Active** |
+| **OpenAI** | Cloud | GPT-4o, GPT-4o-mini | General purpose | $2.50-15/M tokens | Optional |
+| **Anthropic** | Cloud | Claude Opus 4.5, Sonnet 4.5, Haiku 4 | Enterprise, reasoning | $3-15/M tokens | Optional |
+| **Azure OpenAI** | Cloud | GPT-4o, GPT-4 Turbo | Enterprise Azure | $2.50-15/M tokens | Optional |
+| **Google Gemini** | Cloud | Gemini 2.0 Flash, 1.5 Pro | Multimodal, cost-effective | $0.075-7/M tokens | Optional |
+| **vLLM** | Local | Any HuggingFace model | High performance | $0 (self-hosted) | Optional |
 
 ### Quick Provider Switch
 
 ```bash
-# Configure provider
-kautilya llm config --provider anthropic --model claude-sonnet-4-20250514
+# Default: Ollama (no configuration needed)
+ollama pull llama3.1:70b
+
+# Switch to cloud provider (optional)
+kautilya llm config --provider openai --model gpt-4o
 
 # Or switch at runtime
-kautilya manifest run workflow.yaml --llm-provider openai --llm-model gpt-4o
+kautilya manifest run workflow.yaml --llm-provider ollama --llm-model llama3.1:70b
 ```
 
 ## 🎯 Examples
@@ -800,9 +817,16 @@ kubectl scale deployment orchestrator --replicas=5
 ### Environment Variables
 
 ```bash
-# LLM Provider (choose one)
-ANTHROPIC_API_KEY=sk-ant-...
+# LLM Provider (Default: Ollama - no API key needed)
+OLLAMA_HOST=http://localhost:11434
+OLLAMA_MODEL=llama3.1:70b
+
+# GitHub Copilot CLI (for Ralph loop)
+GITHUB_TOKEN=ghp_...
+
+# Optional Cloud Providers
 OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
 AZURE_OPENAI_KEY=...
 AZURE_OPENAI_ENDPOINT=https://...
 GEMINI_API_KEY=...

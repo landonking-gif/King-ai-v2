@@ -16,8 +16,11 @@ from pathlib import Path
 from datetime import datetime
 import httpx
 
+# Import memory integration
+from memory_integration import RalphMemoryClient
+
 class RalphLoop:
-    def __init__(self, max_iterations=None, max_retries_per_story=3):
+    def __init__(self, max_iterations=None, max_retries_per_story=3, memory_service_url="http://localhost:8002"):
         self.max_iterations = max_iterations
         self.max_retries_per_story = max_retries_per_story
         self.prd_file = Path("prd.json")
@@ -25,6 +28,10 @@ class RalphLoop:
         self.prompt_file = Path("scripts/ralph/prompt.md")
         self.project_root = Path.cwd()
         self.story_retry_count = {}  # Track retry attempts per story
+        self.story_attempts = {}  # Track all attempts per story for reflection
+        
+        # Initialize memory service client
+        self.memory_client = RalphMemoryClient(memory_service_url)
 
         # Ensure we're in the right directory
         if not self.prd_file.exists():
@@ -72,13 +79,42 @@ class RalphLoop:
                 self._mark_story_failed(story_id)
                 self._update_progress(iteration, story_id, story_title, success=False, 
                                      error=f"Exceeded max retries ({self.max_retries_per_story})")
+                
+                # 🤔 REFLECT on failed story
+                await self._reflect_on_story(story_id, story_title, final_success=False)
                 continue
 
+            # Initialize attempt tracking for this story
+            if story_id not in self.story_attempts:
+                self.story_attempts[story_id] = []
+
             try:
-                # Generate implementation
-                success = await self._implement_story(
-                    story_id, story_title, story_description, story_acceptance, iteration
+                # Query past learnings before attempting
+                print("\n💭 Checking for relevant past experiences...")
+                past_learnings = await self.memory_client.query_past_learnings(
+                    story_title, story_description, top_k=3
                 )
+
+                # Generate implementation
+                success, attempt_data = await self._implement_story(
+                    story_id, story_title, story_description, story_acceptance, 
+                    iteration, past_learnings
+                )
+
+                # 📔 DIARY: Log this attempt
+                await self._write_diary_entry(
+                    story_id, story_title, retry_count + 1, 
+                    success, attempt_data
+                )
+
+                # Store attempt data for reflection
+                self.story_attempts[story_id].append({
+                    "attempt": retry_count + 1,
+                    "success": success,
+                    "changes_made": attempt_data.get("changes_made", 0),
+                    "error": attempt_data.get("error"),
+                    "quality_checks": attempt_data.get("quality_checks")
+                })
 
                 if success:
                     # Mark story as complete
@@ -89,10 +125,15 @@ class RalphLoop:
                     self.story_retry_count[story_id] = 0
 
                     # Commit changes
-                    self._commit_changes(story_id, story_title)
+                    commit_sha = self._commit_changes(story_id, story_title)
 
                     # Update progress
                     self._update_progress(iteration, story_id, story_title, success=True)
+                    
+                    # 🤔 REFLECT: Analyze what we learned
+                    await self._reflect_on_story(
+                        story_id, story_title, final_success=True, commit_sha=commit_sha
+                    )
                 else:
                     # Increment retry count
                     self.story_retry_count[story_id] = retry_count + 1
@@ -155,42 +196,60 @@ class RalphLoop:
         incomplete_stories.sort(key=lambda s: s['priority'])
         return incomplete_stories[0]
 
-    async def _implement_story(self, story_id, title, description, acceptance, iteration):
+    async def _implement_story(self, story_id, title, description, acceptance, iteration, past_learnings=None):
         """Implement a single story using AI code generation"""
+        attempt_data = {
+            "changes_made": 0,
+            "error": None,
+            "quality_checks": [],
+            "prompt_used": None,
+            "code_generated": None
+        }
+        
         try:
-            # Create iteration prompt
-            prompt = self._create_prompt(title, description, acceptance, iteration)
+            # Create iteration prompt (now includes past learnings)
+            prompt = self._create_prompt(title, description, acceptance, iteration, past_learnings)
+            attempt_data["prompt_used"] = prompt
 
             # Generate code using GitHub Copilot CLI
             generated_code = await self._generate_code(prompt)
+            attempt_data["code_generated"] = generated_code
 
             if not generated_code:
                 print("Code generation failed - no output")
-                return False
+                attempt_data["error"] = "No code generated by Copilot CLI"
+                return False, attempt_data
 
             # Apply the generated code
             print("Applying code changes...")
             applied = self._apply_code_changes(generated_code)
+            attempt_data["changes_made"] = applied
             
             if not applied:
                 print("No code changes were applied")
-                return False
+                attempt_data["error"] = "No code changes applied from generated output"
+                return False, attempt_data
 
             # Run quality checks
             print("Running quality checks...")
-            if not await self._run_quality_checks():
+            quality_result = await self._run_quality_checks()
+            attempt_data["quality_checks"] = quality_result.get("checks", [])
+            
+            if not quality_result.get("passed", False):
                 print("Quality checks failed")
-                return False
+                attempt_data["error"] = "Quality checks failed"
+                return False, attempt_data
 
-            return True
+            return True, attempt_data
 
         except Exception as e:
             print(f"💥 Implementation error: {e}")
             import traceback
             traceback.print_exc()
-            return False
+            attempt_data["error"] = str(e)
+            return False, attempt_data
 
-    def _create_prompt(self, title, description, acceptance, iteration):
+    def _create_prompt(self, title, description, acceptance, iteration, past_learnings=None):
         """Create the AI prompt for this iteration"""
         with open(self.prompt_file, 'r', encoding='utf-8') as f:
             template = f.read()
@@ -226,6 +285,53 @@ class RalphLoop:
             progress_context = "No progress yet - this is the first iteration"
         
         prompt = prompt.replace('{{PROGRESS_CONTEXT}}', progress_context)
+        
+        # 💡 Add past learnings if available
+        if past_learnings:
+            learnings_text = "\n\n## 🧠 PAST LEARNINGS FROM MEMORY\n\n"
+            learnings_text += "Ralph has learned from similar past experiences:\n\n"
+            
+            for i, learning in enumerate(past_learnings, 1):
+                artifact_type = learning['artifact_type']
+                similarity = learning['similarity']
+                content = learning['content']
+                
+                learnings_text += f"### Learning {i} (Similarity: {similarity:.2f})\n"
+                learnings_text += f"Type: {artifact_type}\n\n"
+                
+                if artifact_type == "reflection":
+                    # Extract key insights from reflection
+                    insights = content.get('analysis', {}).get('insights', [])
+                    recommendations = content.get('learnings', {}).get('recommendations', [])
+                    
+                    if insights:
+                        learnings_text += "**Insights:**\n"
+                        for insight in insights[:3]:
+                            learnings_text += f"- {insight}\n"
+                    
+                    if recommendations:
+                        learnings_text += "\n**Recommendations:**\n"
+                        for rec in recommendations[:3]:
+                            learnings_text += f"- {rec}\n"
+                
+                elif artifact_type == "diary_entry":
+                    # Extract key learning from diary
+                    learning_data = content.get('learning', {})
+                    if 'lesson' in learning_data:
+                        learnings_text += f"**Lesson:** {learning_data['lesson']}\n"
+                    if 'success_factor' in learning_data:
+                        learnings_text += f"**Success Factor:** {learning_data['success_factor']}\n"
+                
+                learnings_text += "\n"
+            
+            learnings_text += "**Use these learnings to avoid past mistakes and apply successful patterns.**\n"
+            
+            # Add learnings section to prompt
+            if '{{PAST_LEARNINGS}}' in template:
+                prompt = prompt.replace('{{PAST_LEARNINGS}}', learnings_text)
+            else:
+                # Append at the end if no placeholder
+                prompt += "\n" + learnings_text
 
         return prompt
 
@@ -457,11 +563,11 @@ class RalphLoop:
                     status = "✅" if result else "❌"
                     print(f"  {status} {check_name}")
 
-            return all_passed
+            return {"passed": all_passed, "checks": checks}
 
         except Exception as e:
             print(f"⚠️  Quality check error: {e}")
-            return True  # Don't fail on check errors
+            return {"passed": True, "checks": []}  # Don't fail on check errors
 
     def _mark_story_complete(self, story_id):
         """Mark a story as completed in the PRD"""
@@ -498,10 +604,74 @@ class RalphLoop:
         try:
             subprocess.run(['git', 'add', '.'], check=True)
             commit_msg = f"Ralph: Complete story {story_id} - {story_title}"
-            subprocess.run(['git', 'commit', '-m', commit_msg], check=True)
+            result = subprocess.run(['git', 'commit', '-m', commit_msg], check=True, capture_output=True, text=True)
             print(f"Committed changes: {commit_msg}")
+            
+            # Get commit SHA
+            sha_result = subprocess.run(['git', 'rev-parse', 'HEAD'], check=True, capture_output=True, text=True)
+            commit_sha = sha_result.stdout.strip()
+            return commit_sha
         except subprocess.CalledProcessError as e:
             print(f"⚠️  Git commit failed: {e}")
+            return None
+    
+    async def _write_diary_entry(self, story_id, story_title, attempt_number, success, attempt_data):
+        """Write a diary entry after each story attempt"""
+        try:
+            await self.memory_client.diary(
+                story_id=story_id,
+                story_title=story_title,
+                attempt_number=attempt_number,
+                success=success,
+                changes_made=attempt_data.get("changes_made", 0),
+                prompt_used=attempt_data.get("prompt_used"),
+                code_generated=attempt_data.get("code_generated"),
+                error=attempt_data.get("error"),
+                quality_checks=attempt_data.get("quality_checks"),
+                context={
+                    "project_root": str(self.project_root),
+                    "max_retries": self.max_retries_per_story
+                }
+            )
+        except Exception as e:
+            print(f"⚠️  Failed to write diary entry: {e}")
+            # Don't fail the loop if memory service is unavailable
+    
+    async def _reflect_on_story(self, story_id, story_title, final_success, commit_sha=None):
+        """Reflect on completed or failed story"""
+        try:
+            # Get all attempts for this story
+            all_attempts = self.story_attempts.get(story_id, [])
+            
+            # Get files changed
+            files_changed = self._get_files_changed()
+            
+            # Call reflect
+            await self.memory_client.reflect(
+                story_id=story_id,
+                story_title=story_title,
+                total_attempts=len(all_attempts),
+                final_success=final_success,
+                all_attempts=all_attempts,
+                files_changed=files_changed,
+                commit_sha=commit_sha
+            )
+        except Exception as e:
+            print(f"⚠️  Failed to reflect on story: {e}")
+            # Don't fail the loop if memory service is unavailable
+    
+    def _get_files_changed(self):
+        """Get list of files changed in current branch"""
+        try:
+            result = subprocess.run(
+                ['git', 'diff', '--name-only', 'HEAD'],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            return [f.strip() for f in result.stdout.split('\n') if f.strip()]
+        except subprocess.CalledProcessError:
+            return []
 
     def _update_progress(self, iteration, story_id, story_title, success=True, error=None):
         """Update the progress log"""
@@ -523,6 +693,8 @@ def main():
                        help='Maximum number of iterations (default: unlimited)')
     parser.add_argument('--max-retries', type=int, default=3,
                        help='Maximum retries per story before marking as failed (default: 3)')
+    parser.add_argument('--memory-service', type=str, default='http://localhost:8002',
+                       help='Memory service URL (default: http://localhost:8002)')
     parser.add_argument('--reset', action='store_true',
                        help='Reset all stories to incomplete')
 
@@ -547,8 +719,12 @@ def main():
         print("All stories reset")
         return
 
-    # Run the Ralph loop
-    loop = RalphLoop(max_iterations=args.max_iterations, max_retries_per_story=args.max_retries)
+    # Run the Ralph loop with memory integration
+    loop = RalphLoop(
+        max_iterations=args.max_iterations, 
+        max_retries_per_story=args.max_retries,
+        memory_service_url=args.memory_service
+    )
 
     try:
         asyncio.run(loop.run())

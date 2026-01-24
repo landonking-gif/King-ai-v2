@@ -4,6 +4,24 @@ Ralph is an autonomous AI coding assistant that iteratively implements Product R
 
 **Ralph is a standalone tool** that can work with any codebase. While it was originally developed for King AI v2, it operates independently and can be used in any software project.
 
+## ✨ New: Memory Integration (v2.0)
+
+Ralph now integrates with King AI v3's Memory Service to provide **self-improving autonomous coding**:
+
+- **📔 Diary Entries**: Logs every attempt with full context (`/diary` after each try)
+- **🤔 Reflections**: Analyzes patterns after story completion (`reflect` on completion)
+- **💡 Learning**: Queries past experiences to avoid repeating mistakes
+- **📈 Continuous Improvement**: Gets smarter with each iteration
+
+```bash
+# Run with memory integration
+python ralph.py --memory-service http://localhost:8002
+
+# Ralph will now learn from every attempt and improve over time!
+```
+
+See [MEMORY_INTEGRATION.md](MEMORY_INTEGRATION.md) for detailed documentation and examples.
+
 ## Quick Start
 
 1. **Check authentication**: `python check_auth.py`

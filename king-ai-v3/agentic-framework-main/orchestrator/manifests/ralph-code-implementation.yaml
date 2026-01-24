@@ -1,0 +1,133 @@
+manifest_id: ralph-code-implementation
+name: Ralph Code Implementation Workflow
+version: "1.0.0"
+description: "Delegates code implementation to Ralph autonomous agent on AWS"
+
+inputs:
+  - name: task_description
+    type: string
+    description: "High-level description of what needs to be coded"
+    required: true
+  
+  - name: requirements
+    type: array
+    description: "List of specific requirements"
+    required: true
+  
+  - name: files_context
+    type: array
+    description: "Files that need modification or context"
+    required: false
+  
+  - name: target_server
+    type: string
+    description: "Target AWS server IP"
+    default: "54.167.201.176"
+
+steps:
+  - id: generate_prd
+    role: synthesis
+    description: "Generate detailed Product Requirements Document"
+    capabilities: []
+    inputs:
+      - name: task
+        source: user_input
+        key: task_description
+      - name: requirements
+        source: user_input
+        key: requirements
+      - name: context
+        source: user_input
+        key: files_context
+    outputs:
+      - name: prd
+        type: object
+        schema_ref: "ralph_prd"
+    system_prompt: |
+      You are a technical Product Manager creating detailed PRDs for implementation.
+      
+      Given a task description and requirements, create a comprehensive PRD with:
+      1. Clear title and description
+      2. Specific, actionable requirements
+      3. List of files that need to be created or modified
+      4. Acceptance criteria for completion
+      5. Relevant context about the codebase
+      
+      Output format must be a structured JSON object matching the ralph_prd schema.
+    timeout: 60
+  
+  - id: ralph_execution
+    role: code
+    description: "Execute Ralph autonomous coding agent"
+    capabilities: ["ralph_code_agent"]
+    skills:
+      - name: ralph_code_agent
+        path: "skills/ralph_code_agent"
+        requires_approval: true
+        safety_flags: ["file_system", "network_access", "side_effect"]
+    inputs:
+      - name: prd
+        source: previous_step
+        step_id: generate_prd
+        key: prd
+      - name: target_server
+        source: user_input
+        key: target_server
+      - name: approve_before_execution
+        source: config
+        value: true
+    outputs:
+      - name: code_result
+        type: object
+        schema_ref: "ralph_result"
+    system_prompt: |
+      Execute the Ralph coding agent with the provided PRD.
+      Monitor execution and report results.
+    timeout: 900  # 15 minutes for Ralph execution
+  
+  - id: verify_results
+    role: verify
+    description: "Verify and summarize Ralph's implementation"
+    capabilities: []
+    inputs:
+      - name: ralph_result
+        source: previous_step
+        step_id: ralph_execution
+        key: code_result
+    outputs:
+      - name: final_report
+        type: object
+    system_prompt: |
+      Review Ralph's implementation results and create a summary report.
+      
+      Include:
+      1. Status of implementation (success/failed/pending)
+      2. List of files changed
+      3. Summary of changes made
+      4. Any issues or concerns
+      5. Next steps or recommendations
+      
+      Be thorough but concise.
+    timeout: 30
+
+outputs:
+  - name: implementation_result
+    source: step
+    step_id: verify_results
+    key: final_report
+
+approval_gates:
+  - step_id: ralph_execution
+    approval_type: human
+    message: "Ralph is ready to implement the code. Review the PRD and approve execution."
+    timeout: 3600  # 1 hour to approve
+
+monitoring:
+  log_level: INFO
+  track_provenance: true
+  collect_metrics: true
+
+metadata:
+  tags: ["code", "ralph", "autonomous", "aws"]
+  priority: high
+  author: "King AI v3 Team"

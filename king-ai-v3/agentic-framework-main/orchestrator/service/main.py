@@ -27,11 +27,14 @@ from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
+from adapters.llm import create_adapter, LLMMessage, MessageRole
 from .config import config
 from .models import (
     ArtifactHandleRequest,
     ArtifactHandleResponse,
     ArtifactType,
+    ChatRequest,
+    ChatResponse,
     ClaimVerification,
     CodePatch,
     ErrorResponse,
@@ -214,6 +217,85 @@ async def health_check() -> HealthCheckResponse:
         version="1.0.0",
         dependencies=dependencies,
         uptime_seconds=uptime,
+    )
+
+
+@app.get("/api/health", response_model=HealthCheckResponse)
+async def api_health_check() -> HealthCheckResponse:
+    """
+    API health check endpoint for load balancer compatibility.
+
+    Returns the same health status as /health endpoint.
+    """
+    return await health_check()
+
+
+@app.post("/api/chat/message", response_model=ChatResponse)
+async def chat_message(request: ChatRequest) -> ChatResponse:
+    """
+    Chat endpoint for conversational interface.
+    
+    Processes user messages and returns AI responses using Ollama LLM.
+    """
+    logger.info(f"Received chat message: {request.text}")
+    
+    try:
+        # Create Ollama adapter
+        llm_adapter = create_adapter(
+            provider="local",
+            model=config.ollama_model,
+            endpoint=config.ollama_endpoint
+        )
+        
+        # Build system prompt
+        system_message = LLMMessage(
+            role=MessageRole.SYSTEM,
+            content=(
+                "You are King AI, an intelligent orchestration assistant. "
+                "You help users create workflows, manage tasks, and coordinate complex operations. "
+                "You can:\n"
+                "• Create and manage workflows\n"
+                "• Coordinate subagent tasks\n"
+                "• Handle artifacts and approvals\n"
+                "• Monitor system health\n\n"
+                "Be helpful, concise, and focus on workflow orchestration capabilities. "
+                "If users ask about workflows, guide them to use the /workflows/start endpoint."
+            )
+        )
+        
+        # Build user message
+        user_message = LLMMessage(
+            role=MessageRole.USER,
+            content=request.text
+        )
+        
+        # Get LLM response
+        response = await llm_adapter.complete(
+            messages=[system_message, user_message],
+            temperature=0.7,
+            max_tokens=500
+        )
+        
+        response_text = response.content
+        
+        # Determine response type based on content
+        response_type = "workflow" if "workflow" in request.text.lower() else "text"
+        
+        logger.info(f"LLM response generated: {response_text[:100]}...")
+        
+    except Exception as e:
+        logger.error(f"Error generating LLM response: {e}")
+        response_text = (
+            "I'm having trouble processing your request right now. "
+            "I'm the King AI Orchestrator, and I can help with workflows, "
+            "system status, and task coordination. Please try again."
+        )
+        response_type = "text"
+    
+    return ChatResponse(
+        response=response_text,
+        type=response_type,
+        metadata={"session_id": request.session_id} if request.session_id else None,
     )
 
 

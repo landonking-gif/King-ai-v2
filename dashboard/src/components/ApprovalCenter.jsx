@@ -191,7 +191,7 @@ const ApprovalCenter = () => {
           </div>
         ) : (
           approvals.map((approval) => (
-          <div key={approval.id} className="card glass">
+            <div key={approval.id} className="card glass">
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-start gap-4">
                 <input
@@ -277,7 +277,8 @@ const ApprovalCenter = () => {
               </div>
             </div>
           </div>
-        ))}
+          ))
+        )}
       </div>
     </div>
   );

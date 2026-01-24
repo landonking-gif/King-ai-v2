@@ -351,6 +351,120 @@ The Orchestrator service exposes metrics and health endpoints:
 - JWT authentication for service-to-service communication
 - Provenance tracking for all operations
 
+## Ralph Code Agent Integration
+
+The orchestrator now includes a **Ralph Code Agent** skill that enables autonomous code generation and modification by delegating to the Ralph loop on AWS.
+
+### What It Does
+
+When you ask the orchestrator to implement a code change (e.g., "Add user authentication to my API"), it will:
+
+1. **Generate a detailed PRD** from your natural language request
+2. **Delegate to the Ralph loop** running on your AWS server
+3. **Execute Ralph** which autonomously writes, tests, and refines code
+4. **Return the results** including files changed and implementation summary
+
+### Usage
+
+**Via Dashboard ("Talk to King AI" tab):**
+```
+"Implement a user profile page with avatar upload"
+"Add password reset functionality with email verification"
+"Create an API endpoint for file uploads with validation"
+```
+
+**Via kautilya CLI:**
+```bash
+kautilya workflow submit ralph-code-implementation \
+  --input '{"task_description": "Add JWT authentication to FastAPI backend"}'
+```
+
+**Via API:**
+```python
+import requests
+
+response = requests.post(
+    "http://localhost:8000/workflows/start",
+    json={
+        "manifest_name": "ralph-code-implementation",
+        "user_input": {
+            "task_description": "Implement rate limiting on API endpoints"
+        }
+    }
+)
+
+workflow_id = response.json()["workflow_id"]
+```
+
+### Workflow Steps
+
+The `ralph-code-implementation.yaml` manifest defines a 3-step workflow:
+
+1. **PRD Generation** (`synthesis` role) - Creates structured requirements document
+2. **Ralph Execution** (`code` role) - Runs Ralph on AWS with approval gate
+3. **Verification** (`verify` role) - Validates and summarizes results
+
+### Configuration
+
+**Environment Variables:**
+```bash
+# AWS server for Ralph execution
+RALPH_SERVER_HOST=54.167.201.176
+RALPH_SSH_KEY_PATH=/path/to/king-ai-studio.pem
+RALPH_SSH_USER=ubuntu
+
+# Ralph timeout (seconds)
+RALPH_EXECUTION_TIMEOUT=600
+```
+
+**Approval Requirements:**
+
+By default, Ralph execution requires human approval before running on AWS. To disable:
+
+```yaml
+# In ralph-code-implementation.yaml
+- step: ralph_execution
+  approval_required: false  # Change to false for auto-execution
+```
+
+### Safety Features
+
+- **Human Approval Gate**: All code changes require approval before execution
+- **Sandboxed Execution**: Ralph runs in isolated environment on AWS
+- **Timeout Protection**: Executions limited to 10 minutes
+- **Full Provenance**: All changes tracked in PostgreSQL with timestamps
+- **SSH Security**: Uses key-based authentication, no password exposure
+
+### Files
+
+- [code-exec/skills/ralph_code_agent/](../code-exec/skills/ralph_code_agent/) - Skill implementation
+- [orchestrator/manifests/ralph-code-implementation.yaml](manifests/ralph-code-implementation.yaml) - Workflow manifest
+- [examples/ralph-code-agent/](../examples/ralph-code-agent/) - Usage examples
+
+### Testing
+
+Run the test suite:
+```bash
+cd code-exec/skills/ralph_code_agent
+python test_handler.py
+```
+
+### Troubleshooting
+
+**SSH connection fails:**
+- Verify AWS server IP (54.167.201.176) is reachable
+- Check SSH key permissions: `chmod 600 king-ai-studio.pem`
+- Test manual connection: `ssh -i king-ai-studio.pem ubuntu@54.167.201.176`
+
+**Ralph execution times out:**
+- Increase timeout in `RALPH_EXECUTION_TIMEOUT` environment variable
+- Check Ralph logs on AWS: `ssh ubuntu@54.167.201.176 'tail -f /tmp/ralph_*.log'`
+
+**PRD validation errors:**
+- Ensure task description is detailed and specific
+- Include context about your tech stack
+- List specific files to modify if known
+
 ## Troubleshooting
 
 ### Service won't start
