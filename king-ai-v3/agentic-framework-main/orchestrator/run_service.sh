@@ -52,16 +52,35 @@ EOF
     echo "Copying project to AWS server..."
     cd ..
     rsync -avz -e "/mnt/c/Windows/System32/OpenSSH/ssh.exe -i \"$ssh_key\" -o StrictHostKeyChecking=no" --exclude='.venv' --exclude='__pycache__' --exclude='.git' . "$ssh_user@$aws_ip:~/agentic-framework-main"
+    
+    # Copy dashboard from parent directory
+    echo "Copying dashboard to AWS server..."
+    rsync -avz -e "/mnt/c/Windows/System32/OpenSSH/ssh.exe -i \"$ssh_key\" -o StrictHostKeyChecking=no" --exclude='node_modules' --exclude='.git' ../../dashboard/ "$ssh_user@$aws_ip:~/agentic-framework-main/dashboard/"
     cd orchestrator
+
+    # Fix line endings on AWS server
+    echo "Fixing line endings on AWS server..."
+    /mnt/c/Windows/System32/OpenSSH/ssh.exe -i "$ssh_key" -o StrictHostKeyChecking=no "$ssh_user@$aws_ip" << 'EOF'
+        cd ~/agentic-framework-main
+        sed -i 's/\r$//' mcp-gateway/run.sh
+        sed -i 's/\r$//' memory-service/run.sh
+        sed -i 's/\r$//' subagent-manager/run.sh
+        sed -i 's/\r$//' orchestrator/run_service.sh
+        echo "Line endings fixed"
+EOF
 
     # Setup environment on AWS server
     echo "Setting up environment on AWS server..."
     /mnt/c/Windows/System32/OpenSSH/ssh.exe -i "$ssh_key" -o StrictHostKeyChecking=no "$ssh_user@$aws_ip" << EOF
         cd ~/agentic-framework-main
 
-        # Install python3-venv, redis, and postgresql
+        # Install python3-venv, redis, postgresql, and nginx
         sudo apt update
-        sudo apt install -y python3-venv redis-server postgresql postgresql-contrib wget
+        sudo apt install -y python3-venv redis-server postgresql postgresql-contrib wget nginx
+
+        # Install Node.js and npm for dashboard
+        curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+        sudo apt-get install -y nodejs
 
         # Start services
         sudo systemctl enable redis-server
@@ -101,6 +120,13 @@ EOF
         cp .env memory-service/.env
         cp .env subagent-manager/.env
         cp .env orchestrator/.env
+
+        # Setup dashboard
+        echo "Setting up dashboard..."
+        cd dashboard
+        npm install
+        npm run build
+        cd ..
 EOF
 
     # Run the services on AWS server
@@ -130,6 +156,73 @@ EOF
         cd subagent-manager
         nohup bash run.sh > subagent-manager.log 2>&1 &
         cd ..
+        
+        # Start Dashboard
+        echo "Starting Dashboard..."
+        cd dashboard
+        nohup npm run preview -- --host 0.0.0.0 --port 3000 > dashboard.log 2>&1 &
+        cd ..
+
+        # Configure and start Nginx
+        echo "Configuring Nginx..."
+        sudo rm -f /etc/nginx/sites-enabled/default
+        cd ~
+        cat > nginx.conf << 'NGINX_EOF'
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
+
+    # Health check endpoint
+    location /health {
+        proxy_pass http://127.0.0.1:8000/health;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
+    # Unified API routing
+    location /api {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
+    # API docs
+    location /docs {
+        proxy_pass http://127.0.0.1:8000/docs;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+    }
+
+    location /openapi.json {
+        proxy_pass http://127.0.0.1:8000/openapi.json;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+    }
+
+    # Dashboard (default)
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
+NGINX_EOF
+        sudo cp nginx.conf /etc/nginx/sites-available/king-ai
+        sudo ln -sf /etc/nginx/sites-available/king-ai /etc/nginx/sites-enabled/
+        sudo nginx -t
+        sudo systemctl restart nginx
+        sudo systemctl enable nginx
+        cd ~/agentic-framework-main
         
         # Create data directories
         mkdir -p ~/agentic-framework-main/data/chroma

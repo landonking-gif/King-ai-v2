@@ -408,7 +408,7 @@ async def permission_error_handler(request: Any, exc: PermissionError) -> JSONRe
 def main() -> None:
     """Run the MCP Gateway service."""
     uvicorn.run(
-        "mcp_gateway.service.main:app",
+        "service.main:app",
         host=settings.mcp_gateway_host,
         port=settings.mcp_gateway_port,
         reload=True,

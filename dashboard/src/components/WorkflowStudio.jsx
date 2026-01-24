@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
-import ReactFlow, {
+import {
+  ReactFlow,
   MiniMap,
   Controls,
   Background,

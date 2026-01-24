@@ -28,7 +28,13 @@ class OrchestratorConfig(BaseSettings):
 
     # LLM Provider Configuration
     default_llm_provider: str = Field(
-        default="anthropic", description="Default LLM provider (anthropic, openai, azure)"
+        default="local", description="Default LLM provider (local, anthropic, openai, azure)"
+    )
+    ollama_endpoint: str = Field(
+        default="http://localhost:11434", description="Ollama endpoint URL"
+    )
+    ollama_model: str = Field(
+        default="llama3.1:70b", description="Ollama model name"
     )
     anthropic_api_key: Optional[str] = Field(
         default=None, description="Anthropic API key"
@@ -158,7 +164,7 @@ class OrchestratorConfig(BaseSettings):
     @classmethod
     def validate_llm_provider(cls, v: str) -> str:
         """Validate LLM provider is supported."""
-        allowed_providers = {"anthropic", "openai", "azure"}
+        allowed_providers = {"local", "anthropic", "openai", "azure"}
         v_lower = v.lower()
         if v_lower not in allowed_providers:
             raise ValueError(f"default_llm_provider must be one of {allowed_providers}")

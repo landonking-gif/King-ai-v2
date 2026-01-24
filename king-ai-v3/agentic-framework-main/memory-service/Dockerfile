@@ -1,4 +1,5 @@
-FROM python:3.11-slim
+# Force rebuild cache invalidation - 2026-01-23 23:17
+FROM python:3.11-slim-bookworm
 
 WORKDIR /app
 
@@ -18,6 +19,7 @@ COPY docs /app/docs
 
 # Set Python path
 ENV PYTHONPATH=/app
+ENV FORCE_REBUILD=2026-01-23-23-15
 
 # Expose port
 EXPOSE 8002
@@ -26,5 +28,5 @@ EXPOSE 8002
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import requests; requests.get('http://localhost:8002/health')"
 
-# Run the application
-CMD ["uvicorn", "memory_service.service.main:app", "--host", "0.0.0.0", "--port", "8002"]
+# Run the application (updated for cache invalidation - 2026-01-23 23:15)
+CMD ["python", "-m", "service.main"]

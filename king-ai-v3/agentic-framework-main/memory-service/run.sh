@@ -8,11 +8,16 @@ cd "$(dirname "$0")"
 
 # Activate virtual environment if it exists
 if [ -d "/home/ubuntu/agentic-framework-main/.venv" ]; then
+    echo "Activating venv..."
     source /home/ubuntu/agentic-framework-main/.venv/bin/activate
+    echo "Venv activated, python: $(which python)"
+else
+    echo "Venv not found, exiting"
+    exit 1
 fi
 
-# Set PYTHONPATH to include the project root (parent directory)
-export PYTHONPATH="$PWD/..:$PYTHONPATH"
+# Set PYTHONPATH to include current and parent directory
+export PYTHONPATH="$PWD:$PWD/..:$PYTHONPATH"
 
 # Check if .env exists
 if [ ! -f ".env" ] && [ -f "../.env" ]; then
@@ -25,9 +30,8 @@ else
 fi
 
 # Run the service
-echo "Starting Memory Service on ${MEMORY_SERVICE_HOST:-0.0.0.0}:${MEMORY_SERVICE_PORT:-8001}"
-python -m uvicorn service.main:app \
+echo "Starting Memory Service on ${MEMORY_SERVICE_HOST:-0.0.0.0}:${MEMORY_SERVICE_PORT:-8002}"
+uvicorn service.main:app \
     --host "${MEMORY_SERVICE_HOST:-0.0.0.0}" \
-    --port "${MEMORY_SERVICE_PORT:-8001}" \
-    --reload
+    --port "${MEMORY_SERVICE_PORT:-8002}"
 

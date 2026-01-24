@@ -14,9 +14,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import Counter, Histogram, generate_latest
 from pydantic import BaseModel
 
-from subagent_manager.service.config import config
-from subagent_manager.service.lifecycle import SubagentLifecycleManager
-from subagent_manager.service.models import (
+from .config import config
+from .lifecycle import SubagentLifecycleManager
+from .models import (
     SubagentDestroyRequest,
     SubagentExecuteRequest,
     SubagentInfo,
@@ -24,7 +24,7 @@ from subagent_manager.service.models import (
     SubagentResponse,
     SubagentSpawnRequest,
 )
-from subagent_manager.service.validator import SchemaValidator
+from .validator import SchemaValidator
 
 # Metrics
 subagent_spawned = Counter(

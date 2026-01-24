@@ -17,15 +17,7 @@ const dashboards = [
   { id: 'business-pl', name: 'Business P&L Tracker', component: BusinessPLTracker },
   { id: 'agent-control', name: 'Agent Control Center', component: AgentControlCenter },
   { id: 'analytics', name: 'Analytics', component: Analytics },
-  { id: 'memory-explorer', name: 'Memory Explorer', component: MemoryExplorer },
-  { id: 'model-hub', name: 'Model Hub', component: ModelHub },
-  { id: 'tool-catalog', name: 'Tool Catalog', component: ToolCatalog },
-  { id: 'skill-manager', name: 'Skill Manager', component: SkillManager },
-  { id: 'provenance-viewer', name: 'Provenance Viewer', component: ProvenanceViewer },
   { id: 'talk-to-king', name: 'Talk to King AI', component: TalkToKingAI },
-  { id: 'summary-hub', name: 'Summary Hub', component: SummaryHub },
-  { id: 'activity-monitor', name: 'Activity Monitor', component: ActivityMonitor },
-  { id: 'history-archive', name: 'History Archive', component: HistoryArchive },
   { id: 'settings', name: 'Settings & Configuration', component: Settings },
 ];
 

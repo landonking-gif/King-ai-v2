@@ -48,6 +48,26 @@ class WorkflowStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
+# ============================================================================
+# Chat Models
+# ============================================================================
+
+
+class ChatRequest(BaseModel):
+    """Chat message request from user."""
+
+    text: str = Field(..., description="User message content")
+    session_id: Optional[str] = Field(None, description="Optional session ID for tracking conversations")
+
+
+class ChatResponse(BaseModel):
+    """Chat message response."""
+
+    response: str = Field(..., description="AI response content")
+    type: str = Field(default="text", description="Response type: text, workflow, action")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata like workflow IDs")
+
+
 class SafetyClass(str, Enum):
     """Safety classification for artifacts."""
 

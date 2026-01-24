@@ -172,7 +172,7 @@ const AgentControlCenter = () => {
           </div>
         ) : (
           agents.map((agent) => (
-          <div key={agent.id} className="card glass">
+            <div key={agent.id} className="card glass">
             <div className="flex items-start justify-between mb-4">
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-2">
@@ -274,7 +274,7 @@ const AgentControlCenter = () => {
               </ResponsiveContainer>
             </div>
           </div>
-        ))}
+          ))
         )}
       </div>
 
