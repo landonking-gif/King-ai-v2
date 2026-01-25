@@ -159,6 +159,12 @@ async def root() -> Dict[str, str]:
     }
 
 
+@app.get("/api", response_model=Dict[str, str])
+async def api_root() -> Dict[str, str]:
+    """API root endpoint with service information."""
+    return await root()
+
+
 @app.get("/health", response_model=HealthCheckResponse)
 async def health_check() -> HealthCheckResponse:
     """

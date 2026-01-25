@@ -62,7 +62,7 @@ async def test_approval_flow():
     
     result = await handler(
         prd=test_prd,
-        target_server="54.167.201.176",
+        target_server="3.236.144.91",
         approve_before_execution=True
     )
     

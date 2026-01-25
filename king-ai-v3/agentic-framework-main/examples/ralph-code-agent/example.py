@@ -44,7 +44,7 @@ async def main():
             "src/utils/security.py",
             "tests/test_auth.py"
         ],
-        "target_server": "54.167.201.176"  # AWS server
+        "target_server": "3.236.144.91"  # AWS server
     }
     
     print("📝 Task Details:")

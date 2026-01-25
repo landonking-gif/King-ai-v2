@@ -191,10 +191,10 @@ await memory_client.reflect(
 python scripts/ralph/ralph.py
 
 # Custom memory service URL
-python scripts/ralph/ralph.py --memory-service http://54.167.201.176:8002
+python scripts/ralph/ralph.py --memory-service http://3.236.144.91:8002
 
 # With max retries
-python scripts/ralph/ralph.py --max-retries 5 --memory-service http://54.167.201.176:8002
+python scripts/ralph/ralph.py --max-retries 5 --memory-service http://3.236.144.91:8002
 ```
 
 ### From King AI v3 Orchestrator

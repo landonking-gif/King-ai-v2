@@ -5,17 +5,17 @@ Module: memory-service/service/config.py
 """
 
 from typing import Literal, Optional
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
     """Memory service configuration settings."""
 
-    model_config = SettingsConfigDict(env_file=".env", case_sensitive=False, extra="ignore")
+    model_config = {"env_file": ".env", "case_sensitive": False, "extra": "ignore"}
 
     # Service settings
     host: str = "0.0.0.0"
-    port: int = 8001
+    port: int = 8002
     service_name: str = "memory-service"
 
     # Redis configuration

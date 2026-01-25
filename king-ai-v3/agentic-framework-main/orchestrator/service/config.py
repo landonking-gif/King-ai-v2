@@ -34,7 +34,7 @@ class OrchestratorConfig(BaseSettings):
         default="http://localhost:11434", description="Ollama endpoint URL"
     )
     ollama_model: str = Field(
-        default="llama3.1:70b", description="Ollama model name"
+        default="llama3.1:8b", description="Ollama model name (8b recommended for A10G GPU)"
     )
     anthropic_api_key: Optional[str] = Field(
         default=None, description="Anthropic API key"
