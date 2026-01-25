@@ -23,7 +23,7 @@ User Request → Orchestrator → Ralph Code Agent
 ## Features
 
 - **Automated PRD Generation**: Creates detailed Product Requirements Documents from high-level requests
-- **AWS Integration**: Executes Ralph on your AWS server (54.167.201.176)
+- **AWS Integration**: Executes Ralph on your AWS server (3.236.144.91)
 - **Human Approval Gates**: Optional approval before code execution
 - **Full Provenance**: Tracks all changes with audit trail
 - **File Monitoring**: Reports all files created or modified

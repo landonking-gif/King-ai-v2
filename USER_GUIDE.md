@@ -27,19 +27,31 @@ This comprehensive guide covers everything you need to know about King AI v3 - f
 - **Dashboard** (port 3000): React frontend with real-time updates
 - **Ollama** (port 11434): Local LLM runtime with llama3.1:70b model
 
+### Production Database Configuration
+**⚠️ Security Note**: These are the actual production credentials used in the current deployment.
+
+- **Database**: PostgreSQL 14+
+- **Host**: localhost:5432
+- **Database Name**: `agentic_framework`
+- **Username**: `agentic_user`
+- **Password**: `agentic_pass`
+- **Connection String**: `postgresql://agentic_user:agentic_pass@localhost:5432/agentic_framework`
+
+**Important**: Change these credentials in production deployments for security!
+
 ## 🚀 AWS Deployment Guide
 
 ### Prerequisites for AWS Deployment
 
-wsl bash -c "cd /mnt/c/Users/dmilner.AGV-040318-PC/Downloads/landon/king-ai-v2/king-ai-v3/agentic-framework-main/orchestrator && sed -i 's/\r$//' run_service.sh && echo '54.167.201.176' | bash run_service.sh"
-
+wsl bash -c "cd /mnt/c/Users/dmilner.AGV-040318-PC/Downloads/landon/king-ai-v2/king-ai-v3/agentic-framework-main/orchestrator && sed -i 's/\r$//' run_service.sh && echo '54.87.216.171' | bash run_service.sh"
+ 
 #### 1. AWS Account Setup
 - Create AWS account with EC2 access
 - Launch EC2 instance (t3.medium or larger recommended)
 - Ubuntu 22.04 LTS AMI
 - Security group with ports: 22, 80, 443, 3000, 8000-8003, 8080, 11434
 - Key pair (.pem file) for SSH access
-
+ 
 #### 2. Local Development Environment
 - Python 3.10+
 - Node.js 20+
@@ -268,7 +280,108 @@ curl -X POST http://localhost:8000/api/chat/message \
 - Try the "Talk to King AI" tab
 - Check all dashboard sections load properly
 
-## 🛠️ Local Development Setup
+## � Deployment Troubleshooting
+
+### Common Issues & Solutions
+
+#### 1. Missing Python Dependencies
+**Symptoms**: Services fail to start with `ModuleNotFoundError`
+
+**Solution**: Install missing packages:
+```bash
+# On AWS server
+cd ~/agentic-framework-main
+source .venv/bin/activate
+pip install python-jose[cryptography] asyncpg prometheus-client jsonschema
+```
+
+#### 2. Database Connection Issues
+**Symptoms**: Memory Service fails with authentication errors
+
+**Solution**: Verify database credentials in `memory-service/.env`:
+```bash
+# Correct configuration
+POSTGRES_URL=postgresql://agentic_user:agentic_pass@localhost:5432/agentic_framework
+```
+
+**Note**: The production system uses these exact credentials. For new deployments, create secure credentials and update all `.env` files.
+
+#### 3. Service Startup Failures
+**Symptoms**: Services appear unhealthy in health checks
+
+**Solution**: Use the comprehensive startup script:
+```bash
+# On AWS server
+cd ~/agentic-framework-main
+bash start_all_services.sh
+```
+
+This script:
+- Properly manages process PIDs
+- Creates log files in `/tmp/`
+- Provides detailed health status
+- Handles service dependencies correctly
+
+#### 4. Port Conflicts
+**Symptoms**: Services fail with "Address already in use"
+
+**Solution**: Kill existing processes:
+```bash
+# Kill processes on service ports
+sudo lsof -ti:8000,8001,8002,8080,3000 | xargs -r kill -9
+```
+
+#### 5. LLM Integration Issues
+**Symptoms**: Chat functionality doesn't work
+
+**Solution**: Verify Ollama is running:
+```bash
+# Check Ollama status
+curl http://localhost:11434/api/tags
+
+# Restart if needed
+sudo systemctl restart ollama
+```
+
+#### 6. Dashboard Build Issues
+**Symptoms**: Dashboard shows blank page or errors
+
+**Solution**: Rebuild dashboard:
+```bash
+cd ~/agentic-framework-main/dashboard
+npm install
+npm run build
+npm run preview -- --host 0.0.0.0 --port 3000 &
+```
+
+### Health Check Commands
+```bash
+# Individual service health
+curl http://localhost:8000/health  # Orchestrator
+curl http://localhost:8080/health  # MCP Gateway
+curl http://localhost:8002/health  # Memory Service
+curl http://localhost:8001/health  # Subagent Manager
+
+# System logs
+tail -f /tmp/orchestrator.log
+tail -f /tmp/mcp-gateway.log
+tail -f /tmp/memory-service.log
+tail -f /tmp/subagent-manager.log
+tail -f /tmp/dashboard.log
+```
+
+### Production Deployment Checklist
+- [ ] All Python dependencies installed
+- [ ] Database credentials configured correctly
+- [ ] All services start without errors
+- [ ] Health endpoints return "healthy"
+- [ ] Dashboard loads and is responsive
+- [ ] Chat functionality works
+- [ ] Nginx configured (if using reverse proxy)
+- [ ] Firewall rules allow required ports
+- [ ] SSL certificate configured (recommended)
+
+## �🛠️ Local Development Setup
 
 ### Prerequisites
 - Python 3.10+
@@ -300,7 +413,7 @@ ollama serve
 # Start services using the automated script
 wsl bash -c "cd /mnt/c/Users/dmilner.AGV-040318-PC/Downloads/landon/king-ai-v2/king-ai-v3/agentic-framework-main/orchestrator && sed -i 's/\r$//' run_service.sh && echo 'YOUR_IP_ADRESS_HERE' | bash run_service.sh"
 
-**Note**: Replace `YOUR_IP_ADRESS_HERE` with your AWS EC2 public IP address (e.g., `54.167.201.176`). This script will:
+**Note**: Replace `YOUR_IP_ADRESS_HERE` with your AWS EC2 public IP address (e.g., `3.236.144.91`). This script will:
 - Deploy all services to your AWS server
 - Set up Ollama with the llama3.1:70b model
 - Configure databases and environment variables
@@ -348,7 +461,7 @@ JWT_SECRET_KEY=your-secret-key-here
 JWT_ALGORITHM=HS256
 
 # AWS (for production)
-AWS_IP=54.167.201.176
+AWS_IP=3.236.144.91
 ```
 
 #### Service-Specific Configuration

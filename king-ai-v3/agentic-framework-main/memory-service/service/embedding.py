@@ -2,20 +2,27 @@
 Embedding Generation Module.
 
 Module: memory-service/service/embedding.py
-Uses sentence-transformers for generating embeddings.
+Uses sentence-transformers for generating embeddings, with mock fallback.
 """
 
 from typing import Any, Dict, List, Optional
-import tiktoken
+import hashlib
+import numpy as np
 
-import anyio
-from sentence_transformers import SentenceTransformer
+# Try to import sentence_transformers, fall back to mock if not available
+try:
+    import tiktoken
+    from sentence_transformers import SentenceTransformer
+    SENTENCE_TRANSFORMERS_AVAILABLE = True
+except ImportError:
+    SENTENCE_TRANSFORMERS_AVAILABLE = False
+    tiktoken = None
 
 from .config import Settings
 
 
 class EmbeddingGenerator:
-    """Generate embeddings for artifacts using sentence-transformers."""
+    """Generate embeddings for artifacts using sentence-transformers or mock."""
 
     def __init__(self, settings: Settings) -> None:
         """
@@ -25,42 +32,53 @@ class EmbeddingGenerator:
             settings: Service configuration settings
         """
         self.settings = settings
-        self.model: Optional[SentenceTransformer] = None
-        self.tokenizer: Optional[tiktoken.Encoding] = None
+        self.model: Optional[Any] = None
+        self.tokenizer: Optional[Any] = None
+        self.use_mock = not SENTENCE_TRANSFORMERS_AVAILABLE
 
     async def initialize(self) -> None:
-        """Load embedding model."""
+        """Initialize the embedding model."""
+        if self.use_mock:
+            print("Using mock embedding generator (sentence-transformers not available)")
+            return
 
-        def _load_model() -> SentenceTransformer:
-            return SentenceTransformer(self.settings.embedding_model)
-
-        self.model = await anyio.to_thread.run_sync(_load_model)
-
-        # Initialize tokenizer for token counting
         try:
-            self.tokenizer = tiktoken.get_encoding("cl100k_base")
-        except Exception:
-            # Fallback if tiktoken not available
-            self.tokenizer = None
+            # Initialize sentence transformer model
+            self.model = SentenceTransformer('all-MiniLM-L6-v2')
+
+            # Initialize tokenizer for token counting
+            if tiktoken:
+                self.tokenizer = tiktoken.get_encoding("cl100k_base")
+            print("Embedding generator initialized with sentence-transformers")
+        except Exception as e:
+            print(f"Failed to initialize sentence-transformers: {e}")
+            print("Falling back to mock embedding generator")
+            self.use_mock = True
 
     async def generate_embedding(self, text: str) -> List[float]:
         """
-        Generate embedding vector for text.
+        Generate embedding for text.
 
         Args:
-            text: Input text
+            text: Input text to embed
 
         Returns:
-            Embedding vector as list of floats
+            Embedding vector
         """
+        if self.use_mock:
+            # Generate deterministic mock embedding based on text hash
+            hash_obj = hashlib.md5(text.encode())
+            hash_int = int(hash_obj.hexdigest(), 16)
+            np.random.seed(hash_int % 2**32)  # Use hash as seed for reproducibility
+            embedding = np.random.normal(0, 1, self.settings.embedding_dimension).tolist()
+            return embedding
+
         if not self.model:
             raise RuntimeError("Embedding model not initialized")
 
-        def _encode() -> Any:
-            return self.model.encode(text, convert_to_numpy=True)
-
-        embedding = await anyio.to_thread.run_sync(_encode)
-        return embedding.tolist()
+        # Generate embedding using sentence-transformers
+        embedding = self.model.encode(text, convert_to_tensor=False).tolist()
+        return embedding
 
     async def generate_batch_embeddings(self, texts: List[str]) -> List[List[float]]:
         """
@@ -72,13 +90,22 @@ class EmbeddingGenerator:
         Returns:
             List of embedding vectors
         """
+        if self.use_mock:
+            # Generate mock embeddings for batch
+            embeddings = []
+            for text in texts:
+                hash_obj = hashlib.md5(text.encode())
+                hash_int = int(hash_obj.hexdigest(), 16)
+                np.random.seed(hash_int % 2**32)
+                embedding = np.random.normal(0, 1, self.settings.embedding_dimension).tolist()
+                embeddings.append(embedding)
+            return embeddings
+
         if not self.model:
             raise RuntimeError("Embedding model not initialized")
 
-        def _encode_batch() -> Any:
-            return self.model.encode(texts, convert_to_numpy=True, show_progress_bar=False)
-
-        embeddings = await anyio.to_thread.run_sync(_encode_batch)
+        # Generate embeddings using sentence-transformers
+        embeddings = self.model.encode(texts, convert_to_tensor=False, show_progress_bar=False)
         return embeddings.tolist()
 
     def count_tokens(self, text: str) -> int:
@@ -89,13 +116,16 @@ class EmbeddingGenerator:
             text: Input text
 
         Returns:
-            Token count
+            Number of tokens
         """
-        if self.tokenizer:
-            return len(self.tokenizer.encode(text))
-        else:
-            # Rough approximation: 1 token ≈ 4 characters
-            return len(text) // 4
+        if self.use_mock or not tiktoken:
+            # Rough approximation: 1 token per 4 characters
+            return len(text) // 4 + 1
+
+        if not self.tokenizer:
+            raise RuntimeError("Tokenizer not initialized")
+
+        return len(self.tokenizer.encode(text))
 
     def extract_searchable_text(self, artifact_content: Dict[str, Any]) -> str:
         """

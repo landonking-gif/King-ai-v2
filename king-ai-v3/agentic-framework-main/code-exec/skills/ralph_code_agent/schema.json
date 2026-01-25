@@ -46,7 +46,7 @@
     "target_server": {
       "type": "string",
       "description": "Target deployment server",
-      "default": "54.167.201.176"
+      "default": "3.236.144.91"
     },
     "approve_before_execution": {
       "type": "boolean",

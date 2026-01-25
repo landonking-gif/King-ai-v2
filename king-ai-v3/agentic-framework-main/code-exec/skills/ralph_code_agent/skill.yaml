@@ -51,7 +51,7 @@ parameters:
     type: string
     description: "Target server for code deployment (e.g., AWS IP or 'local')"
     required: false
-    default: "54.167.201.176"
+    default: "3.236.144.91"
   
   - name: approve_before_execution
     type: boolean

@@ -7,13 +7,22 @@ set -e
 cd "$(dirname "$0")"
 
 # Activate virtual environment if it exists
-if [ -d "/home/ubuntu/agentic-framework-main/.venv" ]; then
-    echo "Activating venv..."
+if [ -d ".venv" ]; then
+    echo "Activating local venv..."
+    source .venv/bin/activate
+    echo "Venv activated, python: $(which python)"
+elif [ -d "../.venv" ]; then
+    echo "Activating parent venv..."
+    source ../.venv/bin/activate
+    echo "Venv activated, python: $(which python)"
+elif [ -d "/home/ubuntu/agentic-framework-main/.venv" ]; then
+    echo "Activating AWS venv..."
     source /home/ubuntu/agentic-framework-main/.venv/bin/activate
     echo "Venv activated, python: $(which python)"
 else
-    echo "Venv not found, exiting"
-    exit 1
+    echo "No venv found, trying to run with system python3..."
+    # Try to run with python3, assuming dependencies are installed
+    alias python=python3
 fi
 
 # Set PYTHONPATH to include current and parent directory

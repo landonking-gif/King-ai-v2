@@ -452,13 +452,13 @@ python test_handler.py
 ### Troubleshooting
 
 **SSH connection fails:**
-- Verify AWS server IP (54.167.201.176) is reachable
+- Verify AWS server IP (3.236.144.91) is reachable
 - Check SSH key permissions: `chmod 600 king-ai-studio.pem`
-- Test manual connection: `ssh -i king-ai-studio.pem ubuntu@54.167.201.176`
+- Test manual connection: `ssh -i king-ai-studio.pem ubuntu@3.236.144.91`
 
 **Ralph execution times out:**
 - Increase timeout in `RALPH_EXECUTION_TIMEOUT` environment variable
-- Check Ralph logs on AWS: `ssh ubuntu@54.167.201.176 'tail -f /tmp/ralph_*.log'`
+- Check Ralph logs on AWS: `ssh ubuntu@3.236.144.91 'tail -f /tmp/ralph_*.log'`
 
 **PRD validation errors:**
 - Ensure task description is detailed and specific

@@ -43,6 +43,7 @@ from .storage import (
     get_vector_adapter,
     S3Adapter,
 )
+# Lazy import for heavy dependencies
 from .embedding import EmbeddingGenerator, TokenBudgetManager
 
 
@@ -705,6 +706,12 @@ async def _group_artifacts_by_similarity(
         groups.append(without_embeddings)
 
     return groups
+
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint."""
+    return {"status": "healthy", "service": "memory-service"}
 
 
 if __name__ == "__main__":

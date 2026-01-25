@@ -22,7 +22,7 @@ inputs:
   - name: target_server
     type: string
     description: "Target AWS server IP"
-    default: "54.167.201.176"
+    default: "3.236.144.91"
 
 steps:
   - id: generate_prd
