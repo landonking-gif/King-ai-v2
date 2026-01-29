@@ -6,19 +6,8 @@ export function LiveFeed({ businessId, maxItems = 50 }) {
   const [events, setEvents] = useState([]);
   const feedRef = useRef(null);
 
-  const { connected } = useWebSocket(
-    `ws://${window.location.host}/api/monitoring/ws`,
-    {
-      businessId,
-      onEvent: (event, data, timestamp) => {
-        setEvents((prev) => {
-          const newEvent = { event, data, timestamp, id: Date.now() };
-          const updated = [newEvent, ...prev].slice(0, maxItems);
-          return updated;
-        });
-      },
-    }
-  );
+  // WebSocket disabled - using polling instead
+  const connected = false;
 
   const eventIcons = {
     'business.updated': '🏢',

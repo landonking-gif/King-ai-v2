@@ -558,8 +558,21 @@ class SubagentLifecycleManager:
                 api_key=self.config.openai_api_key,
             )
 
-        else:
-            raise ValueError(f"Unsupported LLM provider: {provider}")
+        elif provider == "vllm":
+            from adapters.llm.vllm import VLLMAdapter
+
+            return VLLMAdapter(
+                model=self.config.llm_model,
+                endpoint=os.getenv("VLLM_ENDPOINT", "http://localhost:8005"),
+            )
+
+        elif provider == "local":
+            from adapters.llm.local import LocalLLMAdapter
+
+            return LocalLLMAdapter(
+                model=self.config.llm_model,
+                endpoint=os.getenv("OLLAMA_ENDPOINT", "http://localhost:11434"),
+            )
 
     async def spawn_subagent(self, request: SubagentSpawnRequest) -> SubagentInfo:
         """

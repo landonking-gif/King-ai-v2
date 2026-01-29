@@ -241,16 +241,16 @@ async def chat_message(request: ChatRequest) -> ChatResponse:
     """
     Chat endpoint for conversational interface.
     
-    Processes user messages and returns AI responses using Ollama LLM.
+    Processes user messages and returns AI responses using vLLM with Kimi-K2-Thinking.
     """
     logger.info(f"Received chat message: {request.text}")
     
     try:
-        # Create Ollama adapter
+        # Create vLLM adapter
         llm_adapter = create_adapter(
-            provider="local",
-            model=config.ollama_model,
-            endpoint=config.ollama_endpoint
+            provider="vllm",
+            model=config.vllm_model,
+            endpoint=config.vllm_endpoint
         )
         
         # Build system prompt
@@ -303,6 +303,77 @@ async def chat_message(request: ChatRequest) -> ChatResponse:
         type=response_type,
         metadata={"session_id": request.session_id} if request.session_id else None,
     )
+
+
+@app.post("/api/chat", response_model=ChatResponse)
+async def api_chat(request: ChatRequest) -> ChatResponse:
+    """
+    Main chat endpoint for dashboard and API clients.
+    
+    Alias for /api/chat/message for compatibility.
+    """
+    return await chat_message(request)
+
+
+@app.get("/api/agents")
+async def list_agents() -> Dict[str, Any]:
+    """
+    List all available agents in the orchestration system.
+    
+    Returns agents from the subagent manager and built-in capabilities.
+    """
+    import httpx
+    
+    # Built-in orchestrator agents
+    agents = [
+        {
+            "name": "orchestrator",
+            "type": "lead_agent",
+            "status": "running",
+            "capabilities": ["workflow_orchestration", "task_planning", "subagent_coordination"],
+            "description": "Lead agent for workflow orchestration and coordination"
+        },
+        {
+            "name": "ralph",
+            "type": "code_agent",
+            "status": "available",
+            "capabilities": ["code_generation", "code_review", "refactoring", "testing"],
+            "description": "Autonomous coding agent for software development tasks"
+        },
+        {
+            "name": "research",
+            "type": "research_agent",
+            "status": "available",
+            "capabilities": ["web_search", "fact_verification", "summarization"],
+            "description": "Research agent for information gathering and verification"
+        },
+        {
+            "name": "synthesis",
+            "type": "synthesis_agent",
+            "status": "available",
+            "capabilities": ["report_generation", "content_synthesis", "analysis"],
+            "description": "Synthesis agent for combining and analyzing information"
+        }
+    ]
+    
+    # Try to get agents from subagent manager
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(f"{config.subagent_manager_url}/agents")
+            if response.status_code == 200:
+                data = response.json()
+                subagents = data.get("agents", [])
+                # Merge with built-in agents
+                for sa in subagents:
+                    if sa.get("name") not in [a["name"] for a in agents]:
+                        agents.append(sa)
+    except Exception as e:
+        logger.warning(f"Could not fetch agents from subagent manager: {e}")
+    
+    return {
+        "count": len(agents),
+        "agents": agents
+    }
 
 
 @app.post("/workflows/start", response_model=WorkflowStartResponse)

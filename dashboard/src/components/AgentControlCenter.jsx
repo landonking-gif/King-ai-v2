@@ -9,14 +9,8 @@ const AgentControlCenter = () => {
   const [showSpawnDialog, setShowSpawnDialog] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState(null);
 
-  // WebSocket for real-time updates
-  const { connected } = useWebSocket('/api/ws/agents', {
-    onEvent: (event, data) => {
-      if (event === 'agent_spawned' || event === 'agent_destroyed' || event === 'agent_updated') {
-        fetchAgents(); // Refresh the list
-      }
-    }
-  });
+  // WebSocket disabled - using polling instead
+  const connected = false;
 
   useEffect(() => {
     fetchAgents();

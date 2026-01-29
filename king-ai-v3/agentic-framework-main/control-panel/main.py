@@ -535,9 +535,57 @@ async def get_model_usage(user: dict = Depends(get_current_user)):
 # Conversational interface
 @app.post("/api/chat/message")
 async def send_chat_message(message: dict, user: dict = Depends(get_current_user)):
-    """Send message to King AI"""
-    # TODO: Integrate with conversational AI
-    return {"response": "This feature is under development"}
+    """Send message to King AI orchestrator"""
+    user_message = message.get("message") or message.get("text", "")
+    
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            # Forward to orchestrator
+            orchestrator_url = os.environ.get("ORCHESTRATOR_URL", "http://localhost:8000")
+            response = await client.post(
+                f"{orchestrator_url}/api/chat",
+                json={"message": user_message, "text": user_message}
+            )
+            
+            if response.status_code == 200:
+                return response.json()
+            else:
+                return {"response": f"Orchestrator error: {response.status_code}", "type": "error"}
+    except httpx.ConnectError:
+        return {"response": "Cannot connect to orchestrator. Please ensure it is running on port 8000.", "type": "error"}
+    except Exception as e:
+        return {"response": f"Error: {str(e)}", "type": "error"}
+
+
+@app.post("/api/chat")
+async def chat_alias(message: dict, user: dict = Depends(get_current_user)):
+    """Alias for /api/chat/message"""
+    return await send_chat_message(message, user)
+
+
+@app.get("/api/agents")
+async def get_agents(user: dict = Depends(get_current_user)):
+    """Get agents from orchestrator"""
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            orchestrator_url = os.environ.get("ORCHESTRATOR_URL", "http://localhost:8000")
+            response = await client.get(f"{orchestrator_url}/api/agents")
+            if response.status_code == 200:
+                return response.json()
+    except Exception as e:
+        pass
+    
+    # Fallback to local agent list
+    return {
+        "count": 4,
+        "agents": [
+            {"name": "orchestrator", "type": "lead_agent", "status": "running"},
+            {"name": "ralph", "type": "code_agent", "status": "available"},
+            {"name": "research", "type": "research_agent", "status": "available"},
+            {"name": "synthesis", "type": "synthesis_agent", "status": "available"}
+        ]
+    }
+
 
 @app.get("/api/chat/history")
 async def get_chat_history(user: dict = Depends(get_current_user)):
@@ -1176,6 +1224,7 @@ async def websocket_pl_updates(websocket: WebSocket):
 
 # ============================================================================
 # CONVERSATIONAL INTERFACE ENDPOINTS - Chat and AI interaction
+# Note: Main chat endpoints are defined earlier. These are for local history storage.
 # ============================================================================
 
 # In-memory chat storage
@@ -1185,52 +1234,7 @@ class ChatMessage(BaseModel):
     message: str
     metadata: Optional[Dict[str, Any]] = None
 
-@app.post("/api/chat/message")
-async def send_chat_message(msg: ChatMessage, user: User = Depends(get_current_active_user)):
-    """Send a message to King AI conversational interface"""
-    user_message = {
-        "id": f"msg-{len(chat_history_store) + 1}",
-        "role": "user",
-        "content": msg.message,
-        "username": user.username,
-        "timestamp": datetime.utcnow().isoformat(),
-    }
-    chat_history_store.append(user_message)
-    
-    # Generate AI response (simplified)
-    content = msg.message.lower()
-    if "create" in content and "workflow" in content:
-        response = f'I\'ve created a new workflow from your request: "{msg.message[:50]}...". Would you like to execute it?'
-        metadata = {"workflow_created": True, "workflow_id": f"wf-{len(chat_history_store)}"}
-    elif "analyze" in content or "report" in content:
-        response = "Here's the analysis: System is performing optimally. All services are healthy. Would you like more details?"
-        metadata = {"analysis": True}
-    elif "execute" in content or "run" in content:
-        response = "Workflow execution started. Step 1 of 3 completed. Moving to Step 2..."
-        metadata = {"execution": True}
-    else:
-        response = f'I understand you want to "{msg.message}". In conversational mode, I can help you create workflows, analyze data, or execute tasks. What would be most helpful?'
-        metadata = {}
-    
-    ai_message = {
-        "id": f"msg-{len(chat_history_store) + 1}",
-        "role": "assistant",
-        "content": response,
-        "timestamp": datetime.utcnow().isoformat(),
-        "metadata": metadata,
-    }
-    chat_history_store.append(ai_message)
-    
-    # Broadcast via WebSocket
-    await ws_manager.broadcast("chat", {
-        "type": "message",
-        "role": "assistant",
-        "content": response,
-        "metadata": metadata,
-        "timestamp": datetime.utcnow().isoformat()
-    })
-    
-    return ai_message
+# Note: /api/chat/message is defined earlier and forwards to orchestrator
 
 @app.get("/api/chat/history")
 async def get_chat_history(limit: int = 50, user: User = Depends(get_current_active_user)):

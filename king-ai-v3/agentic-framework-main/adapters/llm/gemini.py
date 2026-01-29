@@ -143,7 +143,10 @@ class GeminiAdapter(LLMAdapter):
                     error_detail = error_data.get("error", {}).get("message", error_detail)
                 except Exception:
                     pass
-                raise LLMError(f"Gemini API error ({response.status_code}): {error_detail}")
+                raise LLMError(
+                    f"Gemini API error ({response.status_code}): {error_detail}",
+                    provider="gemini",
+                )
 
             response_data = response.json()
             choice = response_data["choices"][0]
@@ -167,7 +170,11 @@ class GeminiAdapter(LLMAdapter):
         except LLMError:
             raise
         except Exception as e:
-            raise LLMError(f"Gemini completion failed: {e}")
+            raise LLMError(
+                f"Gemini completion failed: {e}",
+                provider="gemini",
+                original_error=e,
+            )
 
     async def stream_complete(
         self,
@@ -221,7 +228,10 @@ class GeminiAdapter(LLMAdapter):
             ) as response:
                 if response.status_code != 200:
                     error_detail = await response.aread()
-                    raise LLMError(f"Gemini API error ({response.status_code}): {error_detail}")
+                    raise LLMError(
+                        f"Gemini API error ({response.status_code}): {error_detail}",
+                        provider="gemini",
+                    )
 
                 async for line in response.aiter_lines():
                     if line.startswith("data: "):
@@ -242,7 +252,11 @@ class GeminiAdapter(LLMAdapter):
         except LLMError:
             raise
         except Exception as e:
-            raise LLMError(f"Gemini streaming failed: {e}")
+            raise LLMError(
+                f"Gemini streaming failed: {e}",
+                provider="gemini",
+                original_error=e,
+            )
 
     async def validate_api_key(self) -> bool:
         """

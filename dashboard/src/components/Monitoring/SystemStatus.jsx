@@ -7,16 +7,8 @@ export function SystemStatus() {
   const [metrics, setMetrics] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const { connected } = useWebSocket(
-    `ws://${window.location.host}/api/monitoring/ws`,
-    {
-      onEvent: (event, data) => {
-        if (event === 'system.metric') {
-          setMetrics(data);
-        }
-      },
-    }
-  );
+  // WebSocket disabled - using polling instead
+  const connected = false;
 
   useEffect(() => {
     fetchHealth();

@@ -7,8 +7,8 @@
 # - Database credential mismatches: Automatic fix for memory-service/.env
 # - Incomplete dashboard sync: Full rsync of dashboard directory
 # - Service startup reliability: Uses start_all_services.sh when available
-# - Ollama LLM model warmup: Prevents first-request timeouts
-# - Ollama keepalive service: Maintains model in memory
+# - vLLM model warmup: Prevents first-request timeouts with Kimi-K2-Thinking
+# - vLLM keepalive service: Maintains model in memory
 # - Nginx proxy timeouts: Increased for LLM response times
 #
 # Usage examples:
@@ -28,28 +28,24 @@ read -p "Enter AWS server IP address: " aws_ip
 # Update dashboard .env with the new IP
 /mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -Command "Set-Content -Path 'C:\Users\dmilner.AGV-040318-PC\Downloads\landon\king-ai-v2\dashboard\.env' -Value 'VITE_API_BASE=http://$aws_ip:8000/api'"
 
-ssh_key="$(cd .. && pwd)/king-ai-studio.pem"
+ssh_key="~/.ssh/king-ai-studio.pem"
 ssh_user=ubuntu
 
-# Convert WSL path to Windows path for Windows SSH
-ssh_key=${ssh_key/\/mnt\/c\//C:\\}
-ssh_key=${ssh_key//\//\\}
+# Use native ssh in WSL
+SSH_CMD="ssh -i \"$ssh_key\" -o StrictHostKeyChecking=no"
 
 echo "Deploying to AWS server $aws_ip..."
 
 # One-time system setup (check if already done to avoid redundant operations)
 echo "Checking system setup on AWS server..."
-/mnt/c/Windows/System32/OpenSSH/ssh.exe -i "$ssh_key" -o StrictHostKeyChecking=no "$ssh_user@$aws_ip" << 'EOF'
-    # Check if Ollama is installed
-    if ! command -v ollama &> /dev/null; then
-        echo "Installing Ollama..."
-        sudo apt update && sudo apt install -y curl
-        curl -fsSL https://ollama.ai/install.sh | sh
-        sudo systemctl enable ollama
-        sudo systemctl start ollama
-        ollama pull llama3.1:8b
+$SSH_CMD "$ssh_user@$aws_ip" << 'EOF'
+    # Check if vLLM is installed
+    if ! python3 -c "import vllm" &> /dev/null; then
+        echo "Installing vLLM..."
+        sudo apt update && sudo apt install -y python3-pip
+        pip3 install vllm huggingface-hub
     else
-        echo "✓ Ollama already installed"
+        echo "✓ vLLM already installed"
     fi
     
     # Check if required packages are installed
@@ -88,7 +84,7 @@ EOF
 # Copy project files efficiently (only changed files)
 echo "Syncing project files to AWS server..."
 cd ..
-rsync -az --delete --quiet -e "/mnt/c/Windows/System32/OpenSSH/ssh.exe -i \"$ssh_key\" -o StrictHostKeyChecking=no" \
+rsync -az --delete --quiet -e "$SSH_CMD" \
     --exclude='.venv' \
     --exclude='__pycache__' \
     --exclude='*.pyc' \
@@ -108,20 +104,20 @@ if [ ! -d "../../dashboard" ]; then
     exit 1
 fi
 # Ensure destination directory exists
-/mnt/c/Windows/System32/OpenSSH/ssh.exe -i "$ssh_key" -o StrictHostKeyChecking=no "$ssh_user@$aws_ip" "mkdir -p ~/agentic-framework-main/dashboard"
+$SSH_CMD "$ssh_user@$aws_ip" "mkdir -p ~/agentic-framework-main/dashboard"
 # Use rsync for efficient file transfer
-rsync -az --delete --quiet -e "/mnt/c/Windows/System32/OpenSSH/ssh.exe -i \"$ssh_key\" -o StrictHostKeyChecking=no" \
+rsync -az --delete --quiet -e "$SSH_CMD" \
     --exclude='node_modules' \
     --exclude='dist' \
     --exclude='.git' \
     ../../dashboard/ "$ssh_user@$aws_ip:~/agentic-framework-main/dashboard/"
 # Verify dashboard files were copied
-/mnt/c/Windows/System32/OpenSSH/ssh.exe -i "$ssh_key" -o StrictHostKeyChecking=no "$ssh_user@$aws_ip" "ls -la ~/agentic-framework-main/dashboard/ | head -5"
+$SSH_CMD "$ssh_user@$aws_ip" "ls -la ~/agentic-framework-main/dashboard/ | head -5"
 cd orchestrator
 
 # Fix line endings
 echo "Fixing line endings..."
-/mnt/c/Windows/System32/OpenSSH/ssh.exe -i "$ssh_key" -o StrictHostKeyChecking=no "$ssh_user@$aws_ip" << 'EOF'
+$SSH_CMD "$ssh_user@$aws_ip" << 'EOF'
     cd ~/agentic-framework-main
     find . -name "*.sh" -type f -exec sed -i 's/\r$//' {} \;
     echo "✓ Line endings fixed"
@@ -129,7 +125,7 @@ EOF
 
 # Setup Python environment and install dependencies efficiently
 echo "Setting up Python environment..."
-/mnt/c/Windows/System32/OpenSSH/ssh.exe -i "$ssh_key" -o StrictHostKeyChecking=no "$ssh_user@$aws_ip" << EOF
+$SSH_CMD "$ssh_user@$aws_ip" << EOF
     cd ~/agentic-framework-main
     
     # Create or reuse virtual environment
@@ -147,7 +143,8 @@ echo "Setting up Python environment..."
     # Copy and configure .env files
     if [ ! -f ".env" ]; then
         cp .env.example .env
-        sed -i 's|OLLAMA_ENDPOINT=.*|OLLAMA_ENDPOINT=http://localhost:11434|' .env
+        sed -i 's|VLLM_ENDPOINT=.*|VLLM_ENDPOINT=http://localhost:8005|' .env
+        sed -i 's|VLLM_MODEL=.*|VLLM_MODEL=moonshotai/Kimi-K2-Thinking|' .env
         sed -i 's|postgresql://user:password@localhost:5432/agentic_framework|postgresql://agentic_user:agentic_pass@localhost:5432/agentic_framework|' .env
         echo "MEMORY_SERVICE_PORT=8002" >> .env
         echo "AWS_IP=$aws_ip" >> .env
@@ -156,6 +153,11 @@ echo "Setting up Python environment..."
     # Copy .env to service directories only if they don't exist
     for dir in mcp-gateway memory-service subagent-manager orchestrator; do
         [ ! -f "\$dir/.env" ] && cp .env "\$dir/.env"
+        # Update VLLM settings in existing .env files
+        sed -i 's|OLLAMA_ENDPOINT=.*|VLLM_ENDPOINT=http://localhost:8005|' "\$dir/.env" 2>/dev/null || true
+        sed -i 's|VLLM_ENDPOINT=.*|VLLM_ENDPOINT=http://localhost:8005|' "\$dir/.env" 2>/dev/null || true
+        sed -i 's|VLLM_MODEL=.*|VLLM_MODEL=moonshotai/Kimi-K2-Thinking|' "\$dir/.env" 2>/dev/null || true
+        sed -i 's|postgresql://king:password@localhost:5432/kingai|postgresql://agentic_user:agentic_pass@localhost:5432/agentic_framework|' "\$dir/.env" 2>/dev/null || true
     done
     
     # Setup dashboard (only if package.json changed or node_modules missing)
@@ -171,7 +173,7 @@ EOF
 
 # Start all services
 echo "Starting services on AWS server..."
-/mnt/c/Windows/System32/OpenSSH/ssh.exe -i "$ssh_key" -o StrictHostKeyChecking=no "$ssh_user@$aws_ip" << 'EOF'
+$SSH_CMD "$ssh_user@$aws_ip" << 'EOF'
     cd ~/agentic-framework-main
     source .venv/bin/activate
     
@@ -204,6 +206,33 @@ echo "Starting services on AWS server..."
     # Start MinIO if not running
     if ! pgrep -f "minio server" > /dev/null; then
         nohup ~/minio server ~/agentic-framework-main/data/minio --console-address :9001 > /tmp/minio.log 2>&1 &
+    fi
+    
+    # Download and start vLLM server
+    echo "Setting up vLLM with Kimi-K2-Thinking model..."
+    if [ ! -d "~/models/kimi-k2-thinking" ]; then
+        mkdir -p ~/models
+        huggingface-cli download moonshotai/Kimi-K2-Thinking --local-dir ~/models/kimi-k2-thinking --quiet
+    fi
+    if ! pgrep -f "vllm serve" > /dev/null; then
+        nohup python3 -m vllm serve moonshotai/Kimi-K2-Thinking \
+          --tensor-parallel-size 1 \
+          --tool-call-parser kimi_k2 \
+          --reasoning-parser kimi_k2 \
+          --max-num-batched-tokens 32768 \
+          --host 0.0.0.0 \
+          --port 8005 > /tmp/vllm.log 2>&1 &
+        echo "vLLM server started"
+        # Wait for vLLM to be ready
+        echo "Waiting for vLLM to be ready..."
+        for i in {1..30}; do
+            if curl -sf http://localhost:8005/v1/models > /dev/null 2>&1; then
+                echo "✓ vLLM is ready"
+                break
+            fi
+            echo "Waiting for vLLM... ($i/30)"
+            sleep 10
+        done
     fi
     
     # Use the comprehensive startup script if it exists
@@ -244,10 +273,16 @@ echo "Starting services on AWS server..."
         echo ""
         echo "Service Health Status:"
         echo "======================"
-        for service in "MCP Gateway:8080" "Memory Service:8002" "Subagent Manager:8001" "Orchestrator:8000" "Dashboard:3000"; do
+        for service in "MCP Gateway:8080" "Memory Service:8002" "Subagent Manager:8001" "Orchestrator:8000" "Dashboard:3000" "vLLM:8005"; do
             name=${service%:*}
             port=${service#*:}
-            if curl -sf http://localhost:$port/health > /dev/null 2>&1 || curl -sf http://localhost:$port > /dev/null 2>&1; then
+            if [ "$name" = "vLLM" ]; then
+                if curl -sf http://localhost:$port/v1/models > /dev/null 2>&1; then
+                    echo "✓ $name (port $port) - HEALTHY"
+                else
+                    echo "✗ $name (port $port) - FAILED"
+                fi
+            elif curl -sf http://localhost:$port/health > /dev/null 2>&1 || curl -sf http://localhost:$port > /dev/null 2>&1; then
                 echo "✓ $name (port $port) - HEALTHY"
             else
                 echo "✗ $name (port $port) - FAILED"
@@ -258,13 +293,15 @@ echo "Starting services on AWS server..."
             fi
         done
 
-        # Warm up Ollama model to prevent first-request timeouts
+        # Warm up vLLM model to prevent first-request timeouts
         echo ""
-        echo "Warming up Ollama model..."
-        if timeout 60 ollama run llama3.1:8b "Hello, King AI is ready." > /dev/null 2>&1; then
-            echo "✓ Ollama model warmed up successfully"
+        echo "Warming up vLLM model..."
+        if timeout 60 curl -X POST http://localhost:8005/v1/chat/completions \
+          -H "Content-Type: application/json" \
+          -d '{"model": "moonshotai/Kimi-K2-Thinking", "messages": [{"role": "user", "content": "Hello, King AI is ready."}]}' > /dev/null 2>&1; then
+            echo "✓ vLLM model warmed up successfully"
         else
-            echo "⚠ Ollama model warmup timed out, but keepalive service will handle it"
+            echo "⚠ vLLM model warmup timed out, but keepalive service will handle it"
         fi
 
         echo ""
@@ -332,25 +369,28 @@ NGINX_EOF
         sudo nginx -t && sudo systemctl restart nginx
     fi
 
-    # Setup Ollama keepalive service to prevent model unloading
-    if [ ! -f /etc/systemd/system/ollama-keepalive.service ]; then
-        echo "Setting up Ollama keepalive service..."
-        cat > /home/ubuntu/keep_ollama_warm.py << 'KEEPALIVE_EOF'
+    # Setup vLLM keepalive service to prevent model unloading
+    if [ ! -f /etc/systemd/system/vllm-keepalive.service ]; then
+        echo "Setting up vLLM keepalive service..."
+        cat > /home/ubuntu/keep_vllm_warm.py << 'KEEPALIVE_EOF'
 #!/usr/bin/env python3
 import requests
 import time
 import sys
 
-MODEL = 'llama3.1:8b'
-ENDPOINT = 'http://localhost:11434/api/generate'
+ENDPOINT = 'http://localhost:8005/v1/chat/completions'
 INTERVAL = 240
 
-print(f'Starting Ollama keepalive for {MODEL}')
+print('Starting vLLM keepalive for Kimi-K2-Thinking')
 sys.stdout.flush()
 
 while True:
     try:
-        requests.post(ENDPOINT, json={'model': MODEL, 'prompt': 'ping', 'stream': False}, timeout=300)
+        requests.post(ENDPOINT, json={
+            'model': 'moonshotai/Kimi-K2-Thinking',
+            'messages': [{'role': 'user', 'content': 'ping'}],
+            'max_tokens': 10
+        }, timeout=300)
         ts = time.strftime('%H:%M:%S')
         print(f'Keepalive ping sent at {ts}')
         sys.stdout.flush()
@@ -359,19 +399,18 @@ while True:
         sys.stdout.flush()
     time.sleep(INTERVAL)
 KEEPALIVE_EOF
-        chmod +x /home/ubuntu/keep_ollama_warm.py
+        chmod +x /home/ubuntu/keep_vllm_warm.py
 
-        sudo tee /etc/systemd/system/ollama-keepalive.service > /dev/null << 'SERVICE_EOF'
+        sudo tee /etc/systemd/system/vllm-keepalive.service > /dev/null << 'SERVICE_EOF'
 [Unit]
-Description=Keep Ollama Model Warm
-After=ollama.service
-Requires=ollama.service
+Description=Keep vLLM Model Warm
+After=network.target
 
 [Service]
 Type=simple
 User=ubuntu
 WorkingDirectory=/home/ubuntu
-ExecStart=/home/ubuntu/agentic-framework-main/.venv/bin/python3 /home/ubuntu/keep_ollama_warm.py
+ExecStart=/home/ubuntu/agentic-framework-main/.venv/bin/python3 /home/ubuntu/keep_vllm_warm.py
 Restart=always
 RestartSec=10
 
@@ -380,9 +419,9 @@ WantedBy=multi-user.target
 SERVICE_EOF
 
         sudo systemctl daemon-reload
-        sudo systemctl enable ollama-keepalive
-        sudo systemctl start ollama-keepalive
-        echo "✓ Ollama keepalive service installed"
+        sudo systemctl enable vllm-keepalive
+        sudo systemctl start vllm-keepalive
+        echo "✓ vLLM keepalive service installed"
     fi
 EOF
 

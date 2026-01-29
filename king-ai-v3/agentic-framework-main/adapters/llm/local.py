@@ -142,7 +142,10 @@ class LocalLLMAdapter(LLMAdapter):
                     error_detail = error_data.get("error", {}).get("message", error_detail)
                 except Exception:
                     pass
-                raise LLMError(f"Local LLM error ({response.status_code}): {error_detail}")
+                raise LLMError(
+                    f"Local LLM error ({response.status_code}): {error_detail}",
+                    provider="local",
+                )
 
             response_data = response.json()
             choice = response_data["choices"][0]
@@ -169,7 +172,11 @@ class LocalLLMAdapter(LLMAdapter):
         except LLMError:
             raise
         except Exception as e:
-            raise LLMError(f"Local LLM completion failed: {e}")
+            raise LLMError(
+                f"Local LLM completion failed: {e}",
+                provider="local",
+                original_error=e,
+            )
 
     async def stream_complete(
         self,
@@ -223,7 +230,10 @@ class LocalLLMAdapter(LLMAdapter):
             ) as response:
                 if response.status_code != 200:
                     error_detail = await response.aread()
-                    raise LLMError(f"Local LLM error ({response.status_code}): {error_detail}")
+                    raise LLMError(
+                        f"Local LLM error ({response.status_code}): {error_detail}",
+                        provider="local",
+                    )
 
                 async for line in response.aiter_lines():
                     if line.startswith("data: "):
@@ -246,7 +256,11 @@ class LocalLLMAdapter(LLMAdapter):
         except LLMError:
             raise
         except Exception as e:
-            raise LLMError(f"Local LLM streaming failed: {e}")
+            raise LLMError(
+                f"Local LLM streaming failed: {e}",
+                provider="local",
+                original_error=e,
+            )
 
     async def validate_api_key(self) -> bool:
         """

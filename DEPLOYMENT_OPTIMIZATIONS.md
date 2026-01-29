@@ -79,6 +79,11 @@ The `run_service.sh` deployment script has been optimized to eliminate redundant
   - Cleanly stops existing process without deletion
 - **Impact**: Saves download time and preserves data
 
+### 12. **Quiet Pip Installs** ✅
+- **Before**: Verbose pip install output filled deployment logs with unnecessary package installation details
+- **After**: Added `--quiet` flag to pip install commands to reduce log verbosity
+- **Impact**: Cleaner deployment logs, easier to spot actual errors, reduced log file size
+
 ## Performance Improvements
 
 ### First Deployment (Fresh Server)

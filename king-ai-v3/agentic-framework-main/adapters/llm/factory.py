@@ -85,8 +85,8 @@ PROVIDER_ENV_MAP = {
         "api_key": None,
         "model": "VLLM_MODEL",
         "endpoint": "VLLM_ENDPOINT",
-        "default_model": "meta-llama/Llama-2-70b-hf",
-        "default_endpoint": "http://localhost:8000",
+        "default_model": "moonshotai/Kimi-K2-Thinking",
+        "default_endpoint": "http://localhost:8005",
     },
 }
 

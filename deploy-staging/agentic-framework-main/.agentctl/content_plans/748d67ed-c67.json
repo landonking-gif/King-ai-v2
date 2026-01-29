@@ -1,0 +1,102 @@
+{
+  "plan_id": "748d67ed-c67",
+  "description": "Interactive Plotly Dash dashboard for Pune hourly forecast CSV. Minimalist modern 'liquid' design. Features: date range selector, hour-of-day filter, toggle forecast vs actual (if actuals present), rolling-average smoothing control, hourly heatmap (day vs hour), summary KPIs (mean, max, next-24h forecast), download filtered CSV. Target files: dashboard/app.py, dashboard/assets/style.css, dashboard/requirements.txt, dashboard/README.md. Use Plotly Dash, responsive layout, callbacks for interactivity, and data loading from 'pune_hourly_next_2_days.csv' in project root. Include instructions to run and install. ",
+  "target_format": "python",
+  "output_file": "dashboard/app.py",
+  "estimated_size": "large",
+  "total_estimated_tokens": 12400,
+  "strategy": "streaming_generation",
+  "strategy_description": "Use streaming file writer for very large content",
+  "sections": [
+    {
+      "section_id": "html_structure",
+      "name": "HTML Structure",
+      "description": "DOCTYPE, html, head, meta tags, title, CSS links",
+      "order": 1,
+      "estimated_tokens": 600,
+      "dependencies": []
+    },
+    {
+      "section_id": "css_styles",
+      "name": "CSS Styles",
+      "description": "Embedded or linked CSS for layout and styling",
+      "order": 2,
+      "estimated_tokens": 1600,
+      "dependencies": [
+        "html_structure"
+      ]
+    },
+    {
+      "section_id": "html_body_structure",
+      "name": "Body Structure",
+      "description": "Main container, header, sidebar, content areas",
+      "order": 3,
+      "estimated_tokens": 1000,
+      "dependencies": [
+        "html_structure"
+      ]
+    },
+    {
+      "section_id": "plotly_setup",
+      "name": "Plotly Setup",
+      "description": "Plotly.js library include and initialization",
+      "order": 4,
+      "estimated_tokens": 400,
+      "dependencies": [
+        "html_structure"
+      ]
+    },
+    {
+      "section_id": "chart_containers",
+      "name": "Chart Containers",
+      "description": "HTML divs for each chart",
+      "order": 5,
+      "estimated_tokens": 600,
+      "dependencies": [
+        "html_body_structure"
+      ]
+    },
+    {
+      "section_id": "chart_data",
+      "name": "Chart Data",
+      "description": "JavaScript data arrays for charts",
+      "order": 6,
+      "estimated_tokens": 3000,
+      "dependencies": [
+        "plotly_setup"
+      ]
+    },
+    {
+      "section_id": "chart_configs",
+      "name": "Chart Configurations",
+      "description": "Plotly trace and layout configurations",
+      "order": 7,
+      "estimated_tokens": 4000,
+      "dependencies": [
+        "chart_data"
+      ]
+    },
+    {
+      "section_id": "chart_render",
+      "name": "Chart Rendering",
+      "description": "Plotly.newPlot calls for each chart",
+      "order": 8,
+      "estimated_tokens": 1000,
+      "dependencies": [
+        "chart_configs",
+        "chart_containers"
+      ]
+    },
+    {
+      "section_id": "html_closing",
+      "name": "HTML Closing",
+      "description": "Closing tags and final scripts",
+      "order": 99,
+      "estimated_tokens": 200,
+      "dependencies": []
+    }
+  ],
+  "section_count": 9,
+  "created_at": "2025-12-30T21:16:48.398183",
+  "status": "planned"
+}

@@ -216,5 +216,15 @@ class Settings(BaseSettings):
     # Supabase public key for dashboard
     supabase_publishable_key: str | None = Field(default=None, validation_alias="NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY")
 
+    # --- Agentic Framework Settings (King AI v3) ---
+    # URL for the agentic framework orchestrator
+    agentic_orchestrator_url: str = Field(default="http://localhost:8001", validation_alias="AGENTIC_ORCHESTRATOR_URL")
+    # URL for the MCP gateway
+    mcp_gateway_url: str = Field(default="http://localhost:3000", validation_alias="MCP_GATEWAY_URL")
+    # URL for the memory service
+    memory_service_url: str = Field(default="http://localhost:8002", validation_alias="MEMORY_SERVICE_URL")
+    # Target server for Ralph code agent
+    ralph_target_server: str = Field(default="100.24.50.240", validation_alias="RALPH_TARGET_SERVER")
+
 # Singleton instance
 settings = Settings()

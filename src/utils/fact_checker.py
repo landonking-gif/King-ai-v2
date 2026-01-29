@@ -26,13 +26,14 @@ class FactChecker:
     """Validates LLM outputs for factual accuracy and hallucination detection."""
     
     # Patterns that indicate potential hallucination
+    # Use non-capturing groups (?:...) so findall returns the full match, not tuples
     HALLUCINATION_PATTERNS = [
-        r"I (recall|remember|know) that",
-        r"based on my (knowledge|understanding|memory)",
-        r"I've (seen|heard|learned) that",
-        r"as far as I (know|understand)",
+        r"I (?:recall|remember|know) that",
+        r"based on my (?:knowledge|understanding|memory)",
+        r"I've (?:seen|heard|learned) that",
+        r"as far as I (?:know|understand)",
         r"I believe",
-        r"in my (experience|opinion)",
+        r"in my (?:experience|opinion)",
     ]
     
     # Phrases that indicate uncertainty (good - AI acknowledging limits)
@@ -92,9 +93,14 @@ class FactChecker:
         # Check for hallucination patterns
         hallucination_matches = self.hallucination_regex.findall(response)
         if hallucination_matches:
+            # Convert matches to strings (handles both string and tuple returns from regex)
+            match_strings = [
+                m if isinstance(m, str) else (m[0] if m else str(m))
+                for m in hallucination_matches
+            ]
             issues.append(
                 f"Detected {len(hallucination_matches)} potential hallucination patterns: "
-                f"{', '.join(set(hallucination_matches))}"
+                f"{', '.join(set(match_strings))}"
             )
             confidence -= 0.3
         

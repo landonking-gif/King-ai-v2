@@ -152,7 +152,8 @@ class AzureOpenAIAdapter(LLMAdapter):
                 except Exception:
                     pass
                 raise LLMError(
-                    f"Azure OpenAI API error ({response.status_code}): {error_detail}"
+                    f"Azure OpenAI API error ({response.status_code}): {error_detail}",
+                    provider="azure-openai",
                 )
 
             response_data = response.json()
@@ -177,7 +178,11 @@ class AzureOpenAIAdapter(LLMAdapter):
         except LLMError:
             raise
         except Exception as e:
-            raise LLMError(f"Azure OpenAI completion failed: {e}")
+            raise LLMError(
+                f"Azure OpenAI completion failed: {e}",
+                provider="azure-openai",
+                original_error=e,
+            )
 
     async def stream_complete(
         self,
@@ -234,7 +239,8 @@ class AzureOpenAIAdapter(LLMAdapter):
                 if response.status_code != 200:
                     error_detail = await response.aread()
                     raise LLMError(
-                        f"Azure OpenAI API error ({response.status_code}): {error_detail}"
+                        f"Azure OpenAI API error ({response.status_code}): {error_detail}",
+                        provider="azure-openai",
                     )
 
                 async for line in response.aiter_lines():
@@ -256,7 +262,11 @@ class AzureOpenAIAdapter(LLMAdapter):
         except LLMError:
             raise
         except Exception as e:
-            raise LLMError(f"Azure OpenAI streaming failed: {e}")
+            raise LLMError(
+                f"Azure OpenAI streaming failed: {e}",
+                provider="azure-openai",
+                original_error=e,
+            )
 
     async def validate_api_key(self) -> bool:
         """

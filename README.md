@@ -1,8 +1,8 @@
 # King AI v3 - Autonomous Business Empire
 
-![King AI V3](https://img.shields.io/badge/Status-Operational-green) ![AI-Brain](https://img.shields.io/badge/AI_Model-Ollama_Llama3.1:70b-blue) ![License](https://img.shields.io/badge/License-Private-red)
+![King AI V3](https://img.shields.io/badge/Status-Operational-green) ![AI-Brain](https://img.shields.io/badge/AI_Model-DeepSeek_R1_7B-blue) ![MoltBot](https://img.shields.io/badge/Multi--Channel-MoltBot_Integrated-purple) ![License](https://img.shields.io/badge/License-Private-red)
 
-King AI v3 is a sophisticated autonomous AI system that acts as an "AI CEO" to plan, launch, and manage digital businesses. It features a microservices architecture with specialized agents, self-evolution capabilities, and human oversight through an approval system.
+King AI v3 is a sophisticated autonomous AI system that acts as an "AI CEO" to plan, launch, and manage digital businesses. It features a microservices architecture with specialized agents, self-evolution capabilities, and human oversight through an approval system. **Now integrated with MoltBot for multi-channel AI access via WhatsApp, Telegram, Discord, Slack, and more.**
 
 ## 🚀 Production Deployment
 
@@ -14,18 +14,21 @@ King AI v3 is a sophisticated autonomous AI system that acts as an "AI CEO" to p
 - **Architecture**: Microservices (Orchestrator, MCP Gateway, Memory Service, Subagent Manager)
 
 ### Access Points
-- **Dashboard**: https://king-ai-studio.me
-- **API Docs**: https://king-ai-studio.me/api/docs
-- **API Base**: https://king-ai-studio.me/api/
-- **Health Check**: https://king-ai-studio.me/api/health
+- **Dashboard**: http://100.24.50.240:8000 (King AI)
+- **MoltBot Control UI**: http://100.24.50.240:18789
+- **API Docs**: http://100.24.50.240:8000/docs
+- **API Base**: http://100.24.50.240:8000/api/
+- **OpenAI-Compatible API**: http://100.24.50.240:8000/v1/chat/completions
+- **Health Check**: http://100.24.50.240:8000/api/health
 
 ### System Architecture
-- **Orchestrator** (port 8000): Main AI brain, workflow management, chat interface
+- **Orchestrator** (port 8000): Main AI brain, workflow management, chat interface, OpenAI-compatible API
 - **MCP Gateway** (port 8080): Model Context Protocol for tool integration
 - **Memory Service** (port 8002): Long-term memory and vector storage
 - **Subagent Manager** (port 8001): Manages specialized AI agents
 - **Dashboard** (port 3000): React frontend with real-time updates
-- **Ollama** (port 11434): Local LLM runtime with llama3.1:70b model
+- **Ollama** (port 11434): Local LLM runtime with DeepSeek R1 7B (4.7GB)
+- **MoltBot Gateway** (port 18789): Multi-channel AI interface (WhatsApp, Telegram, Discord, Slack, Signal, etc.)
 
 ## 🛠️ Quick Start
 
@@ -59,15 +62,19 @@ docker-compose up -d postgres redis chroma
 pip install -r requirements.txt
 cd dashboard && npm install && cd ..
 
-# Start Ollama
-ollama pull llama3.1:70b
+# Start Ollama and pull DeepSeek R1 7B
+ollama pull deepseek-r1:7b
 ollama serve
 
-# Start services
+# Start all services
+bash /home/ubuntu/king-ai-v3/start_all_services.sh
+
+# Or start services individually:
 python orchestrator/service/main.py &
 python mcp-gateway/service/main.py &
 python memory-service/service/main.py &
 python subagent-manager/service/main.py &
+cd ../moltbot && pnpm moltbot gateway --port 18789 &
 
 # Start dashboard
 cd dashboard && npm run dev
@@ -117,7 +124,7 @@ cd dashboard && npm run dev
 |----------|-------------|
 | **[USER_GUIDE.md](USER_GUIDE.md)** | Complete user guide - setup, operation, AWS deployment |
 | **[AWS_DEPLOYMENT_CHECKLIST.md](AWS_DEPLOYMENT_CHECKLIST.md)** | Step-by-step AWS deployment checklist |
-| **[scripts/deploy_aws.sh](scripts/deploy_aws.sh)** | Automated AWS deployment script |
+| **[deploy.ps1](deploy.ps1)** | Complete automated AWS deployment script |
 | **[DEVELOPER_DOCS.md](DEVELOPER_DOCS.md)** | Technical documentation - architecture, API, development |
 | **[scripts/control.py](scripts/control.py)** | Automated deployment and management script |
 | **[docker-compose.yml](docker-compose.yml)** | Infrastructure configuration |

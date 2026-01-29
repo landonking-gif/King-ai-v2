@@ -56,8 +56,21 @@ class WorkflowStatus(str, Enum):
 class ChatRequest(BaseModel):
     """Chat message request from user."""
 
-    text: str = Field(..., description="User message content")
+    text: Optional[str] = Field(None, description="User message content (alias: message)")
+    message: Optional[str] = Field(None, description="User message content (alias: text)")
     session_id: Optional[str] = Field(None, description="Optional session ID for tracking conversations")
+    
+    @property
+    def user_text(self) -> str:
+        """Get the user message, preferring 'message' over 'text'."""
+        return self.message or self.text or ""
+    
+    def model_post_init(self, __context) -> None:
+        """Normalize text/message fields after init."""
+        if self.message and not self.text:
+            object.__setattr__(self, 'text', self.message)
+        elif self.text and not self.message:
+            object.__setattr__(self, 'message', self.text)
 
 
 class ChatResponse(BaseModel):

@@ -7,18 +7,8 @@ const ApprovalCenter = () => {
   const [loading, setLoading] = useState(true);
   const [selectedApprovals, setSelectedApprovals] = useState([]);
 
-  // WebSocket for real-time updates
-  const { connected } = useWebSocket('/api/ws/approvals', {
-    onEvent: (event, data) => {
-      if (event === 'approval_created') {
-        fetchApprovals(); // Refresh the list
-      } else if (event === 'approval_approved' || event === 'approval_rejected') {
-        // Remove the processed approval from the list
-        setApprovals(prev => prev.filter(app => app.id !== data.request_id));
-        setSelectedApprovals(prev => prev.filter(id => id !== data.request_id));
-      }
-    }
-  });
+  // WebSocket disabled - using polling instead
+  const connected = false;
 
   useEffect(() => {
     fetchApprovals();

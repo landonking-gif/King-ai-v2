@@ -28,7 +28,13 @@ class OrchestratorConfig(BaseSettings):
 
     # LLM Provider Configuration
     default_llm_provider: str = Field(
-        default="local", description="Default LLM provider (local, anthropic, openai, azure)"
+        default="vllm", description="Default LLM provider (vllm, local, anthropic, openai, azure)"
+    )
+    vllm_endpoint: str = Field(
+        default="http://localhost:8005", description="vLLM endpoint URL"
+    )
+    vllm_model: str = Field(
+        default="casperhansen/deepseek-r1-distill-qwen-7b-awq", description="vLLM model name"
     )
     ollama_endpoint: str = Field(
         default="http://localhost:11434", description="Ollama endpoint URL"
@@ -164,7 +170,7 @@ class OrchestratorConfig(BaseSettings):
     @classmethod
     def validate_llm_provider(cls, v: str) -> str:
         """Validate LLM provider is supported."""
-        allowed_providers = {"local", "anthropic", "openai", "azure"}
+        allowed_providers = {"local", "anthropic", "openai", "azure", "vllm"}
         v_lower = v.lower()
         if v_lower not in allowed_providers:
             raise ValueError(f"default_llm_provider must be one of {allowed_providers}")

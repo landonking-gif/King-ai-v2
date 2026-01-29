@@ -143,7 +143,10 @@ class VLLMAdapter(LLMAdapter):
                     error_detail = error_data.get("error", {}).get("message", error_detail)
                 except Exception:
                     pass
-                raise LLMError(f"vLLM error ({response.status_code}): {error_detail}")
+                raise LLMError(
+                    f"vLLM error ({response.status_code}): {error_detail}",
+                    provider="vllm"
+                )
 
             response_data = response.json()
             choice = response_data["choices"][0]
@@ -170,7 +173,11 @@ class VLLMAdapter(LLMAdapter):
         except LLMError:
             raise
         except Exception as e:
-            raise LLMError(f"vLLM completion failed: {e}")
+            raise LLMError(
+                f"vLLM completion failed: {e}",
+                provider="vllm",
+                original_error=e
+            )
 
     async def stream_complete(
         self,
@@ -224,7 +231,10 @@ class VLLMAdapter(LLMAdapter):
             ) as response:
                 if response.status_code != 200:
                     error_detail = await response.aread()
-                    raise LLMError(f"vLLM error ({response.status_code}): {error_detail}")
+                    raise LLMError(
+                        f"vLLM error ({response.status_code}): {error_detail}",
+                        provider="vllm"
+                    )
 
                 async for line in response.aiter_lines():
                     if line.startswith("data: "):
@@ -248,7 +258,11 @@ class VLLMAdapter(LLMAdapter):
         except LLMError:
             raise
         except Exception as e:
-            raise LLMError(f"vLLM streaming failed: {e}")
+            raise LLMError(
+                f"vLLM streaming failed: {e}",
+                provider="vllm",
+                original_error=e
+            )
 
     async def validate_api_key(self) -> bool:
         """

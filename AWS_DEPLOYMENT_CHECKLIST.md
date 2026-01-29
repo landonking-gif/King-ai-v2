@@ -20,46 +20,44 @@
 
 ### Local Environment
 - [ ] Git repository cloned
-- [ ] SSH key accessible
-- [ ] Project files ready for upload
+- [ ] SSH key accessible at default location (`$HOME\.ssh\king-ai-studio.pem`)
+- [ ] PowerShell available (Windows) or compatible shell
+- [ ] Project files ready for deployment
 
 ## Deployment Steps
 
-### 1. Initial Server Access
-- [ ] SSH connection established: `ssh -i "key.pem" ubuntu@EC2_IP`
-- [ ] Server responding to commands
-
-### 2. Upload Project Files
-- [ ] Create deployment archive locally:
-  ```bash
-  cd king-ai-v3/agentic-framework-main
-  tar -czf king-ai-v3.tar.gz --exclude="node_modules" --exclude=".git" --exclude="__pycache__" .
+### 1. Single Command Deployment
+- [ ] Run the complete deployment script:
+  ```powershell
+  .\deploy.ps1 -IP "YOUR_EC2_PUBLIC_IP"
   ```
-- [ ] Upload archive to server:
-  ```bash
-  scp -i "key.pem" king-ai-v3.tar.gz ubuntu@EC2_IP:~/
-  ```
+- [ ] Monitor deployment progress (8 steps total)
+- [ ] Wait for completion (typically 10-15 minutes)
 
-### 3. Upload Deployment Script
-- [ ] Upload deployment script:
-  ```bash
-  scp -i "key.pem" scripts/deploy_aws.sh ubuntu@EC2_IP:~/
-  ```
+### Alternative Usage
+```powershell
+# With custom SSH key path
+.\deploy.ps1 -IP "YOUR_EC2_PUBLIC_IP" -KeyPath "C:\path\to\your\key.pem"
 
-### 4. Run Deployment
-- [ ] Make script executable: `chmod +x deploy_aws.sh`
-- [ ] Execute deployment: `./deploy_aws.sh`
-- [ ] Monitor deployment progress in terminal
-- [ ] Check for any error messages
+# Skip health checks (for faster deployment)
+.\deploy.ps1 -IP "YOUR_EC2_PUBLIC_IP" -SkipHealthChecks
 
-### 5. Post-Deployment Verification
+# Verbose output
+.\deploy.ps1 -IP "YOUR_EC2_PUBLIC_IP" -Verbose
+```
 
-#### Service Health Checks
-- [ ] Orchestrator: `curl http://localhost:8000/api/health`
-- [ ] MCP Gateway: `curl http://localhost:8080/health`
-- [ ] Memory Service: `curl http://localhost:8002/health`
-- [ ] Subagent Manager: `curl http://localhost:8001/health`
-- [ ] Dashboard: `curl http://localhost:3000`
+### 2. Post-Deployment Verification
+
+#### Automated Health Checks
+The deployment script automatically performs comprehensive health checks including:
+- [ ] Individual service health (5 services)
+- [ ] Nginx proxy endpoints (4 endpoints)
+- [ ] Overall deployment success status
+
+#### Manual Health Checks (if needed)
+- [ ] Main endpoint: `curl http://YOUR_IP/health`
+- [ ] API docs: `curl http://YOUR_IP/docs`
+- [ ] Dashboard: `curl http://YOUR_IP/` (may show fallback message if not built)
 
 #### LLM Verification
 - [ ] Ollama service: `curl http://localhost:11434/api/tags`
@@ -72,12 +70,11 @@
   ```
 
 #### Dashboard Access
-- [ ] Open browser to `http://EC2_IP:3000`
-- [ ] Dashboard loads without errors
-- [ ] "Talk to King AI" tab accessible
-- [ ] Chat interface functional
+- [ ] Open browser to `http://EC2_IP/` (via Nginx proxy)
+- [ ] Dashboard loads without errors (or shows friendly message if not built)
+- [ ] API docs accessible at `http://EC2_IP/docs`
 
-### 6. Optional Enhancements
+### 3. Optional Enhancements
 
 #### Domain Configuration
 - [ ] Domain purchased/available
@@ -101,14 +98,14 @@
 #### Deployment Script Fails
 - [ ] Check available disk space: `df -h`
 - [ ] Verify internet connectivity: `ping google.com`
-- [ ] Check Docker installation: `docker --version`
-- [ ] Review deployment logs: `cat deploy_*.log`
+- [ ] Check SSH key permissions: `ls -la ~/.ssh/king-ai-studio.pem`
+- [ ] Review deployment logs on server: `tail -f /tmp/*.log`
 
 #### Services Not Starting
 - [ ] Check port conflicts: `netstat -tlnp | grep :8000`
 - [ ] Verify environment variables: `cat */.env`
-- [ ] Check service logs: `tail -f orchestrator.log`
-- [ ] Validate Docker containers: `docker ps -a`
+- [ ] Check service logs: `tail -f /tmp/orchestrator.log`
+- [ ] Validate Python virtual environment: `source .venv/bin/activate && python --version`
 
 #### LLM Not Working
 - [ ] Check Ollama container: `docker logs ollama`
@@ -118,8 +115,8 @@
 #### Dashboard Not Loading
 - [ ] Check Node.js installation: `node --version`
 - [ ] Verify build process: `cd dashboard && npm run build`
-- [ ] Check dashboard logs: `tail -f dashboard/dashboard.log`
-- [ ] Test proxy configuration: `curl http://localhost:3000`
+- [ ] Check dashboard logs: `tail -f /tmp/dashboard.log`
+- [ ] Test proxy configuration: `curl http://localhost/health`
 
 ### Emergency Recovery
 
@@ -127,31 +124,36 @@
 ```bash
 # Stop all services
 pkill -f "python.*service/main.py"
-pkill -f "npm"
-docker-compose down
+pkill -f "serve.*3000"
+pkill -f "node.*3000"
 
 # Restart infrastructure
-docker-compose up -d postgres redis chroma
+sudo systemctl restart postgresql redis nginx
 
-# Wait for databases
+# Wait for services
 sleep 30
 
-# Restart services
-./deploy_aws.sh
+# Re-run deployment
+cd ~/agentic-framework-main
+source .venv/bin/activate
+# Restart individual services manually or re-run deploy.ps1
 ```
 
 #### Full System Reset
 ```bash
-# Backup current state
-cp -r king-ai-v3 king-ai-v3.backup
+# Backup current state (if needed)
+cp -r agentic-framework-main agentic-framework-main.backup
 
 # Clean restart
-docker-compose down -v
-docker system prune -f
-rm -rf king-ai-v3 venv
+sudo systemctl stop postgresql redis nginx
+sudo systemctl disable postgresql redis nginx
+sudo apt-get remove -y postgresql redis-server nginx nodejs
 
-# Re-run deployment
-./deploy_aws.sh
+# Remove all files
+rm -rf agentic-framework-main dashboard deploy.zip server-deploy.sh .venv
+
+# Re-run deployment from local machine
+# .\deploy.ps1 -IP "YOUR_EC2_IP"
 ```
 
 ## Performance Optimization
@@ -169,29 +171,30 @@ df -h
 free -h
 
 # Service monitoring
-./monitor.sh
+ps aux | grep -E "(python|node|serve)"
+tail -f /tmp/*.log
 
-# Docker monitoring
-docker stats
-docker logs -f orchestrator
+# Nginx monitoring
+sudo tail -f /var/log/nginx/error.log
+curl -s http://localhost/health | jq
 ```
 
 ### Backup Strategy
 ```bash
 # Database backup
-docker exec postgres pg_dump -U agent_user agentic_framework > backup_$(date +%Y%m%d).sql
+sudo -u postgres pg_dump -U agentic_user agentic_framework > backup_$(date +%Y%m%d).sql
 
 # Configuration backup
 tar -czf config_backup_$(date +%Y%m%d).tar.gz */.env
 
 # Full system backup
-tar -czf full_backup_$(date +%Y%m%d).tar.gz --exclude="node_modules" --exclude="venv" king-ai-v3/
+tar -czf full_backup_$(date +%Y%m%d).tar.gz --exclude="node_modules" --exclude="__pycache__" agentic-framework-main/
 ```
 
 ## Support
 
 If you encounter issues not covered here:
-1. Check the logs: `tail -f *.log`
+1. Check the logs: `tail -f /tmp/*.log`
 2. Review the USER_GUIDE.md for detailed instructions
 3. Check GitHub issues for similar problems
 4. Contact support@king-ai-studio.me

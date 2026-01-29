@@ -1,0 +1,94 @@
+{
+  gateway: {
+    port: 18789,
+    mode: "local",
+    auth: {
+      mode: "token",
+      token: "kingai-moltbot-token-2026"
+    }
+  },
+  
+  agents: {
+    defaults: {
+      workspace: "~/king-ai-workspace",
+      model: { 
+        primary: "kingai/deepseek-r1"
+      },
+      models: {
+        "kingai/deepseek-r1": { 
+          alias: "DeepSeek"
+        },
+        "ollama/deepseek-r1:7b": { 
+          alias: "DeepSeek-Local"
+        }
+      }
+    }
+  },
+  
+  models: {
+    mode: "merge",
+    providers: {
+      kingai: {
+        baseUrl: "http://localhost:8000/v1",
+        apiKey: "king-ai-local",
+        api: "openai-completions",
+        models: [
+          {
+            id: "deepseek-r1",
+            name: "DeepSeek-R1-KingAI",
+            input: ["text"],
+            contextWindow: 32000,
+            maxTokens: 4096
+          }
+        ]
+      },
+      ollama: {
+        baseUrl: "http://localhost:11434/v1",
+        apiKey: "ollama",
+        api: "openai-completions",
+        models: [
+          {
+            id: "deepseek-r1:7b",
+            name: "DeepSeek-R1-7B",
+            input: ["text"],
+            contextWindow: 32000,
+            maxTokens: 4096
+          }
+        ]
+      }
+    }
+  },
+  
+  channels: {
+    telegram: {
+      allowFrom: ["*"],
+      groups: {
+        "*": { requireMention: true }
+      }
+    },
+    
+    discord: {
+      guilds: {
+        "*": { requireMention: true }
+      },
+      dm: {
+        policy: "pairing",
+        allowFrom: []
+      }
+    },
+    
+    slack: {
+      dm: {
+        policy: "pairing",
+        allowFrom: []
+      }
+    },
+    
+    whatsapp: {
+      allowFrom: [],
+      groups: {
+        "*": { requireMention: true }
+      }
+    }
+  }
+}

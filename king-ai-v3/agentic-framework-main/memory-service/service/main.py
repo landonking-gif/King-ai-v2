@@ -708,6 +708,260 @@ async def _group_artifacts_by_similarity(
     return groups
 
 
+# =============================================================================
+# Diary & Reflection Endpoints (for Copilot Memory Plugin integration)
+# =============================================================================
+
+from pydantic import BaseModel as PydanticBaseModel
+
+
+class DiaryEntry(PydanticBaseModel):
+    """Diary entry model for session tracking."""
+    session_id: str
+    title: Optional[str] = None
+    task_summary: Optional[str] = None
+    work_done: Optional[List[str]] = None
+    design_decisions: Optional[List[str]] = None
+    user_preferences: Optional[List[str]] = None
+    files_modified: Optional[List[str]] = None
+    git_changes: Optional[str] = None
+    insights: Optional[List[str]] = None
+    timestamp: Optional[str] = None
+
+
+class DiaryCreateRequest(PydanticBaseModel):
+    """Request to create a diary entry."""
+    session_id: str
+    workspace_path: Optional[str] = None
+    git_diff: Optional[str] = None
+    open_files: Optional[List[str]] = None
+    context: Optional[Dict[str, Any]] = None
+
+
+class DiaryCreateResponse(PydanticBaseModel):
+    """Response from diary creation."""
+    diary_id: str
+    session_id: str
+    entry: DiaryEntry
+    stored_at: str
+
+
+class ReflectionRequest(PydanticBaseModel):
+    """Request to trigger reflection on diary entries."""
+    max_entries: int = 10
+    min_unprocessed: int = 3
+
+
+class ReflectionResponse(PydanticBaseModel):
+    """Response from reflection process."""
+    patterns_found: List[str]
+    preferences_updated: List[str]
+    learnings: List[str]
+    entries_processed: int
+    memory_updated: bool
+
+
+@app.post("/diary", response_model=DiaryCreateResponse)
+async def create_diary_entry(request: DiaryCreateRequest) -> DiaryCreateResponse:
+    """
+    Create a diary entry for the current session.
+    
+    This endpoint captures:
+    - Open workspace files
+    - Recent Git changes  
+    - Session context and activities
+    - Design decisions and insights
+    """
+    from datetime import datetime
+    import uuid
+    
+    diary_id = str(uuid.uuid4())
+    timestamp = datetime.utcnow().isoformat()
+    
+    # Generate diary entry from context
+    entry = DiaryEntry(
+        session_id=request.session_id,
+        title=f"Session {request.session_id[:8]}",
+        task_summary="Session diary captured",
+        work_done=request.open_files or [],
+        design_decisions=[],
+        user_preferences=[],
+        files_modified=request.open_files or [],
+        git_changes=request.git_diff,
+        insights=[],
+        timestamp=timestamp
+    )
+    
+    # Store in memory if postgres is available
+    if postgres_adapter:
+        try:
+            # Create an artifact for the diary entry
+            from .models import Artifact, ArtifactType, SafetyClass
+            
+            artifact = Artifact(
+                id=diary_id,
+                artifact_type=ArtifactType.SYNTHESIS_RESULT,
+                content=entry.dict(),
+                created_by="copilot-memory-plugin",
+                session_id=request.session_id,
+                safety_class=SafetyClass.INTERNAL,
+                tags=["diary", "session", request.session_id]
+            )
+            
+            # Commit to memory
+            commit_req = CommitRequest(
+                artifact=artifact,
+                actor_id="copilot-memory-plugin",
+                actor_type="system",
+                tool_ids=["diary"],
+                generate_embedding=True,
+                store_in_cold=False
+            )
+            
+            await commit_artifact(commit_req)
+            
+        except Exception as e:
+            logger.warning(f"Failed to store diary in database: {e}")
+    
+    return DiaryCreateResponse(
+        diary_id=diary_id,
+        session_id=request.session_id,
+        entry=entry,
+        stored_at=timestamp
+    )
+
+
+@app.get("/diary/{session_id}")
+async def get_diary_entry(session_id: str) -> Dict[str, Any]:
+    """Get diary entry for a specific session."""
+    if postgres_adapter:
+        try:
+            # Query for diary artifacts with this session ID
+            entries = await postgres_adapter.query_artifacts_by_session(session_id)
+            diary_entries = [e for e in entries if "diary" in (e.tags or [])]
+            if diary_entries:
+                return {"session_id": session_id, "entries": [e.content for e in diary_entries]}
+        except Exception as e:
+            logger.warning(f"Failed to retrieve diary: {e}")
+    
+    return {"session_id": session_id, "entries": [], "message": "No diary entries found"}
+
+
+@app.get("/diary")
+async def list_diary_entries(
+    limit: int = 20,
+    unprocessed_only: bool = False
+) -> Dict[str, Any]:
+    """List recent diary entries."""
+    entries = []
+    
+    if postgres_adapter:
+        try:
+            # Get recent diary artifacts
+            all_entries = await postgres_adapter.query_artifacts_by_type("synthesis_result", limit=limit * 2)
+            entries = [
+                {"id": e.id, "session_id": e.session_id, "content": e.content, "created_at": str(e.created_at)}
+                for e in all_entries
+                if "diary" in (e.tags or [])
+            ][:limit]
+        except Exception as e:
+            logger.warning(f"Failed to list diary entries: {e}")
+    
+    return {
+        "count": len(entries),
+        "entries": entries,
+        "unprocessed_only": unprocessed_only
+    }
+
+
+@app.post("/reflect", response_model=ReflectionResponse)
+async def trigger_reflection(request: ReflectionRequest) -> ReflectionResponse:
+    """
+    Analyze unprocessed diary entries and extract patterns.
+    
+    This endpoint:
+    - Identifies recurring patterns
+    - Extracts user preferences
+    - Updates long-term memory with learnings
+    """
+    patterns_found = []
+    preferences_updated = []
+    learnings = []
+    entries_processed = 0
+    
+    if postgres_adapter:
+        try:
+            # Get unprocessed diary entries
+            all_entries = await postgres_adapter.query_artifacts_by_type(
+                "synthesis_result", 
+                limit=request.max_entries
+            )
+            diary_entries = [e for e in all_entries if "diary" in (e.tags or [])]
+            
+            entries_processed = len(diary_entries)
+            
+            # Analyze patterns (simple rule-based for now)
+            file_types = {}
+            for entry in diary_entries:
+                content = entry.content or {}
+                for f in content.get("files_modified", []):
+                    ext = f.split(".")[-1] if "." in f else "unknown"
+                    file_types[ext] = file_types.get(ext, 0) + 1
+            
+            # Extract patterns
+            for ext, count in sorted(file_types.items(), key=lambda x: -x[1])[:5]:
+                if count > 1:
+                    patterns_found.append(f"Frequently modifies .{ext} files ({count} times)")
+            
+            # Generate learnings
+            if patterns_found:
+                learnings.append("User has consistent file type preferences")
+            
+            # Store reflection results as an artifact
+            if patterns_found or learnings:
+                from .models import Artifact, ArtifactType, SafetyClass
+                import uuid
+                
+                reflection_artifact = Artifact(
+                    id=str(uuid.uuid4()),
+                    artifact_type=ArtifactType.SYNTHESIS_RESULT,
+                    content={
+                        "type": "reflection",
+                        "patterns": patterns_found,
+                        "preferences": preferences_updated,
+                        "learnings": learnings,
+                        "entries_analyzed": entries_processed
+                    },
+                    created_by="memory-service",
+                    session_id="reflection",
+                    safety_class=SafetyClass.INTERNAL,
+                    tags=["reflection", "patterns", "learnings"]
+                )
+                
+                commit_req = CommitRequest(
+                    artifact=reflection_artifact,
+                    actor_id="memory-service",
+                    actor_type="system",
+                    tool_ids=["reflect"],
+                    generate_embedding=True,
+                    store_in_cold=False
+                )
+                
+                await commit_artifact(commit_req)
+                
+        except Exception as e:
+            logger.warning(f"Reflection failed: {e}")
+            learnings.append(f"Reflection partially completed: {str(e)}")
+    
+    return ReflectionResponse(
+        patterns_found=patterns_found,
+        preferences_updated=preferences_updated,
+        learnings=learnings,
+        entries_processed=entries_processed,
+        memory_updated=len(patterns_found) > 0 or len(learnings) > 0
+    )
+
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""

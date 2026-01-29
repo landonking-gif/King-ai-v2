@@ -1,0 +1,152 @@
+{
+  // MoltBot configuration for King AI integration
+  // This connects MoltBot multi-channel gateway to King AI orchestrator
+  
+  gateway: {
+    port: 18789,
+    host: "0.0.0.0"
+  },
+  
+  agents: {
+    defaults: {
+      workspace: "~/king-ai-workspace",
+      model: { 
+        primary: "kingai/deepseek-r1"
+      },
+      models: {
+        "kingai/deepseek-r1": { 
+          alias: "DeepSeek",
+          reasoning: true
+        },
+        "ollama/deepseek-r1:7b": { 
+          alias: "DeepSeek Local"
+        }
+      }
+    }
+  },
+  
+  models: {
+    mode: "merge",
+    providers: {
+      // King AI Orchestrator as primary provider (OpenAI-compatible endpoint)
+      kingai: {
+        baseUrl: "http://localhost:8000/v1",
+        apiKey: "king-ai-local",
+        api: "openai-completions",
+        models: [
+          {
+            id: "deepseek-r1",
+            name: "DeepSeek R1 (via King AI)",
+            reasoning: true,
+            input: ["text"],
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+            contextWindow: 32000,
+            maxTokens: 4096
+          }
+        ]
+      },
+      // Direct Ollama access as fallback
+      ollama: {
+        baseUrl: "http://localhost:11434/v1",
+        apiKey: "ollama",
+        api: "openai-completions",
+        models: [
+          {
+            id: "deepseek-r1:7b",
+            name: "DeepSeek R1 7B",
+            reasoning: true,
+            input: ["text"],
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+            contextWindow: 32000,
+            maxTokens: 4096
+          }
+        ]
+      }
+    }
+  },
+  
+  // Channel configurations - configure API keys as needed
+  channels: {
+    // Telegram configuration (easiest to set up)
+    telegram: {
+      enabled: false,
+      // Set TELEGRAM_BOT_TOKEN in environment or uncomment below
+      // token: "${TELEGRAM_BOT_TOKEN}",
+      allowFrom: ["*"],
+      groups: {
+        "*": { requireMention: true }
+      }
+    },
+    
+    // Discord configuration
+    discord: {
+      enabled: false,
+      // Set DISCORD_BOT_TOKEN in environment or uncomment below
+      // token: "${DISCORD_BOT_TOKEN}",
+      guilds: {
+        "*": { requireMention: true }
+      },
+      dm: {
+        policy: "pairing",
+        allowFrom: []
+      }
+    },
+    
+    // Slack configuration
+    slack: {
+      enabled: false,
+      // Set SLACK_BOT_TOKEN and SLACK_APP_TOKEN in environment
+      // botToken: "${SLACK_BOT_TOKEN}",
+      // appToken: "${SLACK_APP_TOKEN}",
+      dm: {
+        policy: "pairing",
+        allowFrom: []
+      }
+    },
+    
+    // WhatsApp configuration (requires QR pairing)
+    whatsapp: {
+      enabled: false,
+      allowFrom: [],
+      groups: {
+        "*": { requireMention: true }
+      }
+    },
+    
+    // Signal configuration (requires signal-cli)
+    signal: {
+      enabled: false,
+      // number: "+1234567890",
+      allowFrom: []
+    },
+    
+    // Google Chat configuration
+    googlechat: {
+      enabled: false
+      // Requires Google Cloud project setup
+    },
+    
+    // Matrix configuration
+    matrix: {
+      enabled: false
+      // homeserver: "https://matrix.org",
+      // userId: "@bot:matrix.org",
+      // accessToken: "${MATRIX_ACCESS_TOKEN}"
+    }
+  },
+  
+  // Session configuration
+  session: {
+    maxMessages: 100,
+    pruneAfterTokens: 50000
+  },
+  
+  // Environment variables (can also use ~/.clawdbot/.env)
+  env: {
+    // Add your API keys here or in ~/.clawdbot/.env
+    // TELEGRAM_BOT_TOKEN: "your-telegram-bot-token",
+    // DISCORD_BOT_TOKEN: "your-discord-bot-token",
+    // SLACK_BOT_TOKEN: "xoxb-your-slack-bot-token",
+    // SLACK_APP_TOKEN: "xapp-your-slack-app-token"
+  }
+}

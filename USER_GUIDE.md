@@ -2,14 +2,14 @@
 
 **Discipline. Autonomy. Success.**
 
-This comprehensive guide covers everything you need to know about King AI v3 - from initial setup to operating your autonomous business empire. King AI v3 features a microservices architecture with Ollama LLM integration, real-time dashboard, and automated AWS deployment.
+This comprehensive guide covers everything you need to know about King AI v3 - from initial setup to operating your autonomous business empire. King AI v3 features a microservices architecture with vLLM LLM integration, real-time dashboard, and automated AWS deployment.
 
 ## 🟢 Current Production Deployment
 
 ### Live System Status
 - **Domain**: https://king-ai-studio.me
 - **Status**: ✅ Operational (AWS EC2 + Load Balancer)
-- **Infrastructure**: AWS EC2 t3.medium, Docker containers, Nginx reverse proxy
+- **Infrastructure**: AWS EC2 g5.2xlarge (A10G GPU), Docker containers, Nginx reverse proxy
 - **SSL**: ✅ Enabled via AWS Load Balancer
 - **Services**: Orchestrator, MCP Gateway, Memory Service, Subagent Manager, Dashboard
 
@@ -20,12 +20,13 @@ This comprehensive guide covers everything you need to know about King AI v3 - f
 - **Direct API**: https://king-ai-studio.me/api/
 
 ### System Architecture
-- **Orchestrator** (port 8000): Main AI brain, workflow management, chat interface
+- **Orchestrator** (port 8000): Main AI brain, workflow management, chat interface, OpenAI-compatible API
 - **MCP Gateway** (port 8080): Model Context Protocol for tool integration
 - **Memory Service** (port 8002): Long-term memory and vector storage
 - **Subagent Manager** (port 8001): Manages specialized AI agents
 - **Dashboard** (port 3000): React frontend with real-time updates
-- **Ollama** (port 11434): Local LLM runtime with llama3.1:70b model
+- **Ollama** (port 11434): Local LLM runtime with DeepSeek R1 7B (4.7GB model)
+- **MoltBot Gateway** (port 18789): Multi-channel AI access (WhatsApp, Telegram, Discord, Slack, Signal, Google Chat, Matrix, etc.)
 
 ### Production Database Configuration
 **⚠️ Security Note**: These are the actual production credentials used in the current deployment.
@@ -43,11 +44,11 @@ This comprehensive guide covers everything you need to know about King AI v3 - f
 
 ### Prerequisites for AWS Deployment
 
-wsl bash -c "cd /mnt/c/Users/dmilner.AGV-040318-PC/Downloads/landon/king-ai-v2/king-ai-v3/agentic-framework-main/orchestrator && sed -i 's/\r$//' run_service.sh && echo '54.87.216.171' | bash run_service.sh"
+wsl bash -c "cd /mnt/c/Users/dmilner.AGV-040318-PC/Downloads/landon/king-ai-v2/king-ai-v3/agentic-framework-main/orchestrator && sed -i 's/\r$//' run_service.sh && echo '52.90.242.99' | bash run_service.sh"
  
 #### 1. AWS Account Setup
 - Create AWS account with EC2 access
-- Launch EC2 instance (t3.medium or larger recommended)
+- Launch EC2 instance (g5.2xlarge recommended for GPU acceleration)
 - Ubuntu 22.04 LTS AMI
 - Security group with ports: 22, 80, 443, 3000, 8000-8003, 8080, 11434
 - Key pair (.pem file) for SSH access
@@ -61,42 +62,65 @@ wsl bash -c "cd /mnt/c/Users/dmilner.AGV-040318-PC/Downloads/landon/king-ai-v2/k
 
 ### Automated AWS Deployment (Recommended)
 
-The easiest way to deploy King AI v3 to AWS is using the automated deployment script:
+The easiest way to deploy King AI v3 to AWS is using the single automated deployment script:
 
 #### Step 1: Prepare Your Local Environment
-```bash
-# Clone the repository
+```powershell
+# Clone the repository (if not already done)
 git clone <your-repo-url>
-cd king-ai-v3/agentic-framework-main
+cd king-ai-v3
 
-# Ensure you have the SSH key
-# Copy your AWS .pem key to the project root
-cp ~/Downloads/your-key.pem king-ai-studio.pem
+# Ensure your SSH key is accessible (default location)
+# The script looks for: $HOME\.ssh\king-ai-studio.pem
+# Copy your AWS .pem key to the default location if needed
+cp ~/Downloads/your-key.pem $HOME\.ssh\king-ai-studio.pem
 ```
 
-#### Step 2: Upload and Run Deployment Script
-```bash
-# On your local machine, upload the deployment script
-scp -i "your-key.pem" scripts/deploy_aws.sh ubuntu@YOUR_EC2_IP:~/
+#### Step 2: Run Single Command Deployment
+```powershell
+# Run the complete deployment (from project root)
+.\deploy.ps1 -IP "YOUR_EC2_PUBLIC_IP"
+```
 
-# On AWS server, make it executable and run
-chmod +x deploy_aws.sh
-./deploy_aws.sh
+**Alternative usage options:**
+```powershell
+# With custom SSH key path
+.\deploy.ps1 -IP "YOUR_EC2_PUBLIC_IP" -KeyPath "C:\path\to\your\key.pem"
+
+# Skip health checks for faster deployment
+.\deploy.ps1 -IP "YOUR_EC2_PUBLIC_IP" -SkipHealthChecks
+
+# Verbose output
+.\deploy.ps1 -IP "YOUR_EC2_PUBLIC_IP" -Verbose
 ```
 
 The automated deployment script performs these steps:
 
-1. **System Preparation**
-   - Updates Ubuntu packages
-   - Installs Docker and Docker Compose
-   - Installs Python 3.10+ and Node.js 20+
-   - Configures system for King AI v3
+1. **Pre-flight Checks**
+   - Validates local project files
+   - Tests SSH connectivity to AWS
+   - Verifies required dependencies
 
-2. **Project Setup**
-   - Extracts uploaded project files
+2. **Project Packaging**
+   - Creates optimized deployment archive
+   - Includes framework and dashboard (if available)
+   - Excludes unnecessary files (node_modules, .git, etc.)
+
+3. **Server Upload & Setup**
+   - Uploads deployment package to AWS
+   - Extracts and configures project files
    - Sets up Python virtual environment
-   - Installs all dependencies
-   - Configures environment variables
+   - Installs all system and Python dependencies
+
+4. **Service Deployment**
+   - Starts all microservices (Orchestrator, MCP Gateway, Memory Service, Subagent Manager)
+   - Builds and deploys dashboard (if available)
+   - Configures Nginx reverse proxy with health check fallbacks
+
+5. **Health Verification**
+   - Tests all service endpoints
+   - Validates Nginx proxy configuration
+   - Provides comprehensive status report
 
 3. **Infrastructure Deployment**
    - Starts PostgreSQL, Redis, and ChromaDB containers
@@ -104,9 +128,10 @@ The automated deployment script performs these steps:
    - Initializes vector storage
 
 4. **LLM Setup**
-   - Starts Ollama container
-   - Downloads llama3.1:70b model
-   - Verifies LLM connectivity
+   - Install vLLM inference framework
+   - Download Kimi-K2-Thinking model from Hugging Face
+   - Start vLLM server with optimized parameters
+   - Verify vLLM connectivity
 
 5. **Service Startup**
    - Launches all microservices (Orchestrator, MCP Gateway, Memory Service, Subagent Manager)
@@ -175,8 +200,8 @@ cp subagent-manager/.env.example subagent-manager/.env
 
 # Edit .env files with your configuration
 nano orchestrator/.env
-# Set: OLLAMA_ENDPOINT=http://localhost:11434
-# Set: LOCAL_MODEL=llama3.1:70b
+# Set: VLLM_ENDPOINT=http://localhost:8005
+# Set: VLLM_MODEL=moonshotai/Kimi-K2-Thinking
 # Set: POSTGRES_URL=postgresql://agent_user:agent_pass@localhost:5432/agentic_framework
 ```
 
@@ -193,9 +218,23 @@ python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 
-# Start Ollama
-docker run -d --name ollama -p 11434:11434 ollama/ollama
-docker exec ollama ollama pull llama3.1:70b
+# Install vLLM and download Kimi-K2-Thinking model
+pip install vllm huggingface-hub
+
+# Verify GPU availability
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader,nounits
+
+mkdir -p models
+huggingface-cli download moonshotai/Kimi-K2-Thinking --local-dir ./models/kimi-k2-thinking
+
+# Start vLLM server
+vllm serve moonshotai/Kimi-K2-Thinking \
+  --tensor-parallel-size 1 \
+  --tool-call-parser kimi_k2 \
+  --reasoning-parser kimi_k2 \
+  --max-num-batched-tokens 32768 \
+  --host 0.0.0.0 \
+  --port 8005 &
 
 # Start microservices
 python orchestrator/service/main.py &
@@ -266,8 +305,8 @@ curl http://localhost:3000
 
 #### LLM Verification
 ```bash
-# Test Ollama
-curl http://localhost:11434/api/tags
+# Test vLLM
+curl http://localhost:8005/v1/models
 
 # Test chat API
 curl -X POST http://localhost:8000/api/chat/message \
@@ -334,13 +373,13 @@ sudo lsof -ti:8000,8001,8002,8080,3000 | xargs -r kill -9
 #### 5. LLM Integration Issues
 **Symptoms**: Chat functionality doesn't work
 
-**Solution**: Verify Ollama is running:
+**Solution**: Verify vLLM is running:
 ```bash
-# Check Ollama status
-curl http://localhost:11434/api/tags
+# Check vLLM status
+curl http://localhost:8005/v1/models
 
 # Restart if needed
-sudo systemctl restart ollama
+sudo systemctl restart vllm-keepalive
 ```
 
 #### 6. Dashboard Build Issues
@@ -381,7 +420,179 @@ tail -f /tmp/dashboard.log
 - [ ] Firewall rules allow required ports
 - [ ] SSL certificate configured (recommended)
 
-## �🛠️ Local Development Setup
+## 🚀 Advanced LLM Deployment: Kimi-K2-Thinking
+
+### Hardware Requirements
+Deployment options for Kimi K2 Thinking:
+
+**Single GPU Setup (Recommended for g5.2xlarge):**
+• 1x GPU with Tensor Parallel (NVIDIA A10G recommended)
+• Supports INT4 quantized weights with 256k context length
+
+**Multi-GPU Setup (High Performance):**
+• 8x GPUs with Tensor Parallel (NVIDIA H200 recommended)
+• Supports INT4 quantized weights with 256k context length
+
+### Install vLLM
+Install vLLM inference framework:
+
+```bash
+pip install vllm
+```
+
+### Download Model
+Download the model from Hugging Face:
+
+```bash
+huggingface-cli download moonshotai/Kimi-K2-Thinking --local-dir ./kimi-k2-thinking
+```
+
+### Launch vLLM Server
+Start the inference server with essential parameters:
+
+#### vLLM Deployment
+```bash
+vllm serve moonshotai/Kimi-K2-Thinking \
+  --tensor-parallel-size 1 \
+  --tool-call-parser kimi_k2 \
+  --reasoning-parser kimi_k2 \
+  --max-num-batched-tokens 32768
+```
+
+### Test Deployment
+Verify the deployment is working:
+
+#### Test API
+```bash
+curl http://localhost:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "moonshotai/Kimi-K2-Thinking",
+    "messages": [
+      {"role": "user", "content": "Hello, what is 1+1?"}
+    ]
+  }'
+```
+
+**Note**: This guide only provides some examples of deployment commands for Kimi-K2-Thinking, which may not be the optimal configuration. Since inference engines are still being updated frequently, please continue to follow the guidance from their homepage if you want to achieve better inference performance.
+
+kimi_k2 reasoning parser and other related features have been merged into vLLM/sglang and will be available in the next release. For now, please use the nightly build Docker image.
+
+### vLLM Deployment
+The recommended deployment for Kimi-K2-Thinking INT4 weights with 256k context length:
+
+- **Single GPU (g5.2xlarge)**: Use TP=1 for A10G GPU
+- **Multi-GPU clusters**: Use TP=8 for H200 platforms
+
+Running parameters for different environments are provided below.
+
+#### Single GPU Tensor Parallelism (Recommended for g5.2xlarge)
+Here is a sample launch command with TP=1:
+
+```bash
+vllm serve $MODEL_PATH \
+  --served-model-name kimi-k2-thinking \
+  --trust-remote-code \
+  --tensor-parallel-size 1 \
+  --enable-auto-tool-choice \
+  --max-num-batched-tokens 32768 \
+  --tool-call-parser kimi_k2 \
+  --reasoning-parser kimi_k2
+```
+
+#### Multi-GPU Tensor Parallelism (H200 clusters)
+For 8-GPU setups, use TP=8:
+
+```bash
+vllm serve $MODEL_PATH \
+  --served-model-name kimi-k2-thinking \
+  --trust-remote-code \
+  --tensor-parallel-size 8 \
+  --enable-auto-tool-choice \
+  --max-num-batched-tokens 32768 \
+  --tool-call-parser kimi_k2 \
+  --reasoning-parser kimi_k2
+```
+
+**Key parameter notes:**
+- `--enable-auto-tool-choice`: Required when enabling tool usage.
+- `--tool-call-parser kimi_k2`: Required when enabling tool usage.
+- `--reasoning-parser kimi_k2`: Required for correctly processing reasoning content.
+- `--max-num-batched-tokens 32768`: Using chunk prefill to reduce peak memory usage.
+- `--tensor-parallel-size`: Set to 1 for single GPU, 8 for multi-GPU clusters
+
+### SGLang Deployment
+Similarly, here are the examples using TP in SGLang for Deployment.
+
+#### Single GPU Tensor Parallelism (g5.2xlarge)
+For single A10G GPU setups:
+
+```bash
+python -m sglang.launch_server --model-path $MODEL_PATH --tp 1 --trust-remote-code --tool-call-parser kimi_k2 --reasoning-parser kimi_k2
+```
+
+#### Multi-GPU Tensor Parallelism (H200 clusters)
+Here is the simple example code to run TP8 on H200 in a single node:
+
+```bash
+python -m sglang.launch_server --model-path $MODEL_PATH --tp 8 --trust-remote-code --tool-call-parser kimi_k2 --reasoning-parser kimi_k2
+```
+
+**Key parameter notes:**
+- `--tool-call-parser kimi_k2`: Required when enabling tool usage.
+- `--reasoning-parser kimi_k2`: Required for correctly processing reasoning content.
+- `--tp`: Set to 1 for single GPU, 8 for multi-GPU clusters
+
+### KTransformers Deployment
+
+#### KTransformers+SGLang Inference Deployment
+Launch with KTransformers + SGLang for CPU+GPU heterogeneous inference:
+
+```bash
+python -m sglang.launch_server \
+  --model path/to/Kimi-K2-Thinking/ \
+  --kt-amx-weight-path path/to/Kimi-K2-Instruct-CPU-weight/ \
+  --kt-cpuinfer 56 \
+  --kt-threadpool-count 2 \
+  --kt-num-gpu-experts 200 \
+  --kt-amx-method AMXINT4 \
+  --trust-remote-code \
+  --mem-fraction-static 0.98 \
+  --chunked-prefill-size 4096 \
+  --max-running-requests 37 \
+  --max-total-tokens 37000 \
+  --enable-mixed-chunk \
+  --tensor-parallel-size 8 \
+  --enable-p2p-check \
+  --disable-shared-experts-fusion
+```
+
+Achieves 577.74 tokens/s Prefill and 45.91 tokens/s Decode (37-way concurrency) on 8× NVIDIA L20 + 2× Intel 6454S.
+
+More details: https://github.com/kvcache-ai/ktransformers/blob/main/doc/en/Kimi-K2-Thinking.md
+
+#### KTransformers+LLaMA-Factory Fine-tuning Deployment
+You can use below command to run LoRA SFT with KT+llamafactory.
+
+```bash
+# For LoRA SFT
+USE_KT=1 llamafactory-cli train examples/train_lora/kimik2_lora_sft_kt.yaml
+# For Chat with model after LoRA SFT
+llamafactory-cli chat examples/inference/kimik2_lora_sft_kt.yaml
+# For API with model after LoRA SFT
+llamafactory-cli api examples/inference/kimik2_lora_sft_kt.yaml
+```
+
+This achieves end-to-end LoRA SFT Throughput: 46.55 token/s on 2× NVIDIA 4090 + Intel 8488C with 1.97T RAM and 200G swap memory.
+
+More details refer to https://github.com/kvcache-ai/ktransformers/blob/main/doc/en/SFT_Installation_Guide_KimiK2.md.
+
+### Others
+Kimi-K2-Thinking reuses the DeepSeekV3CausalLM architecture and convert it's weight into proper shape to save redevelopment effort. To let inference engines distinguish it from DeepSeek-V3 and apply the best optimizations, we set "model_type": "kimi_k2" in config.json.
+
+If you are using a framework that is not on the recommended list, you can still run the model by manually changing model_type to "deepseek_v3" in config.json as a temporary workaround. You may need to manually parse tool calls in case no tool call parser is available in your framework.
+
+## 🛠️ Local Development Setup
 
 ### Prerequisites
 - Python 3.10+
@@ -389,7 +600,7 @@ tail -f /tmp/dashboard.log
 - Redis 6+
 - Node.js 20+
 - Git
-- Ollama (for local LLM)
+- vLLM (for local LLM)
 
 ### Quick Local Setup
 ```bash
@@ -406,16 +617,25 @@ pip install -r requirements.txt
 # Install dashboard dependencies
 cd dashboard && npm install && cd ..
 
-# Start Ollama
-ollama pull llama3.1:70b
-ollama serve
+# Install vLLM and download Kimi-K2-Thinking model
+pip install vllm huggingface-hub
+huggingface-cli download moonshotai/Kimi-K2-Thinking --local-dir ./models/kimi-k2-thinking
+
+# Start vLLM server
+vllm serve moonshotai/Kimi-K2-Thinking \
+  --tensor-parallel-size 1 \
+  --tool-call-parser kimi_k2 \
+  --reasoning-parser kimi_k2 \
+  --max-num-batched-tokens 32768 \
+  --host 0.0.0.0 \
+  --port 8005
 
 # Start services using the automated script
 wsl bash -c "cd /mnt/c/Users/dmilner.AGV-040318-PC/Downloads/landon/king-ai-v2/king-ai-v3/agentic-framework-main/orchestrator && sed -i 's/\r$//' run_service.sh && echo 'YOUR_IP_ADRESS_HERE' | bash run_service.sh"
 
 **Note**: Replace `YOUR_IP_ADRESS_HERE` with your AWS EC2 public IP address (e.g., `3.236.144.91`). This script will:
 - Deploy all services to your AWS server
-- Set up Ollama with the llama3.1:70b model
+- Set up vLLM with the Kimi-K2-Thinking model
 - Configure databases and environment variables
 - Start all microservices automatically
 
@@ -443,9 +663,9 @@ cd dashboard && npm run dev
 #### Core Configuration (.env files in each service)
 ```env
 # LLM Configuration
-OLLAMA_ENDPOINT=http://localhost:11434
-LOCAL_MODEL=llama3.1:70b
-DEFAULT_LLM_PROVIDER=local
+VLLM_ENDPOINT=http://localhost:8005
+VLLM_MODEL=moonshotai/Kimi-K2-Thinking
+DEFAULT_LLM_PROVIDER=vllm
 
 # Database
 POSTGRES_URL=postgresql://agent_user:agent_pass@localhost:5432/agentic_framework
@@ -550,7 +770,7 @@ The primary way to interact with King AI v3.
 **Features:**
 - Natural language conversation
 - Workflow creation and execution
-- Real-time responses powered by Ollama
+- Real-time responses powered by vLLM with Kimi-K2-Thinking
 - Session persistence
 
 **Usage Examples:**
@@ -634,7 +854,7 @@ System configuration and preferences.
 #### 1. Chat Not Responding
 **Symptoms:** Chat interface loads but no responses
 **Solutions:**
-- Check Ollama service: `curl http://localhost:11434/api/tags`
+- Check vLLM service: `curl http://localhost:8005/v1/models`
 - Verify orchestrator logs: `docker logs orchestrator`
 - Check network connectivity between services
 
@@ -655,8 +875,8 @@ System configuration and preferences.
 #### 4. LLM Model Not Available
 **Symptoms:** Chat responds with errors about model
 **Solutions:**
-- Check Ollama models: `ollama list`
-- Pull model: `ollama pull llama3.1:70b`
+- Check vLLM models: `curl http://localhost:8005/v1/models`
+- Verify model: `moonshotai/Kimi-K2-Thinking`
 - Verify model name in .env files
 
 ### Service Health Checks
@@ -677,8 +897,8 @@ echo "MCP Gateway:"; curl -s http://localhost:8080/health
 echo "Memory Service:"; curl -s http://localhost:8002/health
 echo "Subagent Manager:"; curl -s http://localhost:8001/health
 
-# Check Ollama
-echo "Ollama:"; curl -s http://localhost:11434/api/tags | jq '.models | length'
+# Check vLLM
+echo "vLLM:"; curl -s http://localhost:8005/v1/models | jq '.data | length'
 
 echo "=== Health Check Complete ==="
 ```
@@ -803,11 +1023,20 @@ alembic upgrade head
 
 Configure at least one LLM provider:
 
-**Ollama (Local, Free)**
+**vLLM (Local, High-Performance)**
 ```bash
-# Install and start Ollama
-ollama pull llama3.1:8b
-ollama serve
+# Install vLLM
+pip install vllm huggingface-hub
+
+# Download Kimi-K2-Thinking model
+huggingface-cli download moonshotai/Kimi-K2-Thinking --local-dir ./models/kimi-k2-thinking
+
+# Start vLLM server
+vllm serve moonshotai/Kimi-K2-Thinking \
+  --tensor-parallel-size 1 \
+  --tool-call-parser kimi_k2 \
+  --reasoning-parser kimi_k2 \
+  --max-num-batched-tokens 32768
 ```
 
 **Claude (Cloud, High-Quality)**

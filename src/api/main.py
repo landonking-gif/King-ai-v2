@@ -8,7 +8,8 @@ from datetime import datetime
 from src.api.routes import (
     chat, businesses, approvals, evolution, health, playbook, portfolio, system,
     analytics, banking, codegen, commerce, content, finance, legal, lifecycle,
-    monitoring, research, sandbox, supplier, webhooks, dev_dashboard, workflows, agents
+    monitoring, research, sandbox, supplier, webhooks, dev_dashboard, workflows, agents,
+    agentic
 )
 from src.api.routes import scheduler as scheduler_routes
 from src.api.middleware import RateLimitMiddleware, RateLimitConfig
@@ -250,6 +251,7 @@ app.include_router(sandbox.router, prefix="/api/sandbox", tags=["sandbox"])
 app.include_router(supplier.router, prefix="/api/supplier", tags=["supplier"])
 app.include_router(webhooks.router, prefix="/api/webhooks", tags=["webhooks"])
 app.include_router(workflows.router, prefix="/api/workflows", tags=["workflows"])
+app.include_router(agentic.router, prefix="/api/agentic", tags=["agentic-framework"])
 app.include_router(dev_dashboard.router, prefix="/dev", tags=["dev-dashboard"])
 
 @app.websocket("/ws")
