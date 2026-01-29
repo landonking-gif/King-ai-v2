@@ -3,8 +3,8 @@ Entry point for the Subagent Manager service.
 """
 
 import uvicorn
-from service.config import config
-from service.main import app
+from .config import config
+from .main import app
 
 if __name__ == "__main__":
     uvicorn.run(

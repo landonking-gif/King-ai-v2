@@ -65,7 +65,7 @@ Remember: You can ONLY answer based on the CONTEXT above. If the information is 
 """
     
     try:
-        # Create task context - use low risk to use local Ollama
+        # Create task context - use low risk to use local vLLM
         # (high-risk routes to Claude/Gemini which may not be configured)
         ctx = TaskContext(
             task_type="query",
@@ -133,7 +133,7 @@ async def run_tests():
     print("🧪 LIVE HALLUCINATION TEST")
     print("=" * 60)
     print("Testing King AI with prompts that previously caused hallucination...")
-    print("This requires an LLM provider (Ollama, vLLM, etc.) to be running.\n")
+    print("This requires an LLM provider (vLLM, Claude, etc.) to be running.\n")
     
     # Initialize LLM router
     try:

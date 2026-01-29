@@ -8,12 +8,12 @@ const CommandCenter = () => {
 
   const [socket, setSocket] = useState(null);
 
-  // WebSocket for real-time updates
-  const { connected } = useWebSocket('ws://localhost:8100/ws', {
-    onEvent: (eventType, data, timestamp) => {
-      handleWebSocketEvent(eventType, data);
-    }
-  });
+  // WebSocket disabled - using polling instead
+  // const { connected } = useWebSocket('ws://localhost:8100/ws', {
+  //   onEvent: (eventType, data, timestamp) => {
+  //     handleWebSocketEvent(eventType, data);
+  //   }
+  // });
 
   const handleWebSocketEvent = (eventType, data) => {
     switch (eventType) {
@@ -50,9 +50,8 @@ const CommandCenter = () => {
   };
 
   useEffect(() => {
-    // Initialize WebSocket connection is now handled by useWebSocket hook
-    setSocket({ connected }); // For backward compatibility
-  }, [connected]);
+    // WebSocket disabled
+  }, []);
 
   // ... rest of component ...
   const [systemHealth, setSystemHealth] = useState({

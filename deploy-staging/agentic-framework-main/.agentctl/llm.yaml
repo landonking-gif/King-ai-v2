@@ -1,0 +1,6 @@
+default_provider: openai
+providers:
+  openai:
+    api_key_env: OPENAI_API_KEY
+    default_model: null
+    fallback_model: gpt-4o-mini

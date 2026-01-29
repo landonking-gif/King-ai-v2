@@ -56,10 +56,10 @@ class EvolutionEngine:
         # Active proposals
         self._active_proposals: Dict[str, EvolutionProposal] = {}
         
-        # Daily limit for proposals (spec: 1 per day)
+        # Daily limit for proposals (from settings)
         self._daily_proposal_count = 0
         self._last_proposal_date = None
-        self._max_daily_proposals = 1  # Spec requirement
+        self._max_daily_proposals = getattr(settings, 'evolution_daily_limit', 100)  # Default 100/day
     
     async def propose_improvement(
         self,

@@ -48,7 +48,7 @@ class VLLMClient:
         self,
         prompt: str,
         system: str | None = None,
-        max_tokens: int = 4096,
+        max_tokens: int = 1024,
         temperature: float = 0.7
     ) -> str:
         """
@@ -57,7 +57,7 @@ class VLLMClient:
         Args:
             prompt: The user prompt
             system: Optional system prompt
-            max_tokens: Maximum tokens to generate
+            max_tokens: Maximum tokens to generate (dynamically capped based on input)
             temperature: Sampling temperature
             
         Returns:
@@ -68,13 +68,20 @@ class VLLMClient:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
         
+        # Estimate input tokens (~4 chars per token) and cap max_tokens dynamically
+        # Model context is 4096, leave buffer for safety
+        total_input_chars = len(prompt) + (len(system) if system else 0)
+        estimated_input_tokens = total_input_chars // 3  # Conservative estimate
+        available_tokens = 4096 - estimated_input_tokens - 100  # 100 token safety buffer
+        capped_max_tokens = max(256, min(max_tokens, available_tokens))  # At least 256 tokens
+        
         async with self.semaphore:
             response = await self.client.post(
                 f"{self.base_url}/v1/chat/completions",
                 json={
                     "model": self.model,
                     "messages": messages,
-                    "max_tokens": max_tokens,
+                    "max_tokens": capped_max_tokens,
                     "temperature": temperature,
                     "stream": False
                 }
@@ -139,13 +146,19 @@ class VLLMClient:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
         
+        # Estimate input tokens and cap max_tokens dynamically
+        total_input_chars = len(prompt) + (len(system) if system else 0)
+        estimated_input_tokens = total_input_chars // 3
+        available_tokens = 4096 - estimated_input_tokens - 100
+        capped_max_tokens = max(256, min(1024, available_tokens))
+        
         async with self.client.stream(
             "POST",
             f"{self.base_url}/v1/chat/completions",
             json={
                 "model": self.model,
                 "messages": messages,
-                "max_tokens": 4096,
+                "max_tokens": capped_max_tokens,
                 "stream": True
             }
         ) as response:

@@ -7,14 +7,12 @@ from src.utils.llm_router import LLMRouter, TaskContext
 @pytest.mark.asyncio
 async def test_high_risk_routes_to_claude():
     with patch("src.utils.llm_router.settings") as mock_settings, \
-         patch("src.utils.llm_router.OllamaClient") as MockOllama, \
+         patch("src.utils.llm_router.VLLMClient") as MockVLLM, \
          patch("src.utils.llm_router.ClaudeClient") as MockClaude:
-        
+
         # Configure mock settings
-        mock_settings.ollama_url = "http://localhost:11434"
-        mock_settings.ollama_model = "llama3.1:8b"
-        mock_settings.vllm_url = None
-        mock_settings.vllm_model = "meta-llama/Llama-3.1-70B-Instruct"
+        mock_settings.vllm_endpoint = "http://localhost:8005"
+        mock_settings.vllm_model = "moonshotai/Kimi-K2-Thinking"
         mock_settings.anthropic_api_key = "test-key"
         mock_settings.claude_model = "claude-3-5-sonnet-20241022"
         mock_settings.gemini_api_key = None

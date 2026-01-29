@@ -6,8 +6,8 @@ import sys
 
 # Mock config before importing anything that depends on it
 mock_settings = MagicMock()
-mock_settings.ollama_url = "http://localhost:11434"
-mock_settings.ollama_model = "llama3.1:8b"
+mock_settings.vllm_endpoint = "http://localhost:8005"
+mock_settings.vllm_model = "moonshotai/Kimi-K2-Thinking"
 sys.modules['config.settings'] = MagicMock(settings=mock_settings)
 
 from src.integrations.stripe_client import (

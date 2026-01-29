@@ -53,3 +53,12 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+import sys
+print(f"DEBUG: postgres_url = {settings.postgres_url}", file=sys.stderr)
+print(f"DEBUG: working directory = {__import__('os').getcwd()}", file=sys.stderr)
+print(f"DEBUG: .env file exists = {__import__('os').path.exists('.env')}", file=sys.stderr)
+if __import__('os').path.exists('.env'):
+    with open('.env', 'r') as f:
+        print(f"DEBUG: .env content = {repr(f.read())}", file=sys.stderr)
+print(f"DEBUG: env POSTGRES_URL = {__import__('os').environ.get('POSTGRES_URL', 'NOT SET')}", file=sys.stderr)
+print(f"DEBUG: env POSTGRESQL_URL = {__import__('os').environ.get('POSTGRESQL_URL', 'NOT SET')}", file=sys.stderr)

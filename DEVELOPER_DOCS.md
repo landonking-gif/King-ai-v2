@@ -6,16 +6,26 @@ King AI v2 is a hybrid "Dual-Brain" autonomous business empire. It is designed t
 ### Component Overview
 1.  **Backend (FastAPI)**:
     *   **Port**: 8000
-    *   **Location**: `src/api`
+    *   **Location**: `src/api` and `orchestrator/service/main.py`
     *   **Role**: Handles all business logic, database interactions, and AI orchestration.
+    *   **APIs**: REST API (`/api/*`) and OpenAI-compatible endpoint (`/v1/chat/completions`)
 2.  **Frontend (React/Vite)**:
     *   **Port**: 5173
     *   **Location**: `dashboard/`
     *   **Role**: Glassmorphic UI for the user to interact with the CEO and view empire stats.
-3.  **Database (PostgreSQL & Redis)**:
+3.  **MoltBot Gateway**:
+    *   **Port**: 18789
+    *   **Location**: `king-ai-v3/moltbot`
+    *   **Role**: Multi-channel AI interface supporting WhatsApp, Telegram, Discord, Slack, Signal, Google Chat, Matrix, and more.
+    *   **Config**: `~/.moltbot/moltbot.json`
+4.  **LLM Runtime (Ollama)**:
+    *   **Port**: 11434
+    *   **Model**: DeepSeek R1 7B (4.7GB)
+    *   **Role**: Local LLM inference for King AI and MoltBot
+5.  **Database (PostgreSQL & Redis)**:
     *   **Role**: PG stores persistent business data; Redis handles caching and task queues.
     *   **Deployment**: Runs via Docker Compose.
-4.  **Load Balancer (Nginx)**:
+6.  **Load Balancer (Nginx)**:
     *   **Port**: 80 (internal)
     *   **Role**: Reverse proxy routing traffic to API and dashboard.
     *   **SSL Termination**: Handled by AWS Load Balancer.

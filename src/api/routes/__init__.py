@@ -22,6 +22,7 @@ from . import (
     supplier,
     dev_dashboard,
     scheduler,
+    agentic,
 )
 
 __all__ = [
@@ -46,4 +47,5 @@ __all__ = [
     "supplier",
     "dev_dashboard",
     "scheduler",
+    "agentic",
 ]

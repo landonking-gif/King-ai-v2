@@ -17,12 +17,12 @@ const Analytics = () => {
     { time: '10 min ago', desc: 'Approval request processed' }
   ]);
 
-  // WebSocket connection for real-time updates
-  const { connected, subscribe } = useWebSocket('ws://localhost:8100/ws/activity-feed', {
-    onEvent: (eventType, data, timestamp) => {
-      handleWebSocketEvent(eventType, data, timestamp);
-    }
-  });
+  // WebSocket disabled - using polling instead
+  // const { connected, subscribe } = useWebSocket('ws://localhost:8100/ws/activity-feed', {
+  //   onEvent: (eventType, data, timestamp) => {
+  //     handleWebSocketEvent(eventType, data, timestamp);
+  //   }
+  // });
 
   const handleWebSocketEvent = (eventType, data, timestamp) => {
     switch (eventType) {
@@ -65,12 +65,7 @@ const Analytics = () => {
   useEffect(() => {
     // Fetch initial analytics data
     fetchAnalyticsData();
-
-    // Subscribe to analytics channel
-    if (connected) {
-      subscribe('analytics');
-    }
-  }, [connected, subscribe]);
+  }, []);
 
   const fetchAnalyticsData = async () => {
     try {
@@ -144,8 +139,8 @@ const Analytics = () => {
       <div className="activity-monitor">
         <h3>Recent Activity</h3>
         <div className="connection-status">
-          <span className={`status-dot ${connected ? 'connected' : 'disconnected'}`}></span>
-          {connected ? 'Live Updates Active' : 'Connecting...'}
+          <span className="status-dot connected"></span>
+          Polling Active
         </div>
         <div className="activity-list">
           {activityFeed.map((item, index) => (

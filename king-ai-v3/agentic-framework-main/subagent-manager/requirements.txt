@@ -1,0 +1,2 @@
+# Subagent Manager Service Dependencies
+-r ../requirements.txt

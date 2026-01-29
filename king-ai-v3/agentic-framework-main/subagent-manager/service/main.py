@@ -26,16 +26,23 @@ from .models import (
 )
 from .validator import SchemaValidator
 
-# Metrics
-subagent_spawned = Counter(
-    "subagent_spawned_total", "Total number of subagents spawned", ["role"]
-)
-subagent_executed = Counter(
-    "subagent_executed_total", "Total number of task executions", ["status"]
-)
-execution_duration = Histogram(
-    "subagent_execution_duration_seconds", "Task execution duration"
-)
+# Metrics - wrapped to prevent duplicate registration
+try:
+    subagent_spawned = Counter(
+        "subagent_spawned_total", "Total number of subagents spawned", ["role"]
+    )
+    subagent_executed = Counter(
+        "subagent_executed_total", "Total number of task executions", ["status"]
+    )
+    execution_duration = Histogram(
+        "subagent_execution_duration_seconds", "Task execution duration"
+    )
+except ValueError:
+    # Metrics already registered (happens during reload)
+    from prometheus_client import REGISTRY
+    subagent_spawned = REGISTRY._collector_to_names.get("subagent_spawned_total")
+    subagent_executed = REGISTRY._collector_to_names.get("subagent_executed_total")
+    execution_duration = REGISTRY._collector_to_names.get("subagent_execution_duration_seconds")
 
 
 # Global lifecycle manager
@@ -325,9 +332,9 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run(
-        "subagent_manager.service.main:app",
+        "service.main:app",
         host=config.host,
         port=config.port,
         log_level=config.log_level.lower(),
-        reload=True,
+        reload=False,
     )

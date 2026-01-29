@@ -28,8 +28,8 @@ class SubagentManagerConfig(BaseSettings):
     )
 
     # LLM configuration
-    llm_provider: str = Field(default="mock", description="Default LLM provider")
-    llm_model: str = Field(default="mock-model", description="Default LLM model")
+    llm_provider: str = Field(default="vllm", description="Default LLM provider")
+    llm_model: str = Field(default="moonshotai/Kimi-K2-Thinking", description="Default LLM model")
     llm_temperature: float = Field(default=0.7, description="Default temperature")
     llm_max_tokens: int = Field(default=4096, description="Default max tokens")
 

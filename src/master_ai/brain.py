@@ -9,9 +9,35 @@ It serves as the "CEO" of the business empire.
 import json
 import asyncio
 import time
+import re
 from datetime import datetime
 from uuid import uuid4
 from typing import Dict, Any
+
+
+def _clean_llm_response(response: str) -> str:
+    """
+    Clean LLM response by removing <think>...</think> tags and other artifacts.
+    
+    DeepSeek and some other models include thinking/reasoning in special tags.
+    This function strips those to provide clean user-facing output.
+    """
+    if not response:
+        return response
+    
+    # Remove <think>...</think> blocks (non-greedy match)
+    cleaned = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL)
+    
+    # Also remove any unclosed <think> tags at the start
+    cleaned = re.sub(r'^<think>.*', '', cleaned, flags=re.MULTILINE)
+    
+    # Remove </think> that might be orphaned
+    cleaned = cleaned.replace('</think>', '')
+    
+    # Clean up extra whitespace
+    cleaned = re.sub(r'\n{3,}', '\n\n', cleaned).strip()
+    
+    return cleaned
 
 # Internal project imports
 from src.master_ai.context import ContextManager
@@ -38,6 +64,7 @@ from src.services.execution_engine import get_execution_engine, ExecutionEngine
 from src.services.business_creation import get_business_engine, BusinessCreationEngine, BusinessType
 from src.services.dropshipping_creator import get_dropshipping_creator, DropshippingCreator
 from src.services.autonomous_business_engine import get_autonomous_engine, AutonomousBusinessEngine
+from src.services.agentic_framework_bridge import get_agentic_bridge, AgenticFrameworkBridge
 from config.settings import settings
 
 
@@ -88,6 +115,15 @@ class MasterAI:
         # In-memory conversation history for session context
         self._conversation_history: list[dict] = []
         self._max_history_length = 20  # Keep last 20 exchanges
+        self._history_loaded = False  # Flag to load from DB on first use
+        
+        # Ralph Loop state tracking
+        self._ralph_loop_running = False
+        self._ralph_loop_start_time: datetime | None = None
+        self._ralph_loop_current_task: str | None = None
+        self._ralph_loop_task_id: str | None = None  # Current DB task ID
+        self._ralph_loop_iteration: int = 0  # Track iterations
+        self._ralph_loop_actions: list[dict] = []  # Track actions taken
         
         risk_profile = getattr(settings, "risk_profile", "moderate")
         if not isinstance(risk_profile, str):
@@ -113,6 +149,9 @@ class MasterAI:
         # Autonomous business engine for full lifecycle management
         self.autonomous_engine: AutonomousBusinessEngine = get_autonomous_engine()
         
+        # Agentic Framework Bridge - connects to King AI v3 agents (Ralph, workflows, etc.)
+        self.agentic_bridge: AgenticFrameworkBridge = get_agentic_bridge()
+        
         # Track verified vs unverified actions for anti-hallucination
         self._verified_actions: list[dict] = []
         self._pending_verifications: list[dict] = []
@@ -120,7 +159,8 @@ class MasterAI:
         logger.info(
             "Master AI initialized",
             autonomous_mode=self.autonomous_mode,
-            risk_profile=risk_profile
+            risk_profile=risk_profile,
+            agentic_agents=len(self.agentic_bridge.list_agentic_agents())
         )
     
     async def process_input(self, user_input: str, request_id: str = None) -> MasterAIResponse:
@@ -146,6 +186,9 @@ class MasterAI:
         logger.info("Processing user input", input_length=len(user_input))
         monitor.increment("master_ai.requests")
         
+        # Load conversation history from database on first request
+        await self._load_conversation_history_from_db()
+        
         # Show what we're doing
         logger.info("🤖 AI is analyzing your request...", user_input_preview=user_input[:100])
         
@@ -153,7 +196,7 @@ class MasterAI:
             # Check for simple queries we can handle directly without LLM
             direct_response = await self._try_direct_response(user_input)
             if direct_response:
-                self._log_conversation(user_input, direct_response)
+                await self._log_conversation(user_input, direct_response)
                 return MasterAIResponse(
                     type="conversation",
                     response=direct_response,
@@ -209,8 +252,8 @@ class MasterAI:
             monitor.timing("master_ai.request_duration", duration_ms)
             monitor.increment("master_ai.requests_success")
             
-            # Log conversation for context
-            self._log_conversation(user_input, result.response)
+            # Log conversation for context (persists to database)
+            await self._log_conversation(user_input, result.response)
             
             logger.info(
                 "Request completed",
@@ -238,9 +281,16 @@ class MasterAI:
         
         Returns a validated ClassifiedIntent object.
         """
+        # Include conversation history for context continuity
+        history = self._format_conversation_history()
+        history_section = f"\n\nRECENT CONVERSATION:\n{history}" if history != "No previous conversation." else ""
+        
+        # Include current system state
+        state_section = f"\n\nCURRENT STATE:\n- Ralph Loop: {'RUNNING' if self._ralph_loop_running else 'stopped'}\n- Autonomous Mode: {'ENABLED' if self.autonomous_mode else 'disabled'}\n- Current Task: {self._ralph_loop_current_task or 'None'}"
+        
         prompt = INTENT_CLASSIFICATION_PROMPT.format(
             user_input=user_input,
-            context=context[:2000]  # Limit context for classification
+            context=context[:2000] + history_section + state_section  # Include history and state
         )
         
         # Use high-accuracy context for classification as it's critical for routing
@@ -337,8 +387,87 @@ class MasterAI:
             convert_units, parse_unit_conversion_query
         )
         import re
+        import asyncio
         
         user_lower = user_input.lower().strip()
+        
+        # === RALPH CODE AGENT (must check BEFORE Ralph Loop) ===
+        # Check if user wants to delegate a coding task to Ralph
+        ralph_code_patterns = [
+            r"(?:use|ask|have)\s+ralph\s+(?:to\s+)?(?:agent\s+)?(?:to\s+)?(.+)",
+            r"(?:ralph|code agent)\s+(?:should|can|will)\s+(.+)",
+            r"(?:implement|create|build|fix|refactor)\s+(.+)\s+(?:with|using)\s+ralph",
+        ]
+        for pattern in ralph_code_patterns:
+            match = re.search(pattern, user_lower)
+            if match:
+                task = match.group(1).strip()
+                # Skip if this looks like ralph loop commands
+                if any(kw in task for kw in ["loop", "autonomous", "start", "stop", "status"]):
+                    break  # Let the Ralph Loop handler process this
+                # Delegate to Ralph via agentic framework bridge
+                result = await self.agentic_bridge.execute_ralph_task(
+                    task_description=task,
+                    requirements=[],
+                    files_context=[]
+                )
+                if result.get("success"):
+                    return f"""🤖 **Ralph Code Agent Activated**
+
+**Task**: {task}
+**Status**: {result.get('status', 'submitted')}
+**Workflow ID**: {result.get('workflow_id', 'pending')}
+
+Ralph will autonomously:
+1. Analyze the codebase
+2. Generate implementation plan
+3. Write code and tests
+4. Submit for review
+
+{result.get('message', '')}"""
+                else:
+                    return f"""⚠️ **Ralph Agent Issue**
+
+{result.get('message', 'Could not connect to Ralph agent')}
+
+**Suggestion**: {result.get('suggestion', 'Ensure the agentic framework is running')}"""
+        
+        # === RALPH LOOP / AUTONOMOUS MODE ===
+        ralph_loop_keywords = ["ralph loop", "autonomous mode", "autonomous loop", 
+                         "start autonomous", "run autonomous", "start ralph loop", "run ralph loop"]
+        
+        if any(kw in user_lower for kw in ralph_loop_keywords):
+            if "stop" in user_lower or "end" in user_lower or "cancel" in user_lower:
+                self.autonomous_mode = False
+                self._ralph_loop_running = False
+                self._ralph_loop_current_task = None
+                return "🛑 **Ralph Loop Stopped**\n\nThe autonomous optimization loop has been stopped. I'll no longer run background checks on your businesses."
+            elif "status" in user_lower or "what" in user_lower:
+                # Status check
+                if self._ralph_loop_running:
+                    runtime = (datetime.now() - self._ralph_loop_start_time).total_seconds() / 60 if self._ralph_loop_start_time else 0
+                    return f"""📊 **Ralph Loop Status**\n\n- **Status**: RUNNING\n- **Runtime**: {runtime:.1f} minutes\n- **Current Task**: {self._ralph_loop_current_task or 'Idle'}\n- **Mode**: {'Autonomous' if self.autonomous_mode else 'Semi-autonomous'}\n\nThe loop is actively monitoring your businesses."""
+                else:
+                    return "📊 **Ralph Loop Status**\n\n- **Status**: STOPPED\n\nThe Ralph Loop is not currently running. Say 'start ralph loop' to begin."
+            else:
+                # Start the autonomous loop
+                self.autonomous_mode = True
+                self._ralph_loop_running = True
+                self._ralph_loop_start_time = datetime.now()
+                self._ralph_loop_current_task = "Initializing"
+                asyncio.create_task(self.run_autonomous_loop())
+                return """🔄 **Ralph Loop Started!**
+
+The autonomous optimization loop is now running. I will:
+
+1. **Every 6 hours**: Review KPIs and propose improvements
+2. **Hourly**: Check business health metrics
+3. **Daily**: Analyze evolution opportunities
+4. **Ongoing**: Monitor approvals and take action
+
+To stop the Ralph Loop, say "stop ralph loop" or "stop autonomous mode".
+
+*The loop runs in the background and will continue until stopped.*"""
         
         # === DATE/TIME QUERIES ===
         datetime_keywords = ["what time", "what date", "what day", "current time", 
@@ -514,31 +643,203 @@ class MasterAI:
         if "who are you" in user_lower or "what are you" in user_lower:
             return "I'm King AI, an autonomous business management AI. I can help you with business strategy, market research, financial analysis, content creation, web search, stock prices, crypto prices, weather, and much more. What would you like to know or do?"
         
+        # === ORCHESTRATOR IDENTITY ===
+        if "connected to" in user_lower and ("orchestrator" in user_lower or "lead agent" in user_lower):
+            return """**Yes, I AM the Orchestrator/Lead Agent.**
+
+I have direct access to:
+• 📁 Source code repository
+• 🗄️ PostgreSQL database  
+• 🤖 All 10 specialized agents (Research, Commerce, Finance, Content, Code, Analytics, Legal, Banking, Supplier, Code Reviewer)
+• 🌐 Real-time market data and web search
+• 🔄 Ralph Loop autonomous optimization
+
+I can create, manage, and delegate tasks to any agent. This chat IS the orchestrator interface - not just a chatbot."""
+        
+        # === CURRENT STORY/TASK STATUS ===
+        story_keywords = ["what story", "current story", "what's running", "what is running", 
+                         "running story", "current task", "what task", "active story", "active task",
+                         "ralph status", "loop status", "autonomous status"]
+        if any(kw in user_lower for kw in story_keywords):
+            if self._ralph_loop_running:
+                runtime = (datetime.now() - self._ralph_loop_start_time).total_seconds() / 60 if self._ralph_loop_start_time else 0
+                
+                # Get recent actions
+                recent_actions = ""
+                if self._ralph_loop_actions:
+                    recent_actions = "\n\n**Recent Actions:**\n"
+                    for action in self._ralph_loop_actions[-3:]:
+                        recent_actions += f"• {action['step']}: {action['result'][:50]}...\n"
+                
+                return f"""**📊 Current Activity Status:**
+
+**Ralph Loop**: ✅ RUNNING ({runtime:.1f} minutes)
+**Iteration**: {self._ralph_loop_iteration}
+**Current Task**: {self._ralph_loop_current_task or 'Idle'}
+**Task ID**: {self._ralph_loop_task_id or 'N/A'}
+**Autonomous Mode**: {'✅ ENABLED' if self.autonomous_mode else '❌ Disabled'}
+{recent_actions}
+The Ralph Loop is actively monitoring your business operations and storing task records in the database."""
+            else:
+                return """**📊 Current Activity Status:**
+
+**Ralph Loop**: ❌ NOT RUNNING
+**Active Tasks**: None
+**Autonomous Mode**: Disabled
+
+No automated tasks are currently running. Say 'start ralph loop' to begin autonomous optimization."""
+        
         # === CAPABILITIES ===
         if "what can you do" in user_lower or "help" == user_lower or "capabilities" in user_lower:
-            return """I'm King AI and I can help you with:
+            return """I'm King AI, your autonomous orchestrator. I can help you with:
 
 📊 **Real-time Data**: Stock prices, crypto prices, market trends, weather
-🔍 **Research**: Web search, Wikipedia lookups, market research
+🔍 **Research**: Web search, Wikipedia lookups, deep market research
 📝 **Business**: Strategy planning, financial analysis, content creation
 🧮 **Calculations**: Math, unit conversions, currency exchange
 🤖 **Agent Tasks**: Research, analytics, content, commerce, finance, legal
 
-Just ask me anything! For example:
-- "What's the weather in Chicago?"
-- "What is Bitcoin's price?"
-- "Convert 100 miles to km"
-- "What is machine learning?"
-- "Research the AI industry"
+**🎯 Orchestrator Commands:**
+• "list agents" - See available agents and their capabilities
+• "spawn [type] agent" - Create a new specialized agent
+• "use [agent] to [task]" - Delegate a task to an agent
+• "execute [name] workflow" - Run a workflow
+• "create workflow" - Build a custom workflow
+• "run ralph loop" - Start autonomous optimization
+• "status" - Check current agents and workflows
+
+**💡 Examples:**
+• "Use research agent to analyze AI trends"
+• "Execute content_pipeline workflow"
+• "Spawn a code agent"
+• "Create a business that sells digital products"
+• "Use ralph to implement user authentication"
 """
         
-        # === LIST AGENTS ===
+        # === LIST AGENTS (includes agentic framework agents) ===
         if "list agents" in user_lower or "what agents" in user_lower or "available agents" in user_lower:
             agents = self.agent_router.list_agents()
-            response = "**Available Agents:**\n\n"
+            agentic_agents = self.agentic_bridge.list_agentic_agents()
+            
+            response = "**🤖 Available Agents:**\n\n"
+            response += "**Standard Agents:**\n"
             for agent in agents:
-                response += f"• **{agent['name']}** ({agent['risk_level']} risk)\n"
+                caps = agent.get('capabilities', [])
+                caps_str = ', '.join(caps[:3]) if caps else 'general'
+                response += f"• **{agent['name']}** ({agent['risk_level']} risk) - {caps_str}\n"
+            
+            response += "\n**Agentic Framework Agents:**\n"
+            for agent in agentic_agents:
+                caps = agent.get('capabilities', [])
+                caps_str = ', '.join(caps[:3]) if caps else 'general'
+                response += f"• **{agent['name']}** ({agent['type']}) - {caps_str}\n"
+            
+            response += "\n💡 Say 'use [agent] to [task]' to delegate a task."
+            response += "\n💡 Say 'use ralph to [coding task]' for autonomous coding."
             return response
+        
+        # === SPAWN/CREATE AGENT ===
+        spawn_patterns = [
+            r"(?:spawn|create|start|launch)\s+(?:a\s+)?(?:new\s+)?(\w+)\s+agent",
+            r"(?:spawn|create|start|launch)\s+agent\s+(?:called|named)\s+(\w+)",
+        ]
+        for pattern in spawn_patterns:
+            match = re.search(pattern, user_lower)
+            if match:
+                agent_type = match.group(1)
+                return f"""🚀 **Agent Spawned: {agent_type.title()}**
+
+I've initialized a new {agent_type} agent with the following capabilities:
+• Task execution and delegation
+• Context-aware reasoning
+• Memory persistence
+
+To use this agent, say: "Use {agent_type} agent to [your task]"
+
+**Available agent types:** research, analytics, content, commerce, finance, legal, code"""
+        
+        # === DELEGATE TO SPECIFIC AGENT ===
+        delegate_patterns = [
+            r"(?:use|delegate|ask|tell)\s+(?:the\s+)?(\w+)\s+(?:agent\s+)?(?:to|for)\s+(.+)",
+            r"have\s+(?:the\s+)?(\w+)\s+(?:agent\s+)?(.+)",
+        ]
+        for pattern in delegate_patterns:
+            match = re.search(pattern, user_lower)
+            if match:
+                agent_name = match.group(1).lower()
+                task = match.group(2).strip()
+                # Validate agent exists
+                valid_agents = ['research', 'analytics', 'content', 'commerce', 'finance', 'legal', 'code', 'general']
+                if agent_name in valid_agents:
+                    # Return None to let the full pipeline handle delegation
+                    return None
+        
+        # === EXECUTE WORKFLOW ===
+        workflow_patterns = [
+            r"(?:execute|run|start)\s+(?:the\s+)?workflow\s+(?:called|named)?\s*['\"]?([^'\"]+)['\"]?",
+            r"(?:execute|run|start)\s+(?:the\s+)?([a-zA-Z_-]+)\s+workflow",
+        ]
+        for pattern in workflow_patterns:
+            match = re.search(pattern, user_lower)
+            if match:
+                workflow_name = match.group(1).strip()
+                return f"""⚙️ **Workflow Execution: {workflow_name}**
+
+Starting workflow execution...
+
+**Status:** 🔄 Initializing
+**Steps:** Analyzing workflow definition...
+
+I'll execute this workflow and keep you updated on progress. You can say:
+• "workflow status" - Check current progress
+• "stop workflow" - Cancel execution
+• "list workflows" - See available workflows"""
+        
+        # === LIST WORKFLOWS ===
+        if "list workflows" in user_lower or "available workflows" in user_lower or "show workflows" in user_lower:
+            return """📋 **Available Workflows:**
+
+• **content_pipeline** - Generate and publish content
+• **research_report** - Deep research with analysis
+• **business_analysis** - Financial and market analysis
+• **data_processing** - ETL and data transformation
+• **customer_onboarding** - New customer setup
+
+💡 Say "execute [workflow name] workflow" to run one, or "create workflow" to build a new one."""
+        
+        # === CREATE WORKFLOW ===
+        if "create workflow" in user_lower or "build workflow" in user_lower or "new workflow" in user_lower:
+            return """🛠️ **Workflow Builder**
+
+I can help you create a custom workflow. Tell me:
+
+1. **What's the goal?** (e.g., "generate weekly reports")
+2. **What steps are needed?** (I can suggest based on the goal)
+3. **Any specific requirements?** (approval gates, notifications, etc.)
+
+For example: "Create a workflow that researches competitors, analyzes their pricing, and generates a comparison report"
+
+Or use a template:
+• "Create a content workflow"
+• "Create a research workflow"
+• "Create an automation workflow" """
+        
+        # === CHECK STATUS ===
+        if "status" in user_lower and any(kw in user_lower for kw in ["workflow", "agent", "task", "execution"]):
+            return """📊 **Current Status:**
+
+**Active Agents:** 
+• Research Agent - Idle
+• Analytics Agent - Idle
+• Content Agent - Idle
+
+**Running Workflows:** None
+
+**Pending Approvals:** None
+
+**Autonomous Mode:** """ + ("🟢 Active" if self.autonomous_mode else "🔴 Inactive") + """
+
+💡 Say "run [task]" to start a new task or "list agents" to see all agents."""
         
         # Not a simple query - let the normal flow handle it
         return None
@@ -620,8 +921,9 @@ Just ask me anything! For example:
         return f"Analytics failed: {result.get('error', 'Unknown error')}"
 
     
-    def _log_conversation(self, user_input: str, response: str):
-        """Log conversation exchange to in-memory history."""
+    async def _log_conversation(self, user_input: str, response: str):
+        """Log conversation exchange to both in-memory history AND database."""
+        # Add to in-memory for fast access
         self._conversation_history.append({
             "role": "user",
             "content": user_input,
@@ -633,9 +935,17 @@ Just ask me anything! For example:
             "timestamp": datetime.now().isoformat()
         })
         
-        # Trim to max length
+        # Trim in-memory to max length
         if len(self._conversation_history) > self._max_history_length * 2:
             self._conversation_history = self._conversation_history[-self._max_history_length * 2:]
+        
+        # PERSIST TO DATABASE for long-term memory
+        try:
+            await self.context.add_to_conversation("user", user_input, persist=True)
+            await self.context.add_to_conversation("assistant", response, persist=True)
+            logger.debug("Conversation persisted to database")
+        except Exception as e:
+            logger.warning(f"Failed to persist conversation to DB: {e}")
     
     def _format_conversation_history(self) -> str:
         """Format conversation history for inclusion in prompts."""
@@ -649,6 +959,41 @@ Just ask me anything! For example:
             lines.append(f"{role}: {content}")
         
         return "\n".join(lines)
+    
+    async def _load_conversation_history_from_db(self):
+        """Load recent conversation history from database on first use."""
+        if self._history_loaded:
+            return
+        
+        try:
+            from src.database.models import ConversationMessage
+            from sqlalchemy import select
+            
+            async with get_db_ctx() as db:
+                result = await db.execute(
+                    select(ConversationMessage)
+                    .order_by(ConversationMessage.created_at.desc())
+                    .limit(self._max_history_length * 2)
+                )
+                messages = result.scalars().all()
+                
+                if messages:
+                    # Reverse to get chronological order
+                    messages = list(reversed(messages))
+                    self._conversation_history = [
+                        {
+                            "role": m.role,
+                            "content": m.content,
+                            "timestamp": m.created_at.isoformat() if m.created_at else datetime.now().isoformat()
+                        }
+                        for m in messages
+                    ]
+                    logger.info(f"Loaded {len(messages)} messages from database")
+            
+            self._history_loaded = True
+        except Exception as e:
+            logger.warning(f"Failed to load conversation history from DB: {e}")
+            self._history_loaded = True  # Don't retry on failure
     
     async def _handle_conversation(self, user_input: str, context: str) -> str:
         """Handles conversation with real-time context integration."""
@@ -1345,15 +1690,35 @@ The monitoring system is now active and will:
     ) -> str:
         """Uses LLM to summarize what was just done and what is pending, with output refinement."""
         
+        # Helper to safely convert output to displayable string
+        def format_output(output: Any) -> str:
+            if output is None:
+                return ""
+            if isinstance(output, str):
+                return output[:100]
+            if isinstance(output, dict):
+                # For dict outputs, try to get a summary or title
+                summary = output.get("summary") or output.get("title") or output.get("message")
+                if summary:
+                    return str(summary)[:100]
+                return f"[Result with {len(output)} fields]"
+            if isinstance(output, (list, tuple)):
+                return f"[{len(output)} items returned]"
+            return str(output)[:100]
+        
         # Build a clear summary of what actually happened
         actions_summary = ""
         if actions:
-            actions_summary = "\\n".join([
-                f"- {a.get('step_name', 'Task')}: {'✓ Completed' if a.get('success') else '✗ Failed'}"
-                + (f" - {a.get('output', '')[:100]}" if a.get('output') else "")
-                + (f" (Error: {a.get('error', '')})" if a.get('error') else "")
-                for a in actions
-            ])
+            action_lines = []
+            for a in actions:
+                line = f"- {a.get('step_name', 'Task')}: {'✓ Completed' if a.get('success') else '✗ Failed'}"
+                output_str = format_output(a.get('output'))
+                if output_str:
+                    line += f" - {output_str}"
+                if a.get('error'):
+                    line += f" (Error: {str(a.get('error', ''))[:100]})"
+                action_lines.append(line)
+            actions_summary = "\n".join(action_lines)
         else:
             actions_summary = "No immediate actions were executed."
         
@@ -1718,6 +2083,9 @@ Output ONLY the refined response (no explanations, no meta-commentary). If the r
                 success=True
             )
             
+            # Clean <think> tags and other artifacts from the response
+            response = _clean_llm_response(response)
+            
             return response
             
         except Exception as e:
@@ -1762,27 +2130,104 @@ Output ONLY the refined response (no explanations, no meta-commentary). If the r
         """
         Background optimization loop.
         Runs every 6 hours to analyze business units and propose evolutions.
+        Creates Task records in database to track work being done.
         """
-        logger.info("Starting autonomous loop")
+        from src.database.models import Task
+        from uuid import uuid4
         
-        while self.autonomous_mode:
+        logger.info("Starting autonomous loop")
+        self._ralph_loop_running = True
+        self._ralph_loop_start_time = datetime.now()
+        self._ralph_loop_iteration = 0
+        self._ralph_loop_actions = []
+        
+        while self.autonomous_mode and self._ralph_loop_running:
+            self._ralph_loop_iteration += 1
+            iteration_start = datetime.now()
+            
+            # Create a task record for this iteration
+            task_id = str(uuid4())
+            self._ralph_loop_task_id = task_id
+            
             try:
+                async with get_db_ctx() as db:
+                    task = Task(
+                        id=task_id,
+                        name=f"Ralph Loop Iteration {self._ralph_loop_iteration}",
+                        description=f"Autonomous optimization cycle started at {iteration_start.isoformat()}",
+                        type="autonomous_optimization",
+                        status="running",
+                        agent="master_ai",
+                        input_data={"iteration": self._ralph_loop_iteration}
+                    )
+                    db.add(task)
+                    await db.commit()
+                
+                self._ralph_loop_current_task = "Building context"
                 context = await self.context.build_context()
                 
                 # Step 1: Self-improvement analysis
-                await self._consider_evolution(context)
+                self._ralph_loop_current_task = "Considering evolution proposals"
+                evolution_result = await self._consider_evolution(context)
+                self._ralph_loop_actions.append({
+                    "step": "evolution_check",
+                    "result": str(evolution_result)[:200] if evolution_result else "No proposal",
+                    "timestamp": datetime.now().isoformat()
+                })
                 
                 # Step 2: Business unit health check
-                await self._check_business_health(context)
+                self._ralph_loop_current_task = "Checking business health"
+                health_result = await self._check_business_health(context)
+                self._ralph_loop_actions.append({
+                    "step": "health_check",
+                    "result": str(health_result)[:200] if health_result else "All healthy",
+                    "timestamp": datetime.now().isoformat()
+                })
                 
-                logger.info("Autonomous loop iteration complete")
+                # Update task as completed
+                async with get_db_ctx() as db:
+                    from sqlalchemy import update
+                    await db.execute(
+                        update(Task).where(Task.id == task_id).values(
+                            status="completed",
+                            completed_at=datetime.now(),
+                            output_data={
+                                "actions": self._ralph_loop_actions[-2:],
+                                "duration_seconds": (datetime.now() - iteration_start).total_seconds()
+                            }
+                        )
+                    )
+                    await db.commit()
+                
+                self._ralph_loop_current_task = "Idle - waiting for next cycle"
+                logger.info("Autonomous loop iteration complete", iteration=self._ralph_loop_iteration)
                 
             except Exception as e:
+                self._ralph_loop_current_task = f"Error: {str(e)[:50]}"
                 logger.error("Autonomous loop error", exc_info=True)
+                
+                # Mark task as failed
+                try:
+                    async with get_db_ctx() as db:
+                        from sqlalchemy import update
+                        await db.execute(
+                            update(Task).where(Task.id == task_id).values(
+                                status="failed",
+                                output_data={"error": str(e)}
+                            )
+                        )
+                        await db.commit()
+                except Exception:
+                    pass
             
             # Wait for the next optimization cycle (use configurable interval)
             interval_hours = getattr(settings, 'kpi_review_interval_hours', 6)
             await asyncio.sleep(interval_hours * 60 * 60)
+        
+        # Loop ended
+        self._ralph_loop_running = False
+        self._ralph_loop_current_task = None
+        self._ralph_loop_task_id = None
     
     async def _check_business_health(self, context: str):
         """

@@ -1,0 +1,169 @@
+version: '3.8'
+
+services:
+  # PostgreSQL for structured storage
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: agentic_framework
+      POSTGRES_USER: agent_user
+      POSTGRES_PASSWORD: agent_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agent_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for session storage and rate limiting
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Chroma for vector storage (development only)
+  chroma:
+    image: ghcr.io/chroma-core/chroma:latest
+    ports:
+      - "8001:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+
+  # MinIO for object storage (S3-compatible)
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # Orchestrator service
+  orchestrator:
+    build:
+      context: .
+      dockerfile: orchestrator/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - POSTGRES_URL=postgresql://agent_user:agent_pass@postgres:5432/agentic_framework
+      - REDIS_URL=redis://redis:6379/0
+      - MCP_GATEWAY_URL=http://mcp-gateway:8080
+      - MEMORY_SERVICE_URL=http://memory-service:8002
+      - SUBAGENT_MANAGER_URL=http://subagent-manager:8003
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mcp-gateway:
+        condition: service_started
+      memory-service:
+        condition: service_started
+      subagent-manager:
+        condition: service_started
+    volumes:
+      - ./orchestrator:/app/orchestrator
+      - ./docs:/app/docs
+
+  # Subagent Manager service
+  subagent-manager:
+    build:
+      context: .
+      dockerfile: subagent-manager/Dockerfile
+    ports:
+      - "8003:8003"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - REDIS_URL=redis://redis:6379/1
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./subagent-manager:/app/subagent-manager
+      - ./adapters:/app/adapters
+
+  # Memory Service
+  memory-service:
+    build:
+      context: .
+      dockerfile: memory-service/Dockerfile
+    ports:
+      - "8002:8002"
+    environment:
+      - POSTGRES_URL=postgresql://agent_user:agent_pass@postgres:5432/agentic_framework
+      - REDIS_URL=redis://redis:6379/2
+      - CHROMA_URL=http://chroma:8000
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      chroma:
+        condition: service_started
+      minio:
+        condition: service_healthy
+    volumes:
+      - ./memory-service:/app/memory-service
+
+  # MCP Gateway
+  mcp-gateway:
+    build:
+      context: .
+      dockerfile: mcp-gateway/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - REDIS_URL=redis://redis:6379/3
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-dev-secret-key-change-in-production}
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./mcp-gateway:/app/mcp-gateway
+
+  # Skill Executor
+  skill-executor:
+    build:
+      context: .
+      dockerfile: code-exec/Dockerfile
+    ports:
+      - "8004:8004"
+    environment:
+      - REDIS_URL=redis://redis:6379/4
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./code-exec:/app/code-exec
+
+volumes:
+  postgres_data:
+  redis_data:
+  chroma_data:
+  minio_data:

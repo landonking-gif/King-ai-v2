@@ -63,12 +63,12 @@ def check_response(response: str, test_case: dict) -> tuple[bool, str]:
     
     return True, "PASS"
 
-async def test_ollama_direct():
-    """Test Ollama directly first."""
+async def test_vllm_direct():
+    """Test vLLM directly first."""
     import httpx
-    
-    print("Testing direct Ollama connection...")
-    
+
+    print("Testing direct vLLM connection...")
+
     system_prompt = """You are King AI, an AI assistant. You have STRICT limitations:
 
 CRITICAL RULES:
@@ -87,34 +87,36 @@ NEVER make up or fabricate information. If you don't know something, say so."""
         async with httpx.AsyncClient(timeout=120.0) as client:
             for test in TEST_CASES:
                 print(f"\nTesting: {test['name']}")
-                
+
                 response = await client.post(
-                    "http://localhost:11434/api/generate",
+                    "http://localhost:8005/v1/chat/completions",
                     json={
-                        "model": "llama3.2:1b",
-                        "prompt": test["prompt"],
-                        "system": system_prompt,
-                        "stream": False,
-                        "options": {"temperature": 0.1}
+                        "model": "moonshotai/Kimi-K2-Thinking",
+                        "messages": [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": test["prompt"]}
+                        ],
+                        "temperature": 0.1,
+                        "max_tokens": 200
                     }
                 )
-                
+
                 if response.status_code != 200:
                     print(f"  ERROR: HTTP {response.status_code}")
                     continue
-                
-                result = response.json()["response"]
+
+                result = response.json()["choices"][0]["message"]["content"]
                 passed, msg = check_response(result, test)
-                
+
                 status = "✅" if passed else "❌"
                 print(f"  {status} {msg}")
                 if not passed:
                     print(f"  Response: {result[:200]}...")
-                    
+
     except Exception as e:
         print(f"Error: {e}")
         return False
-    
+
     return True
 
 async def test_conversation_context():
@@ -189,8 +191,8 @@ async def main():
     print("King AI Integration Test")
     print("="*50)
     
-    # Test direct Ollama
-    await test_ollama_direct()
+    # Test direct vLLM
+    await test_vllm_direct()
     
     # Test conversation context
     await test_conversation_context()
