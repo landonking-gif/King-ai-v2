@@ -1,0 +1,157 @@
+version: '3.8'
+
+services:
+  # Frontend
+  control-panel-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - control-panel-backend
+    environment:
+      - VITE_API_URL=http://control-panel-backend:8100
+      - VITE_WS_URL=ws://control-panel-backend:8100
+    networks:
+      - king-ai-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend
+  control-panel-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    ports:
+      - "8100:8100"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://user:password@postgres/control_panel
+      - REDIS_URL=redis://redis:6379
+      - OLLAMA_URL=http://host.docker.internal:11434
+      - SECRET_KEY=your-secret-key-change-in-production
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - king-ai-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8100/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: control_panel
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - king-ai-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d control_panel"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache/PubSub
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - king-ai-network
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - control-panel-backend
+      - control-panel-frontend
+    networks:
+      - king-ai-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Microservices (stubs for local development)
+  orchestrator:
+    image: python:3.10-slim
+    ports:
+      - "8000:8000"
+    command: python -m http.server 8000
+    networks:
+      - king-ai-network
+    working_dir: /app
+
+  subagent-manager:
+    image: python:3.10-slim
+    ports:
+      - "8001:8001"
+    command: python -m http.server 8001
+    networks:
+      - king-ai-network
+    working_dir: /app
+
+  memory-service:
+    image: python:3.10-slim
+    ports:
+      - "8002:8002"
+    command: python -m http.server 8002
+    depends_on:
+      - redis
+    networks:
+      - king-ai-network
+    working_dir: /app
+
+  mcp-gateway:
+    image: python:3.10-slim
+    ports:
+      - "8080:8080"
+    command: python -m http.server 8080
+    networks:
+      - king-ai-network
+    working_dir: /app
+
+  code-executor:
+    image: python:3.10-slim
+    ports:
+      - "8004:8004"
+    command: python -m http.server 8004
+    networks:
+      - king-ai-network
+    working_dir: /app
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  king-ai-network:
+    driver: bridge

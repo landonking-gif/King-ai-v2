@@ -1,0 +1,12 @@
+name: compact_memory
+version: 1.0.0
+description: Compact artifacts and conversation history for token reduction while preserving key information
+safety_flags:
+  - none
+requires_approval: false
+handler: handler.compact_memory
+tags:
+  - memory
+  - compaction
+  - summarization
+  - token-reduction

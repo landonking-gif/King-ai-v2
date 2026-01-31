@@ -1,0 +1,90 @@
+name: ralph_code_agent
+version: "1.0.0"
+description: "Delegates code implementation tasks to the Ralph autonomous coding agent loop"
+author: "King AI v3 Team"
+category: "code_generation"
+
+safety:
+  pii_risk: false
+  file_system: true
+  network_access: true
+  side_effect: true
+
+parameters:
+  - name: prd
+    type: object
+    description: "Product Requirements Document with task details"
+    required: true
+    schema:
+      type: object
+      properties:
+        title:
+          type: string
+          description: "Title of the coding task"
+        description:
+          type: string
+          description: "Detailed description of what needs to be implemented"
+        requirements:
+          type: array
+          items:
+            type: string
+          description: "List of specific requirements"
+        files_to_modify:
+          type: array
+          items:
+            type: string
+          description: "List of files that need to be created or modified"
+        acceptance_criteria:
+          type: array
+          items:
+            type: string
+          description: "Criteria for task completion"
+        context:
+          type: string
+          description: "Additional context about the codebase"
+      required:
+        - title
+        - description
+        - requirements
+  
+  - name: target_server
+    type: string
+    description: "Target server for code deployment (e.g., AWS IP or 'local')"
+    required: false
+    default: "3.236.144.91"
+  
+  - name: approve_before_execution
+    type: boolean
+    description: "Require human approval before Ralph executes"
+    required: false
+    default: true
+
+returns:
+  type: object
+  description: "Result of the Ralph coding agent execution"
+  schema:
+    type: object
+    properties:
+      status:
+        type: string
+        enum: ["success", "failed", "pending_approval", "timeout"]
+      files_changed:
+        type: array
+        items:
+          type: string
+        description: "List of files created or modified"
+      summary:
+        type: string
+        description: "Summary of changes made"
+      ralph_output:
+        type: string
+        description: "Full output from Ralph agent"
+      execution_time:
+        type: number
+        description: "Time taken in seconds"
+      approval_required:
+        type: boolean
+        description: "Whether human approval is needed"
+    required:
+      - status
+      - summary

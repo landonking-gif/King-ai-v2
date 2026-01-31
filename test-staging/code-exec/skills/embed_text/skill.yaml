@@ -1,0 +1,12 @@
+name: embed_text
+version: 1.0.0
+description: Generate embeddings for text using sentence-transformers
+safety_flags:
+  - none
+requires_approval: false
+handler: handler.embed_text
+tags:
+  - text-processing
+  - embeddings
+  - vector
+  - ml

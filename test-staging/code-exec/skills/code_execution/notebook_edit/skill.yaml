@@ -1,0 +1,13 @@
+name: notebook_edit
+version: 1.0.0
+description: Edit Jupyter notebook cells - replace, insert, or delete cells
+safety_flags:
+  - file_system
+  - side_effect
+requires_approval: true
+handler: handler.edit_notebook
+tags:
+  - execution
+  - jupyter
+  - notebook
+  - prepackaged

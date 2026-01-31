@@ -1,0 +1,12 @@
+name: file_glob
+version: 1.0.0
+description: Find files matching glob patterns (e.g., **/*.py, src/**/*.ts)
+safety_flags:
+  - file_system
+requires_approval: false
+handler: handler.glob_files
+tags:
+  - file-operations
+  - search
+  - glob
+  - prepackaged

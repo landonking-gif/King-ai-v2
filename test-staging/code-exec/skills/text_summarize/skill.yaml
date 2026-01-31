@@ -1,0 +1,11 @@
+name: text_summarize
+version: 1.0.0
+description: Summarize text by extracting key points and reducing token count
+safety_flags:
+  - none
+requires_approval: false
+handler: handler.summarize
+tags:
+  - text-processing
+  - nlp
+  - summarization

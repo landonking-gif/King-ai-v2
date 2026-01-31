@@ -72,6 +72,7 @@ class AzureOpenAIAdapter(LLMAdapter):
             base_url=self.endpoint,
             headers=headers,
             timeout=kwargs.get("default_timeout", 60.0),
+            verify=False,
         )
 
     def _convert_messages(self, messages: List[LLMMessage]) -> List[Dict[str, Any]]:

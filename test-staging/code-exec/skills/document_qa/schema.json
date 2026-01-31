@@ -1,0 +1,148 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "input": {
+    "type": "object",
+    "properties": {
+      "documents": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "List of file paths to process (PDF, DOCX, XLSX, PPTX, HTML, CSV)",
+        "minItems": 1
+      },
+      "query": {
+        "type": "string",
+        "description": "Question to answer from documents",
+        "minLength": 3,
+        "maxLength": 2000
+      },
+      "include_sources": {
+        "type": "boolean",
+        "description": "Include source citations in response",
+        "default": true
+      },
+      "max_context_tokens": {
+        "type": "integer",
+        "description": "Maximum tokens for context window",
+        "default": 6000,
+        "minimum": 1000,
+        "maximum": 32000
+      },
+      "rerank_top_k": {
+        "type": "integer",
+        "description": "Number of chunks after LLM reranking",
+        "default": 5,
+        "minimum": 1,
+        "maximum": 20
+      },
+      "process_images": {
+        "type": "boolean",
+        "description": "Process images with Vision LLM",
+        "default": true
+      },
+      "chunk_size": {
+        "type": "integer",
+        "description": "Target chunk size in tokens",
+        "default": 512,
+        "minimum": 128,
+        "maximum": 2048
+      }
+    },
+    "required": ["documents", "query"],
+    "additionalProperties": false
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "success": {
+        "type": "boolean",
+        "description": "Whether the Q&A completed successfully"
+      },
+      "answer": {
+        "type": "string",
+        "description": "Generated answer with [src_XXX] citations"
+      },
+      "sources": {
+        "type": "array",
+        "description": "Source reference details",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "Source ID (e.g., src_001)"
+            },
+            "file": {
+              "type": "string",
+              "description": "Source file name"
+            },
+            "page": {
+              "type": "integer",
+              "description": "Page number (for PDF, Word)"
+            },
+            "slide": {
+              "type": "integer",
+              "description": "Slide number (for PowerPoint)"
+            },
+            "sheet": {
+              "type": "string",
+              "description": "Sheet name (for Excel)"
+            },
+            "section": {
+              "type": "string",
+              "description": "Section or heading name"
+            },
+            "position": {
+              "type": "string",
+              "description": "Position in context (primary, secondary, supporting)"
+            },
+            "rerank_score": {
+              "type": "number",
+              "description": "Relevance score from LLM reranking (0-10)"
+            }
+          },
+          "required": ["id", "file"]
+        }
+      },
+      "chunks_retrieved": {
+        "type": "integer",
+        "description": "Number of relevant chunks used"
+      },
+      "confidence": {
+        "type": "number",
+        "description": "Answer confidence score (0-1)",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "metadata": {
+        "type": "object",
+        "description": "Execution metadata",
+        "properties": {
+          "documents_processed": {
+            "type": "integer",
+            "description": "Number of documents processed"
+          },
+          "chunks_created": {
+            "type": "integer",
+            "description": "Total chunks created from documents"
+          },
+          "images_processed": {
+            "type": "integer",
+            "description": "Number of images processed with Vision LLM"
+          },
+          "execution_time_seconds": {
+            "type": "number",
+            "description": "Total execution time in seconds"
+          }
+        }
+      },
+      "error": {
+        "type": "string",
+        "description": "Error message if success is false"
+      }
+    },
+    "required": ["success", "answer", "sources", "chunks_retrieved", "confidence"],
+    "additionalProperties": false
+  }
+}

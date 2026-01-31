@@ -1,0 +1,13 @@
+name: file_edit
+version: 1.0.0
+description: Edit a file by performing exact string replacement (surgical edit)
+safety_flags:
+  - file_system
+  - side_effect
+requires_approval: true
+handler: handler.edit_file
+tags:
+  - file-operations
+  - edit
+  - filesystem
+  - prepackaged
