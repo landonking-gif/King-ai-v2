@@ -1,0 +1,57 @@
+{
+  "input": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "file_path": {
+        "type": "string",
+        "description": "Absolute path to the file to edit",
+        "minLength": 1
+      },
+      "old_string": {
+        "type": "string",
+        "description": "Text to find and replace (must be unique in file)",
+        "minLength": 1
+      },
+      "new_string": {
+        "type": "string",
+        "description": "Replacement text"
+      },
+      "replace_all": {
+        "type": "boolean",
+        "description": "Replace all occurrences (not just first)",
+        "default": false
+      }
+    },
+    "required": ["file_path", "old_string", "new_string"],
+    "additionalProperties": false
+  },
+  "output": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "success": {
+        "type": "boolean",
+        "description": "Whether the edit succeeded"
+      },
+      "file_path": {
+        "type": "string",
+        "description": "Path to the edited file"
+      },
+      "replacements_made": {
+        "type": "integer",
+        "description": "Number of replacements made"
+      },
+      "diff_preview": {
+        "type": "string",
+        "description": "Preview of changes made"
+      },
+      "error": {
+        "type": "string",
+        "description": "Error message if failed"
+      }
+    },
+    "required": ["success", "file_path"],
+    "additionalProperties": false
+  }
+}

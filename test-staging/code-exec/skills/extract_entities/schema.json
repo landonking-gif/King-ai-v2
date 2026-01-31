@@ -1,0 +1,84 @@
+{
+  "input": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "text": {
+        "type": "string",
+        "description": "Text to extract entities from",
+        "minLength": 1,
+        "maxLength": 100000
+      },
+      "entity_types": {
+        "type": "array",
+        "description": "Types of entities to extract (if empty, extract all)",
+        "items": {
+          "type": "string",
+          "enum": ["PERSON", "ORGANIZATION", "LOCATION", "DATE", "MONEY", "EMAIL", "PHONE", "URL"]
+        },
+        "uniqueItems": true,
+        "default": []
+      },
+      "min_confidence": {
+        "type": "number",
+        "description": "Minimum confidence threshold (0.0-1.0)",
+        "minimum": 0.0,
+        "maximum": 1.0,
+        "default": 0.5
+      }
+    },
+    "required": ["text"],
+    "additionalProperties": false
+  },
+  "output": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "entities": {
+        "type": "array",
+        "description": "Extracted entities",
+        "items": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string",
+              "description": "Entity text"
+            },
+            "type": {
+              "type": "string",
+              "description": "Entity type"
+            },
+            "confidence": {
+              "type": "number",
+              "description": "Confidence score (0.0-1.0)",
+              "minimum": 0.0,
+              "maximum": 1.0
+            },
+            "start_pos": {
+              "type": "integer",
+              "description": "Start position in text"
+            },
+            "end_pos": {
+              "type": "integer",
+              "description": "End position in text"
+            }
+          },
+          "required": ["text", "type", "confidence", "start_pos", "end_pos"]
+        }
+      },
+      "total_entities": {
+        "type": "integer",
+        "description": "Total number of entities extracted"
+      },
+      "entity_counts": {
+        "type": "object",
+        "description": "Count of entities by type",
+        "additionalProperties": {
+          "type": "integer"
+        }
+      }
+    },
+    "required": ["entities", "total_entities", "entity_counts"],
+    "additionalProperties": false
+  }
+}

@@ -1,0 +1,87 @@
+{
+  "input": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "pattern": {
+        "type": "string",
+        "description": "Regex pattern to search for",
+        "minLength": 1
+      },
+      "path": {
+        "type": "string",
+        "description": "File or directory to search in"
+      },
+      "glob": {
+        "type": "string",
+        "description": "Filter files by glob pattern (e.g., *.py, *.ts)"
+      },
+      "case_insensitive": {
+        "type": "boolean",
+        "description": "Case insensitive search",
+        "default": false
+      },
+      "context_lines": {
+        "type": "integer",
+        "description": "Number of context lines before/after match",
+        "minimum": 0,
+        "maximum": 10,
+        "default": 0
+      },
+      "max_results": {
+        "type": "integer",
+        "description": "Maximum number of matches to return",
+        "minimum": 1,
+        "maximum": 500,
+        "default": 100
+      },
+      "output_mode": {
+        "type": "string",
+        "enum": ["content", "files_with_matches", "count"],
+        "description": "Output mode: content shows lines, files_with_matches shows paths, count shows counts",
+        "default": "files_with_matches"
+      }
+    },
+    "required": ["pattern"],
+    "additionalProperties": false
+  },
+  "output": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "matches": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "file": {"type": "string"},
+            "line_number": {"type": "integer"},
+            "content": {"type": "string"},
+            "context_before": {"type": "array", "items": {"type": "string"}},
+            "context_after": {"type": "array", "items": {"type": "string"}}
+          }
+        },
+        "description": "List of matches"
+      },
+      "files_with_matches": {
+        "type": "array",
+        "items": {"type": "string"},
+        "description": "Files containing matches"
+      },
+      "total_matches": {
+        "type": "integer",
+        "description": "Total number of matches"
+      },
+      "files_searched": {
+        "type": "integer",
+        "description": "Number of files searched"
+      },
+      "truncated": {
+        "type": "boolean",
+        "description": "Whether results were truncated"
+      }
+    },
+    "required": ["total_matches", "files_searched", "truncated"],
+    "additionalProperties": false
+  }
+}

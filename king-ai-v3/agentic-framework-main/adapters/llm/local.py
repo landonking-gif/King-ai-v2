@@ -59,6 +59,7 @@ class LocalLLMAdapter(LLMAdapter):
             base_url=self.endpoint,
             headers=headers,
             timeout=kwargs.get("default_timeout", 120.0),  # Longer timeout for local inference
+            verify=False,
         )
 
     def _convert_messages(self, messages: List[LLMMessage]) -> List[Dict[str, Any]]:

@@ -56,6 +56,7 @@ class GeminiAdapter(LLMAdapter):
             base_url=self.API_BASE_URL,
             headers=headers,
             timeout=kwargs.get("default_timeout", 60.0),
+            verify=False,
         )
 
     def _convert_messages(self, messages: List[LLMMessage]) -> tuple[Optional[str], List[Dict[str, Any]]]:

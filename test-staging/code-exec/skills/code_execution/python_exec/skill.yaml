@@ -1,0 +1,138 @@
+name: python_exec
+version: 1.0.0
+description: |
+  Execute Python code in an isolated environment with timeout protection.
+  Use for generating binary files (Word, Excel, PDF), data transformations,
+  complex calculations, mathematical operations, and any task requiring
+  programmatic logic. Essential for intermediate computation steps in
+  research workflows and multi-step query resolution.
+
+safety_flags:
+  - side_effect
+  - external_call
+requires_approval: true
+handler: handler.execute_python
+
+# Anthropic marketplace compatibility
+anthropic_compatible: true
+
+tags:
+  - execution
+  - python
+  - code
+  - generate
+  - transform
+  - calculate
+  - compute
+  - math
+  - research
+  - prepackaged
+
+# Tier 1: Lightweight metadata for fast pre-filtering
+tier1:
+  short_description: Execute Python code for calculations, file generation, and data processing
+  category: code_execution
+  priority: 2
+  file_types:
+    - .docx
+    - .xlsx
+    - .pptx
+    - .pdf
+    - .csv
+    - .json
+    - .xml
+    - .html
+    - .png
+    - .jpg
+    - .svg
+    - .txt
+  intents:
+    - generate
+    - create
+    - convert
+    - transform
+    - calculate
+    - compute
+    - process
+    - build
+    - render
+    - export
+    - format
+    - analyze
+    - aggregate
+    - sum
+    - average
+    - compare
+    - chart
+    - plot
+    - visualize
+    - statistics
+    - summarize
+    - merge
+    - combine
+    - total
+    - count
+    - ratio
+    - percentage
+    - growth
+
+# Tier 2: Rich metadata for LLM decision-making
+when_to_use: |
+  USE THIS SKILL WHEN:
+
+  ## Document Generation
+  - Creating Word documents (.docx) with python-docx
+  - Creating Excel files (.xlsx) with openpyxl or pandas
+  - Creating PowerPoint presentations (.pptx) with python-pptx
+  - Generating PDF files with reportlab or fpdf
+  - Converting between file formats
+
+  ## Calculations & Data Processing
+  - Performing mathematical calculations (percentages, averages, sums)
+  - Computing financial metrics (ratios, growth rates, CAGR)
+  - Aggregating data from multiple sources
+  - Statistical analysis (mean, median, std deviation)
+  - Date/time calculations and formatting
+
+  ## Deep Research Steps
+  - Intermediate calculations during multi-step research queries
+  - Processing extracted data before synthesis
+  - Validating numerical data from documents
+  - Computing comparisons between entities (e.g., ESG scores)
+  - Generating summary statistics from research findings
+
+  ## Data Transformation
+  - Transforming JSON/CSV data into structured reports
+  - Parsing and reformatting extracted content
+  - Merging data from multiple document extractions
+  - Sorting and filtering large datasets
+
+  ## Visualization
+  - Building charts and graphs with matplotlib/plotly
+  - Creating data visualizations for reports
+  - Generating infographics from data
+
+when_not_to_use: |
+  DO NOT USE THIS SKILL WHEN:
+  - Simply writing plain text or markdown files (use file_write instead)
+  - Reading files (use file_read instead)
+  - Searching files (use file_grep or file_glob instead)
+  - Running shell commands (use bash_exec instead)
+  - The task can be done with simpler tools
+  - Just displaying text output (respond directly instead)
+  - Simple string manipulation that doesn't need Python
+
+examples:
+  - "Create a Word document with formatted tables"
+  - "Generate an Excel report with charts"
+  - "Convert CSV data to formatted Excel"
+  - "Build a PowerPoint presentation"
+  - "Create a PDF report with styling"
+  - "Transform JSON data into a Word document"
+  - "Generate a chart image from data"
+  - "Calculate the average ESG scores from the extracted data"
+  - "Compute year-over-year growth rates"
+  - "Create a comparison table of financial metrics"
+  - "Aggregate research findings into summary statistics"
+  - "Calculate percentage changes between companies"
+  - "Generate a bar chart comparing competitor metrics"

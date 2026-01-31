@@ -1,0 +1,58 @@
+{
+  "input": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "text": {
+        "type": "string",
+        "description": "Text to generate embeddings for",
+        "minLength": 1,
+        "maxLength": 10000
+      },
+      "model": {
+        "type": "string",
+        "description": "Embedding model to use",
+        "enum": ["all-MiniLM-L6-v2", "all-mpnet-base-v2", "paraphrase-MiniLM-L6-v2"],
+        "default": "all-MiniLM-L6-v2"
+      },
+      "normalize": {
+        "type": "boolean",
+        "description": "Whether to normalize embeddings to unit length",
+        "default": true
+      }
+    },
+    "required": ["text"],
+    "additionalProperties": false
+  },
+  "output": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "embedding": {
+        "type": "array",
+        "description": "Embedding vector",
+        "items": {
+          "type": "number"
+        }
+      },
+      "dimension": {
+        "type": "integer",
+        "description": "Embedding dimension"
+      },
+      "model_used": {
+        "type": "string",
+        "description": "Model used for embedding"
+      },
+      "text_length": {
+        "type": "integer",
+        "description": "Input text length in characters"
+      },
+      "normalized": {
+        "type": "boolean",
+        "description": "Whether embedding is normalized"
+      }
+    },
+    "required": ["embedding", "dimension", "model_used", "text_length", "normalized"],
+    "additionalProperties": false
+  }
+}

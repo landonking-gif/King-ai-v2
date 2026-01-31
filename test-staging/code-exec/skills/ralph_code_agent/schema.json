@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "RalphCodeAgentInput",
+  "type": "object",
+  "properties": {
+    "prd": {
+      "type": "object",
+      "description": "Product Requirements Document",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Title of the coding task"
+        },
+        "description": {
+          "type": "string",
+          "description": "Detailed description of implementation"
+        },
+        "requirements": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Specific requirements list"
+        },
+        "files_to_modify": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Files to create or modify"
+        },
+        "acceptance_criteria": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Success criteria"
+        },
+        "context": {
+          "type": "string",
+          "description": "Additional context"
+        }
+      },
+      "required": ["title", "description", "requirements"]
+    },
+    "target_server": {
+      "type": "string",
+      "description": "Target deployment server",
+      "default": "3.236.144.91"
+    },
+    "approve_before_execution": {
+      "type": "boolean",
+      "description": "Require approval before execution",
+      "default": true
+    }
+  },
+  "required": ["prd"]
+}

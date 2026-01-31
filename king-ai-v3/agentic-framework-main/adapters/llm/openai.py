@@ -64,6 +64,7 @@ class OpenAIAdapter(LLMAdapter):
             base_url=self.API_BASE_URL,
             headers=headers,
             timeout=kwargs.get("default_timeout", 60.0),
+            verify=False,
         )
 
     def _uses_completion_tokens(self) -> bool:
