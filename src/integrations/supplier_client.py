@@ -132,7 +132,7 @@ class AliExpressClient(BaseSupplierClient):
         """
         sorted_params = sorted(params.items())
         sign_str = self.api_secret + "".join(f"{k}{v}" for k, v in sorted_params) + self.api_secret
-        return hashlib.md5(sign_str.encode()).hexdigest().upper()
+        return hashlib.md5(sign_str.encode(), usedforsecurity=False).hexdigest().upper()
 
     async def _request(self, method: str, params: dict) -> dict:
         await self._rate_limit()

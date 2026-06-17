@@ -150,8 +150,8 @@ class SandboxEnvironment:
             if settings.docker_sandbox_enabled:
                 # Create Dockerfile
                 await self._create_dockerfile()
-                
-                # Build container (if Docker unavailable, fall back to local execution)
+
+                # Build container
                 success = await self._build_container()
 
                 if success:
@@ -160,16 +160,39 @@ class SandboxEnvironment:
                     logger.info(f"Sandbox ready with Docker: {self.sandbox_id}")
                     return True
 
-                # Docker build failed: run locally inside the sandbox directory.
+                # Docker build failed in strict mode — refuse to run uncontained code
+                if settings.docker_sandbox_strict:
+                    self.status = SandboxStatus.FAILED
+                    logger.error(
+                        f"Sandbox setup FAILED: Docker unavailable and strict mode is on. "
+                        f"Refusing to execute code without container isolation: {self.sandbox_id}"
+                    )
+                    return False
+
+                # Non-strict mode: fall back to local execution with explicit warning
                 self._use_docker = False
                 self.status = SandboxStatus.READY
-                logger.warning(f"Docker unavailable; using local sandbox execution: {self.sandbox_id}")
+                logger.warning(
+                    f"Docker unavailable and strict mode off; using local sandbox execution. "
+                    f"THIS IS INSECURE — enable Docker for production: {self.sandbox_id}"
+                )
                 return True
+            elif settings.docker_sandbox_strict:
+                # Docker disabled AND strict mode on — refuse
+                self.status = SandboxStatus.FAILED
+                logger.error(
+                    f"Sandbox setup FAILED: Docker disabled and strict mode is on. "
+                    f"Cannot execute code without container isolation: {self.sandbox_id}"
+                )
+                return False
             else:
-                # Docker disabled: use local execution directly
+                # Docker disabled, strict mode off: proceed with explicit warning
                 self._use_docker = False
                 self.status = SandboxStatus.READY
-                logger.info(f"Sandbox ready with local execution (Docker disabled): {self.sandbox_id}")
+                logger.warning(
+                    f"Sandbox ready with INSECURE local execution (Docker disabled). "
+                    f"Enable Docker for production use: {self.sandbox_id}"
+                )
                 return True
             
         except Exception as e:

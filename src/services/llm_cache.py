@@ -130,7 +130,7 @@ class CacheKeyGenerator:
     @staticmethod
     def prompt_hash(prompt: str) -> str:
         """Generate prompt-only hash for similarity lookup."""
-        return hashlib.md5(prompt.encode()).hexdigest()
+        return hashlib.md5(prompt.encode(), usedforsecurity=False).hexdigest()
 
 
 class LRUEvictionPolicy:

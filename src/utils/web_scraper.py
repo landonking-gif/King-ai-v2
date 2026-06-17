@@ -141,7 +141,7 @@ class WebScraper:
     
     def _get_cache_key(self, url: str) -> str:
         """Generate cache key for URL."""
-        return hashlib.md5(url.encode()).hexdigest()
+        return hashlib.md5(url.encode(), usedforsecurity=False).hexdigest()
     
     def _check_cache(self, url: str) -> Optional[ScrapedPage]:
         """Check if URL is in cache and not expired."""

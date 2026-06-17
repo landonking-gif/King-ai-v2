@@ -426,7 +426,7 @@ class FeatureFlagService:
         
         # Consistent hashing for stable assignment
         hash_input = f"{flag_key}:{user_id}"
-        hash_value = int(hashlib.md5(hash_input.encode()).hexdigest(), 16)
+        hash_value = int(hashlib.md5(hash_input.encode(), usedforsecurity=False).hexdigest(), 16)
         bucket = hash_value % 100
         
         return bucket < percentage
@@ -450,7 +450,7 @@ class FeatureFlagService:
         
         # Consistent hashing
         hash_input = f"{flag.key}:variant:{user_id}"
-        hash_value = int(hashlib.md5(hash_input.encode()).hexdigest(), 16)
+        hash_value = int(hashlib.md5(hash_input.encode(), usedforsecurity=False).hexdigest(), 16)
         bucket = (hash_value % 10000) / 100  # 0-100 with 2 decimal precision
         
         # Select variant
@@ -595,7 +595,7 @@ class FeatureFlagService:
     def _cache_key(self, key: str, context: Dict[str, Any]) -> str:
         """Generate cache key."""
         context_str = json.dumps(context, sort_keys=True, default=str)
-        return f"{key}:{hashlib.md5(context_str.encode()).hexdigest()}"
+        return f"{key}:{hashlib.md5(context_str.encode(), usedforsecurity=False).hexdigest()}"
     
     def _invalidate_cache(self, key: str) -> None:
         """Invalidate cache for a flag."""

@@ -520,7 +520,7 @@ KEY FINDINGS:
         """Store research in vector store for future reference."""
         try:
             # Use deterministic hash for consistent IDs
-            query_hash = hashlib.md5(report.query.encode()).hexdigest()
+            query_hash = hashlib.md5(report.query.encode(), usedforsecurity=False).hexdigest()
             research_id = f"research_{query_hash}_{int(datetime.now().timestamp())}"
             
             await self.vector_store.upsert(

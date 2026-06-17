@@ -8,8 +8,8 @@ services:
     ports:
       - "8100:8100"
     environment:
-      - SECRET_KEY=your-secret-key-here
-      - DATABASE_URL=postgresql+asyncpg://control_user:password@control-postgres:5432/control_panel
+      - SECRET_KEY=${CONTROL_PANEL_SECRET_KEY:-change-me-in-production}
+      - DATABASE_URL=postgresql+asyncpg://${CONTROL_POSTGRES_USER:-control_user}:${CONTROL_POSTGRES_PASSWORD:-password}@control-postgres:5432/control_panel
       - REDIS_URL=redis://control-redis:6379
     depends_on:
       - control-postgres
@@ -35,13 +35,11 @@ services:
   control-postgres:
     image: postgres:16
     environment:
-      - POSTGRES_USER=control_user
-      - POSTGRES_PASSWORD=password
+      - POSTGRES_USER=${CONTROL_POSTGRES_USER:-control_user}
+      - POSTGRES_PASSWORD=${CONTROL_POSTGRES_PASSWORD:-password}
       - POSTGRES_DB=control_panel
     volumes:
       - control_pgdata:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
     networks:
       - control-panel-network
 

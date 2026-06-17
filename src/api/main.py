@@ -12,7 +12,7 @@ from src.api.routes import (
     agentic
 )
 from src.api.routes import scheduler as scheduler_routes
-from src.api.middleware import RateLimitMiddleware, RateLimitConfig
+from src.api.middleware import RateLimitMiddleware, RateLimitConfig, AuthMiddleware
 from src.master_ai.brain import MasterAI
 from src.database.connection import init_db
 from src.services.scheduler import scheduler, TaskFrequency
@@ -205,14 +205,17 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS
+# CORS — explicit origins only; wildcard + credentials is a security violation
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Authentication — JWT Bearer tokens + X-API-Key
+app.add_middleware(AuthMiddleware)
 
 # Rate Limiting
 if settings.enable_rate_limiting:

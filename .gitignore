@@ -74,3 +74,11 @@ Thumbs.db
 *.zip
 *.rar
 *.7z
+
+# Secrets — NEVER commit keys, certificates, or credentials
+private.key
+request.csr
+*.pem
+*.p12
+*.pfx
+*.jks

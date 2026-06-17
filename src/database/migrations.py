@@ -51,7 +51,7 @@ class Migration:
     def __post_init__(self):
         if not self.checksum:
             content = (self.up_sql or "") + (self.down_sql or "")
-            self.checksum = hashlib.md5(content.encode()).hexdigest()[:12]
+            self.checksum = hashlib.md5(content.encode(), usedforsecurity=False).hexdigest()[:12]
 
 
 @dataclass
@@ -264,17 +264,17 @@ class MigrationRunner:
             # Table might not exist yet
             pass
     
-    async def _execute_sql(self, sql: str) -> None:
-        """Execute SQL statement."""
+    async def _execute_sql(self, sql: str, *args) -> None:
+        """Execute SQL statement with optional parameterized arguments."""
         if self._connection:
-            await self._connection.execute(sql)
+            await self._connection.execute(sql, *args)
         else:
-            logger.debug(f"Would execute: {sql[:100]}...")
-    
-    async def _query(self, sql: str) -> List[Dict]:
-        """Execute query and return rows."""
+            logger.debug(f"Would execute: {sql[:100]}... args={args}")
+
+    async def _query(self, sql: str, *args) -> List[Dict]:
+        """Execute query and return rows with optional parameterized arguments."""
         if self._connection:
-            return await self._connection.fetch(sql)
+            return await self._connection.fetch(sql, *args)
         return []
     
     def get_pending(self) -> List[Migration]:
@@ -489,32 +489,32 @@ class MigrationRunner:
         )
         
         self._records[migration.id] = record
-        
+
+        error_val = 'NULL' if not error else f"'{error}'"
         insert_sql = f"""
         INSERT INTO {self.MIGRATIONS_TABLE}
         (migration_id, version, name, status, checksum, execution_time_ms, error_message, batch)
-        VALUES ('{migration.id}', '{migration.version}', '{migration.name}', 
-                '{status.value}', '{migration.checksum}', {duration}, 
-                {'NULL' if not error else f"'{error}'"}, {self._current_batch})
+        VALUES ($1, $2, $3, $4, $5, $6, {error_val}, $7)
         ON CONFLICT (migration_id) DO UPDATE
         SET status = EXCLUDED.status,
             execution_time_ms = EXCLUDED.execution_time_ms,
             error_message = EXCLUDED.error_message,
             executed_at = CURRENT_TIMESTAMP;
         """
-        
-        await self._execute_sql(insert_sql)
-    
+
+        await self._execute_sql(insert_sql, migration.id, migration.version, migration.name,
+                                 status.value, migration.checksum, duration, self._current_batch)
+
     async def _remove_record(self, migration_id: str) -> None:
         """Remove migration record after rollback."""
         self._records.pop(migration_id, None)
-        
+
         delete_sql = f"""
         DELETE FROM {self.MIGRATIONS_TABLE}
-        WHERE migration_id = '{migration_id}';
+        WHERE migration_id = $1;
         """
-        
-        await self._execute_sql(delete_sql)
+
+        await self._execute_sql(delete_sql, migration_id)
     
     def status(self) -> Dict[str, Any]:
         """Get migration status summary."""

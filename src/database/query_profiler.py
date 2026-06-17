@@ -173,7 +173,7 @@ class QueryNormalizer:
     def hash_query(query: str) -> str:
         """Create a hash of a normalized query."""
         normalized = QueryNormalizer.normalize(query)
-        return hashlib.md5(normalized.encode()).hexdigest()[:12]
+        return hashlib.md5(normalized.encode(), usedforsecurity=False).hexdigest()[:12]
     
     @staticmethod
     def detect_type(query: str) -> QueryType:

@@ -60,6 +60,9 @@ class EvolutionEngine:
         self._daily_proposal_count = 0
         self._last_proposal_date = None
         self._max_daily_proposals = getattr(settings, 'evolution_daily_limit', 100)  # Default 100/day
+
+        # Execution guard — file writes require an approved proposal execution context
+        self._execution_approved = False
     
     async def propose_improvement(
         self,
@@ -447,9 +450,12 @@ class EvolutionEngine:
             raise ValueError("Proposal is not ready for execution")
         
         logger.info("Executing proposal", proposal_id=proposal.id)
-        
+
         proposal.status = ProposalStatus.EXECUTING
-        
+
+        # Enable file writes only within approved execution context
+        self._execution_approved = True
+
         # Create rollback data
         rollback_data = await self._create_rollback_data(proposal)
         proposal.rollback_data = rollback_data
@@ -494,6 +500,9 @@ class EvolutionEngine:
         
         # Persist results
         await self._update_proposal(proposal)
+
+        # Revoke execution permission — no more file writes without re-approval
+        self._execution_approved = False
         
         # Record in history
         await self._record_history(proposal, "executed" if success else "failed")
@@ -836,10 +845,16 @@ resource "{resource_type}" "{resource_name}" {{
         )
     
     async def _update_docker_compose(self, service_name: str, config: Dict):
-        """Update docker-compose.yml with service changes."""
+        """Update docker-compose.yml with service changes. Requires active approval."""
+        if not self._execution_approved:
+            raise PermissionError(
+                f"Cannot modify docker-compose.yml without explicit approval. "
+                f"Propose change via _apply_config_changes with approval gate."
+            )
+
         import yaml
         import aiofiles
-        
+
         compose_file = Path("docker-compose.yml")
         if compose_file.exists():
             async with aiofiles.open(compose_file, 'r') as f:
@@ -854,7 +869,13 @@ resource "{resource_type}" "{resource_name}" {{
                 await f.write(yaml.dump(compose, default_flow_style=False))
     
     async def _update_integration_settings(self, integration_name: str, config: Dict):
-        """Update integration settings in configuration."""
+        """Update integration settings in configuration. Requires active approval."""
+        if not self._execution_approved:
+            raise PermissionError(
+                f"Cannot modify integration settings without explicit approval. "
+                f"Propose change via _apply_config_changes with approval gate."
+            )
+
         import yaml
         import aiofiles
         
@@ -876,7 +897,14 @@ resource "{resource_type}" "{resource_name}" {{
         """
         Legacy method for backward compatibility.
         Physically applies a code modification to the codebase.
+        Requires execution approval — use execute_proposal() instead.
         """
+        if not self._execution_approved:
+            raise PermissionError(
+                f"Cannot apply code changes without explicit approval. "
+                f"Use execute_proposal() with an approved EvolutionProposal instead."
+            )
+
         from src.utils.code_patcher import CodePatcher
         import os
         

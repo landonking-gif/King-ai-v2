@@ -57,6 +57,9 @@ class LoRAConfig:
     ])
     learning_rate: float = 1e-4
     num_epochs: int = 3
+    # HuggingFace revision pinning — REQUIRED for security
+    # Empty string means "use whatever is latest", which is unsafe
+    model_revision: str = "main"
     batch_size: int = 4
     max_length: int = 2048
 
@@ -214,14 +217,18 @@ class MLRetrainingPipeline:
             from trl import SFTTrainer
             from datasets import load_dataset
             
-            # Load base model
-            logger.info(f"Loading base model: {job.base_model}")
+            # Load base model — version pinned to prevent supply-chain attacks
+            logger.info(f"Loading base model: {job.base_model} (revision={job.config.model_revision})")
             model = AutoModelForCausalLM.from_pretrained(
                 job.base_model,
+                revision=job.config.model_revision,
                 load_in_8bit=True,
                 device_map="auto"
             )
-            tokenizer = AutoTokenizer.from_pretrained(job.base_model)
+            tokenizer = AutoTokenizer.from_pretrained(
+                job.base_model,
+                revision=job.config.model_revision,
+            )
             tokenizer.pad_token = tokenizer.eos_token
             
             # Prepare for training
@@ -238,7 +245,7 @@ class MLRetrainingPipeline:
             )
             model = get_peft_model(model, lora_config)
             
-            # Load dataset
+            # Load dataset from local file path (no HF repo download)
             dataset = load_dataset("json", data_files=str(dataset_path), split="train")
             
             # Training arguments

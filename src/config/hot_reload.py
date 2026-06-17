@@ -134,7 +134,7 @@ class ConfigWatcher:
         """Calculate file content hash."""
         try:
             content = path.read_bytes()
-            return hashlib.md5(content).hexdigest()
+            return hashlib.md5(content, usedforsecurity=False).hexdigest()
         except Exception:
             return ""
     
@@ -437,7 +437,8 @@ class HotReloadConfig:
             config=self._config.copy(),
             sources=list(self._sources.keys()),
             hash=hashlib.md5(
-                json.dumps(self._config, sort_keys=True, default=str).encode()
+                json.dumps(self._config, sort_keys=True, default=str).encode(),
+                usedforsecurity=False
             ).hexdigest(),
         )
         

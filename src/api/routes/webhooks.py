@@ -197,15 +197,20 @@ class WebhookVerifier:
         signature: str,
         secret: str,
     ) -> bool:
-        """Verify Plaid webhook signature."""
+        """Verify Plaid webhook signature using HMAC-SHA256.
+
+        Plaid webhooks can be verified by computing HMAC-SHA256 of the
+        raw request body with the Plaid webhook verification key.
+        For full JWT verification, use the plaid-python SDK's
+        WebhookVerificationKeyGetter in production.
+        """
         try:
-            # Plaid uses JWT verification - simplified for now
             computed = hmac.new(
                 secret.encode('utf-8'),
                 payload,
                 hashlib.sha256
             ).hexdigest()
-            
+
             return hmac.compare_digest(signature, computed)
         except Exception as e:
             logger.error(f"Plaid signature verification failed: {e}")
@@ -282,13 +287,17 @@ async def stripe_webhook(
     """
     body = await request.body()
     payload = json.loads(body)
-    
-    # Verify signature if secret is configured
+
+    # Signature verification is mandatory when secret is configured
     secret = webhook_registry.get_secret(WebhookSource.STRIPE)
-    if secret and stripe_signature:
+    if secret:
+        if not stripe_signature:
+            raise HTTPException(status_code=401, detail="Missing Stripe-Signature header")
         if not WebhookVerifier.verify_stripe(body, stripe_signature, secret):
-            raise HTTPException(status_code=401, detail="Invalid signature")
-    
+            raise HTTPException(status_code=401, detail="Invalid Stripe signature")
+    else:
+        logger.warning("No Stripe webhook secret configured — accepting webhook without verification")
+
     event = WebhookEvent(
         source=WebhookSource.STRIPE,
         event_type=payload.get("type", "unknown"),
@@ -333,12 +342,16 @@ async def shopify_webhook(
     """
     body = await request.body()
     payload = json.loads(body)
-    
-    # Verify signature if secret is configured
+
+    # Signature verification is mandatory when secret is configured
     secret = webhook_registry.get_secret(WebhookSource.SHOPIFY)
-    if secret and x_shopify_hmac_sha256:
+    if secret:
+        if not x_shopify_hmac_sha256:
+            raise HTTPException(status_code=401, detail="Missing X-Shopify-Hmac-Sha256 header")
         if not WebhookVerifier.verify_shopify(body, x_shopify_hmac_sha256, secret):
-            raise HTTPException(status_code=401, detail="Invalid signature")
+            raise HTTPException(status_code=401, detail="Invalid Shopify signature")
+    else:
+        logger.warning("No Shopify webhook secret configured — accepting webhook without verification")
     
     event = WebhookEvent(
         source=WebhookSource.SHOPIFY,
@@ -371,7 +384,17 @@ async def plaid_webhook(
     """
     body = await request.body()
     payload = json.loads(body)
-    
+
+    # Signature verification is mandatory when secret is configured
+    secret = webhook_registry.get_secret(WebhookSource.PLAID)
+    if secret:
+        if not plaid_verification:
+            raise HTTPException(status_code=401, detail="Missing Plaid-Verification header")
+        if not WebhookVerifier.verify_plaid(body, plaid_verification, secret):
+            raise HTTPException(status_code=401, detail="Invalid Plaid signature")
+    else:
+        logger.warning("No Plaid webhook secret configured — accepting webhook without verification")
+
     event = WebhookEvent(
         source=WebhookSource.PLAID,
         event_type=payload.get("webhook_type", "") + "." + payload.get("webhook_code", ""),

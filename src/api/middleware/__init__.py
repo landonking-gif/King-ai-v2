@@ -3,7 +3,7 @@ API Middleware Package.
 
 Provides middleware components for:
 - Rate limiting
-- Authentication
+- Authentication (JWT + API key)
 - Logging
 - Error handling
 """
@@ -17,6 +17,7 @@ from src.api.middleware.rate_limiter import (
     create_rate_limit_middleware,
     RATE_LIMITS,
 )
+from src.api.middleware.auth import AuthMiddleware
 
 __all__ = [
     "RateLimitMiddleware",
@@ -26,4 +27,5 @@ __all__ = [
     "RedisRateLimiter",
     "create_rate_limit_middleware",
     "RATE_LIMITS",
+    "AuthMiddleware",
 ]

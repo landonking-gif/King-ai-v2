@@ -474,7 +474,7 @@ class ABTestingFramework:
         # Check traffic percentage
         if experiment.traffic_percentage < 1.0:
             hash_val = int(hashlib.md5(
-                f"{experiment_id}:{user_id}:traffic".encode()
+                f"{experiment_id}:{user_id}:traffic".encode(), usedforsecurity=False
             ).hexdigest(), 16) % 100
             if hash_val >= experiment.traffic_percentage * 100:
                 return None
@@ -501,7 +501,7 @@ class ABTestingFramework:
         if experiment.assignment_strategy == AssignmentStrategy.HASH:
             # Deterministic hash-based assignment
             hash_val = int(hashlib.md5(
-                f"{experiment.id}:{user_id}".encode()
+                f"{experiment.id}:{user_id}".encode(), usedforsecurity=False
             ).hexdigest(), 16) % 100
             
             cumulative = 0

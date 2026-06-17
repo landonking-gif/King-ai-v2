@@ -316,14 +316,14 @@ class ArtifactStore:
             param_idx += 1
         
         where_clause = " AND ".join(conditions) if conditions else "1=1"
-        
+
         async with self.db_pool.acquire() as conn:
             rows = await conn.fetch(f"""
                 SELECT * FROM artifacts
                 WHERE {where_clause}
                 ORDER BY created_at DESC
-                LIMIT {limit}
-            """, *params)
+                LIMIT ${param_idx}
+            """, *params + [limit])
             
             return [self._row_to_artifact(dict(row)) for row in rows]
     

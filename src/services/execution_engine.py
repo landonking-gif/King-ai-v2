@@ -263,7 +263,7 @@ class ExecutionEngine:
             "path": str(path),
             "size_bytes": stats.st_size,
             "created": True,
-            "checksum": hashlib.md5(content.encode()).hexdigest()
+            "checksum": hashlib.md5(content.encode(), usedforsecurity=False).hexdigest()
         }
     
     async def _execute_file_read(self, params: Dict) -> Dict:
@@ -280,7 +280,7 @@ class ExecutionEngine:
             "path": str(path),
             "content": content,
             "size_bytes": len(content),
-            "checksum": hashlib.md5(content.encode()).hexdigest()
+            "checksum": hashlib.md5(content.encode(), usedforsecurity=False).hexdigest()
         }
     
     async def _execute_file_write(self, params: Dict) -> Dict:
@@ -301,7 +301,7 @@ class ExecutionEngine:
         return {
             "path": str(path),
             "size_bytes": len(actual_content),
-            "checksum": hashlib.md5(actual_content.encode()).hexdigest(),
+            "checksum": hashlib.md5(actual_content.encode(), usedforsecurity=False).hexdigest(),
             "mode": mode
         }
     
@@ -489,7 +489,7 @@ class ExecutionEngine:
         async with aiofiles.open(path, "r", encoding="utf-8") as f:
             actual_content = await f.read()
         
-        actual_checksum = hashlib.md5(actual_content.encode()).hexdigest()
+        actual_checksum = hashlib.md5(actual_content.encode(), usedforsecurity=False).hexdigest()
         expected_checksum = output.get("checksum")
         
         if expected_checksum and actual_checksum == expected_checksum:

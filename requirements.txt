@@ -1,0 +1,95 @@
+# King AI v2 — Core Dependencies
+# Generated from runtime venv 2026-06-15
+
+# Core API framework
+fastapi==0.128.0
+uvicorn[standard]==0.40.0
+starlette==0.50.0
+pydantic==2.12.5
+pydantic-settings==2.12.0
+python-multipart==0.0.20
+
+# Database
+sqlalchemy==2.0.46
+asyncpg==0.31.0
+psycopg2-binary==2.9.11
+aiosqlite==0.22.1
+alembic==1.18.1
+
+# Cache / Queues
+redis==7.1.0
+
+# HTTP clients
+httpx==0.28.1
+aiohttp==3.13.3
+requests==2.32.5
+websockets==15.0.1
+
+# LLM providers
+openai==2.28.0
+anthropic==0.71.0
+ollama==0.6.1
+tiktoken==0.12.0
+
+# ML/DL (used by master_ai)
+numpy==2.4.1
+scikit-learn==1.8.0
+torch==2.9.1
+transformers==4.57.3
+huggingface-hub==0.36.0
+sentence-transformers==5.2.0
+safetensors==0.7.0
+
+# Vector database
+pinecone==8.0.0
+
+# PayPal/Stripe
+# stripe (uncomment when adding): stripe==11.0.0
+# plaid-python (uncomment when adding): plaid-python==28.1.0
+
+# Storage
+minio==7.2.20
+aiofiles==25.1.0
+
+# Security / Auth
+# pyjwt (uncomment when replacing jwt lib): pyjwt==2.10.0
+passlib==1.7.4
+argon2-cffi==25.1.0
+
+# Configuration
+pyyaml==6.0.3
+python-dotenv==1.2.1
+
+# Web/HTML parsing
+beautifulsoup4==4.14.3
+markupsafe==3.0.3
+jinja2==3.1.6
+
+# Monitoring
+prometheus_client==0.24.1
+structlog==25.5.0
+
+# Resilience / Async helpers
+tenacity==9.1.2
+anyio==4.12.0
+
+# Encoding / Data
+orjson==3.11.5
+regex==2025.11.3
+
+# PDF
+pypdf2==3.0.1
+pycryptodome==3.23.0
+
+# Misc utilities
+click==8.3.1
+rich==14.2.0
+tqdm==4.67.1
+filelock==3.20.1
+fsspec==2025.12.0
+joblib==1.5.3
+networkx==3.6.1
+packaging==24.2
+psutil==7.2.1
+six==1.17.0
+watchfiles==1.1.1
